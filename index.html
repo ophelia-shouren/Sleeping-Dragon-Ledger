@@ -257,7 +257,20 @@ function openCard(id){
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===c.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
   dialog('<h2>'+(isUser?'User 人设卡':id?'编辑角色':'新建角色')+'</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+
     (isUser?'':'<label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label>')+
-    '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对四栏内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+'</div></form>');
+    '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对四栏内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+(!isUser&&id?'<button type="button" data-delete-contact="'+esc(id)+'">删除角色</button>':'')+'</div></form>');
+}
+function removeContact(id){
+  const c=contact(id);
+  if(!c)return;
+  if(threads.has(id)||memoryJobs.has(id)||mergeJobs.has(id)){
+    toast('角色仍在处理消息或记忆，请稍后再删除。');return;
+  }
+  if(!confirm('确定删除「'+displayName(c)+'」？角色卡、三个模式的聊天记录和记忆都会一并删除，无法撤销。'))return;
+  if(!commit({...state,contacts:state.contacts.filter(x=>x.id!==id)}))return;
+  localRuns.delete(id);replyErrors.delete(id);memoryErrors.delete(id);streamText.delete(id);
+  for(const mode of Object.keys(chatModeLabels))chatImages.delete(imageKey(id,mode));
+  if(activeContact===id)activeContact='';
+  $('dialog').close();render();resetIdleTimer();toast('角色已删除');
 }
 function saveCard(form){
   const id=form.dataset.id,data=new FormData(form);
@@ -1433,6 +1446,7 @@ document.addEventListener('click',e=>{
   if(d.retryMemory)summarizeMemories(d.retryMemory);
   if(d.deleteMemory&&$('memoryForm'))deleteMemory($('memoryForm').dataset.id,d.deleteMemory);
   if(d.card)openCard(d.card);
+  if(d.deleteContact)removeContact(d.deleteContact);
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
   if(d.world)openWorld(d.world);
   if(d.toggleWorld&&commit({...state,worlds:state.worlds.map(x=>x.id===d.toggleWorld?{...x,enabled:!x.enabled}:x)}))render();
