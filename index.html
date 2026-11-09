@@ -925,36 +925,64 @@ function parseCardDecks(raw,format='auto'){
   if(!groups.size)throw Error('未识别到字卡。可使用「问候：早安，好久不见，晚安」。');
   return [...groups.values()];
 }
+function manualChatSource(items,keyword){
+  const singleLine=value=>value.replace(/\r?\n/g,'\\n');
+  if(keyword)return items.flatMap(rule=>rule.triggers.map(trigger=>singleLine(trigger)+'→'+singleLine(rule.reply))).join('\n');
+  return items.map(deck=>'['+singleLine(deck.name)+']\n'+deck.items.map(singleLine).join('\n')).join('\n\n');
+}
+function parseManualChat(value,keyword){
+  const lines=value.split(/\r?\n/).map(line=>line.trim());
+  if(keyword){
+    return lines.flatMap((line,i)=>{
+      if(!line)return [];
+      const separator=line.indexOf('→'),trigger=line.slice(0,separator).trim(),reply=line.slice(separator+1).trim();
+      if(separator<1||!trigger||!reply)throw Error('第 '+(i+1)+' 行请使用「输入→输出」。');
+      return [{triggers:[trigger],reply}];
+    });
+  }
+  const groups=new Map();
+  let name='默认';
+  for(const line of lines){
+    if(!line)continue;
+    const heading=line.match(/^\[(.+)\]$/);
+    if(heading&&heading[1].trim()){name=heading[1].trim();continue;}
+    if(!groups.has(name))groups.set(name,new Set());
+    groups.get(name).add(line);
+  }
+  return [...groups].map(([name,items])=>({name,items:[...items],enabled:true}));
+}
 function openLocalChatSettings(c=contact(activeContact)){
   if(!c)return;
   const cfg=localConfig(c),keyword=cfg.mode==='keyword';
   if(cfg.mode==='ai')return;
-  const source=keyword?(cfg.rules.length?JSON.stringify({rules:cfg.rules},null,2):''):(cfg.decks.length?JSON.stringify({categories:cfg.decks},null,2):'');
-  const fields=keyword?'<p class="muted">每行一条规则，例如「晚安，睡觉 => 晚安，做个好梦。」多个提示词对应同一句回复。未命中时保持安静。</p>':
-    '<p class="muted">每行一个分类，例如「问候：早安，你好，晚安」。也可以直接输入逗号分隔的一段字卡。</p>';
+  const source=manualChatSource(keyword?cfg.rules:cfg.decks,keyword);
+  const fields=keyword?'<p class="muted">每行一条「输入→输出」，例如「晚安→做个好梦。」同一句回复可分行配置多个输入。</p>':
+    '<p class="muted">每行一张字卡，逗号保留在卡片里。单独写一行 [分类名]，下一行起就是该分类的字卡。</p>';
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
     cfg.decks.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
   dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+fields+
     '<label>导入'+(keyword?' Markdown／JSON':' JSON')+'<input id="localChatImport" type="file" accept="'+(keyword?'.md,.markdown,.json':'.json')+'"></label>'+
-    '<label>'+(keyword?'提示词规则':'字卡内容')+'<textarea name="source" rows="7">'+esc(source)+'</textarea></label>'+
+    '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+
     (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
-  $('localChatForm').parsed=keyword?cfg.rules:cfg.decks;
+  const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
 }
 function localFormPreview(form,items){
   const keyword=form.dataset.mode==='keyword';
   form.parsed=items;
+  form.sourceSnapshot=form.elements.source.value;
   $('localChatSummary').innerHTML=keyword?'<ul>'+items.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small>'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join('')+'</ul>':
     items.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
 }
 function parseLocalForm(form){
   const enabled=new Map(form.parsed.map((d,i)=>[d.name,form.querySelector('[name=deckEnabled][value="'+i+'"]')?.checked??d.enabled]));
   const value=form.elements.source.value;
-  if(form.dataset.mode==='keyword')return parseKeywordRules(value);
-  return parseCardDecks(value).map(d=>({...d,enabled:enabled.get(d.name)??true}));
+  const keyword=form.dataset.mode==='keyword';
+  const items=value===form.sourceSnapshot?form.parsed:parseManualChat(value,keyword);
+  return keyword?items:items.map(d=>({...d,enabled:enabled.get(d.name)??true}));
 }
 async function importLocalChat(input){
   const form=input.form,file=input.files[0];if(!form||!file)return;
@@ -963,7 +991,7 @@ async function importLocalChat(input){
   if(!form.isConnected)return;
   const keyword=form.dataset.mode==='keyword';
   const items=keyword?parseKeywordRules(raw,format):parseCardDecks(raw,'json');
-  form.elements.source.value=JSON.stringify(keyword?{rules:items}:{categories:items},null,2);
+  form.elements.source.value=manualChatSource(items,keyword);
   localFormPreview(form,items);
   input.value='';
 }
@@ -1467,6 +1495,11 @@ document.addEventListener('click',e=>{
     case 'removeBillRule':b.closest('.bill-trigger').remove();break;
     case 'addBillRule':$('billRuleFields').insertAdjacentHTML('beforeend',billRuleFields());break;
     case 'removeBillRule':b.closest('.bill-trigger').remove();break;
+    case 'insertRuleArrow':{
+      const input=$('localChatSource');
+      if(input){input.setRangeText('→',input.selectionStart,input.selectionEnd,'end');input.focus();}
+      break;
+    }
     case 'localChatSettings':openLocalChatSettings();break;
     case 'localChatPreview':{
       const form=$('localChatForm');try{localFormPreview(form,parseLocalForm(form));}catch(e){toast(e.message);}
