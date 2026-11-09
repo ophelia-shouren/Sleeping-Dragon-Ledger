@@ -117,6 +117,11 @@ body.full-chat{overflow:hidden}
 .composer-send{flex:none;margin-left:auto;padding:6px 12px;border:1px solid var(--gold);border-radius:8px;color:var(--button-ink);background:var(--button-hi);font-weight:600;box-shadow:inset 0 0 0 2px var(--button-lo)}
 .composer-send:hover{color:var(--button-ink);background:var(--button-lo)}
 .composer-send:disabled{opacity:.55;cursor:wait}
+.typing-dots{display:flex;align-items:baseline;gap:3px;min-height:23px;color:var(--gold);font-size:21px;line-height:1;font-weight:700;padding:0 2px}
+.typing-dots span{display:inline-block;animation:typing-wave 1.15s ease-in-out infinite}
+.typing-dots span:nth-child(2){animation-delay:.14s}.typing-dots span:nth-child(3){animation-delay:.28s}
+@keyframes typing-wave{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+@media(prefers-reduced-motion:reduce){.typing-dots span{animation:none}}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog>
@@ -237,7 +242,7 @@ function chat(){
   const c=contact(activeContact),user=appearance('user');
   if(!c){
     const list=state.contacts.map(x=>{
-      const last=localSession(x).messages.at(-1);
+      const last=localSession(x).messages.findLast(m=>!replyPending(m));
       return '<div class="contact-row">'+avatarButton(x.id,x)+'<button class="contact-link" data-chat="'+esc(x.id)+'"><strong>'+esc(displayName(x))+'</strong><span>'+esc(last?(last.role==='user'?'你：':'')+(last.content||'[图片]'):'还没有对话')+'</span></button><span class="muted">›</span></div>';
     }).join('');
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
@@ -248,11 +253,14 @@ function chat(){
   const chatUser={...user,name:'你',nickname:''};
   const mode=localConfig(c).mode,ai=mode==='ai',session=localSession(c);
   const p=profileFor(c),busy=ai&&threads.has(c.id),name=displayName(c);
+  const typing=busy||(mode==='cards'&&localRuns.has(c.id));
+  const now=Date.now();
   return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2><p class="muted">'+(ai?(p?esc(p.name+' / '+p.model):'尚未连接 API'):'本地 '+chatModeLabels[mode])+'</p></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开聊天目录" title="聊天目录">★</button></div></div>'+
     '<div id="messages" class="messages">'+(session.messages.length?session.messages.map(x=>{
+      if(mode==='keyword'&&replyPending(x,now))return typingBubble(c);
       const mine=x.role==='user',person=mine?chatUser:c;
       return '<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+'">'+(mine?'':'<small>'+esc(name)+'</small>')+'<p>'+esc(x.content)+'</p>'+imageInMessage(x)+'</article></div>';
-    }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(busy?'<div class="bubble assistant stream-reply" id="streamReply">'+esc(streamText.get(c.id)||'正在等候回信…')+'</div>':'')+'</div>'+
+    }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
     '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+chatAttachments(c,busy)+'</form></section>';
 }
@@ -288,7 +296,7 @@ function removeContact(id){
   }
   if(!confirm('确定删除「'+displayName(c)+'」？角色卡、三个模式的聊天记录和记忆都会一并删除，无法撤销。'))return;
   if(!commit({...state,contacts:state.contacts.filter(x=>x.id!==id)}))return;
-  localRuns.delete(id);replyErrors.delete(id);memoryErrors.delete(id);streamText.delete(id);
+  localRuns.delete(id);replyErrors.delete(id);memoryErrors.delete(id);
   for(const mode of Object.keys(chatModeLabels))chatImages.delete(imageKey(id,mode));
   if(activeContact===id)activeContact='';
   $('dialog').close();render();resetIdleTimer();toast('角色已删除');
@@ -362,7 +370,7 @@ async function send(retry=false){
     const messages=[{role:'system',content:[front,system,memoryContext(c)].filter(Boolean).join('\n\n')},...recentDialogue(history)];
     if(end)messages.push({role:'system',content:end});
     const streaming=state.streamReplies;
-    const response=await request(p,'chat/completions',{model:p.model,messages,stream:streaming},streaming?raw=>visibleStream(c.id,raw):undefined);
+    const response=await request(p,'chat/completions',{model:p.model,messages,stream:streaming});
     const reply=dialogueReply(response);
     if(typeof reply!=='string'||!reply.trim())throw Error('模型返回了空回复或不兼容的回复格式。');
     const latest=contact(c.id);
@@ -373,7 +381,7 @@ async function send(retry=false){
     replyErrors.set(c.id,message);
     if(page==='chat'&&activeContact===c.id&&!deviceLocked&&localConfig(contact(c.id)).mode==='ai')showModelError(message);
   }finally{
-    threads.delete(c.id);streamText.delete(c.id);
+    threads.delete(c.id);
     summarizeMemories(c.id);
     if(page==='chat'&&(!activeContact||activeContact===c.id)){
       const input=document.querySelector('#chatForm textarea');
@@ -431,6 +439,11 @@ function dialogueText(value,depth=0){
   const tagged=[...text.matchAll(/<(dialogue|reply|response|content|message|assistant)\b[^>]*>([\s\S]*?)(?:<\/\1>|$)/gi)];
   if(tagged.length)return tagged.map(x=>next(x[2])).filter(Boolean).join('\n');
   return text.replace(/^\s*(?:assistant|对话|回复)\s*[:：]\s*/i,'').trim();
+}
+
+
+function typingBubble(c){
+  return '<div class="message-row assistant">'+avatarButton(c.id,c)+'<article class="bubble assistant typing-bubble"><small>'+esc(displayName(c))+'</small><div class="typing-dots" role="status" aria-label="角色正在输入"><span aria-hidden="true">.</span><span aria-hidden="true">.</span><span aria-hidden="true">.</span></div></article></div>';
 }
 </script>
 <script>
@@ -846,8 +859,8 @@ async function mergeMemories(form){
 
 const chatModeLabels={ai:'AI 模式',keyword:'提示词模式',cards:'字卡模式'};
 const chatModeDefaults=()=>({mode:'ai',rules:[],billRules:[],decks:[],speed:1,idle:60,proactive:false,count:1,multiple:false,keyword:{messages:[],draft:''},cards:{messages:[],draft:''}});
-const localRuns=new Map(), chatImages=new Map(), streamText=new Map();
-let idleTimer;
+const localRuns=new Map(), chatImages=new Map();
+let idleTimer,typingTimer;
 const imageKey=(id,mode)=>id+':'+mode;
 function localConfig(c){return c?.chatModes||chatModeDefaults();}
 function localSession(c){const cfg=localConfig(c);return cfg.mode==='ai'?c:cfg[cfg.mode];}
@@ -1051,6 +1064,7 @@ function resetIdleTimer(){
 }
 function queueLocalCards(c){
   const cfg=localConfig(c),run=Symbol(),id=c.id;
+  if(!cfg.decks.some(d=>d.enabled&&d.items.length)){repaintChat();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
   let sent=0;
   function step(){
@@ -1059,13 +1073,14 @@ function queueLocalCards(c){
     if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&!deviceLocked&&!document.hidden){
       const content=chooseCard(localConfig(latest));
       if(content&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'assistant',content}]})){
-        repaintChat();
-        if(++sent<cfg.count){setTimeout(step,cfg.speed*1000);return;}
+        if(++sent<cfg.count){repaintChat();setTimeout(step,cfg.speed*1000);return;}
       }
     }
-    localRuns.delete(id);resetIdleTimer();
+    localRuns.delete(id);
+    if(page==='chat'&&activeContact===id&&!deviceLocked)repaintChat();
+    resetIdleTimer();
   }
-  setTimeout(step,cfg.speed*1000);
+  repaintChat();setTimeout(step,cfg.speed*1000);
 }
 function repaintChat(){
   const input=document.querySelector('#chatForm textarea');
@@ -1081,11 +1096,12 @@ function sendLocalChat(c){
   if(cfg.mode==='keyword'&&content){
     const normalized=content.normalize('NFKC').toLowerCase();
     const rule=cfg.rules.find(r=>r.triggers.some(t=>normalized.includes(t.normalize('NFKC').toLowerCase())));
-    if(rule)messages.push({role:'assistant',content:rule.reply});
+    if(rule)messages.push(keywordReply(rule.reply));
   }
   if(!patchSession(c,cfg.mode,{messages,draft:''}))return;
-  chatImages.delete(k);repaintChat();
+  chatImages.delete(k);
   if(cfg.mode==='cards')queueLocalCards(contact(c.id));
+  else repaintChat();
 }
 
 async function describeChatImage(image){
@@ -1098,16 +1114,7 @@ async function describeChatImage(image){
   if(!caption)throw Error('图片 API 没有返回可用的描述。');
   return caption;
 }
-function visibleStream(id,raw){
-  const content=dialogueText(raw);
-  streamText.set(id,content);
-  const node=$('streamReply');
-  if(node&&activeContact===id&&localConfig(contact(id)).mode==='ai'){
-    node.textContent=content||'正在等候回信…';
-    $('messages').scrollTop=$('messages').scrollHeight;
-  }
-}
-async function readChatStream(response,onDelta){
+async function readChatStream(response){
   const reader=response.body.getReader(),decoder=new TextDecoder();
   let buffer='',message='',done=false;
   function line(value){
@@ -1118,8 +1125,8 @@ async function readChatStream(response,onDelta){
     const event=JSON.parse(data);
     if(event.error)dialogueReply(event);
     const choice=event.choices?.[0],part=choice?.delta?.content??choice?.text;
-    if(typeof part==='string'){message+=part;onDelta(message);}
-    else if(Array.isArray(part)){message+=part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join('');onDelta(message);}
+    if(typeof part==='string'){message+=part;}
+    else if(Array.isArray(part)){message+=part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join('');}
   }
   try{
     while(!done){
@@ -1142,68 +1149,6 @@ function validateChatModes(cfg){
 }
 
 function chatTextRecord({role,content,image,caption}){return {role,content:[content,caption?'[图片描述] '+caption:image?'[图片]':''].filter(Boolean).join('\n')};}
-
-const billPeriods={day:'本日',week:'本周',month:'本月'};
-const billDirections={income:'入账',expense:'出账'};
-const billComparisons={gt:'大于',lt:'小于'};
-function billRuleFields(rule={}){
-  const select=(name,options,value)=>'<select name="'+name+'">'+Object.entries(options).map(([key,label])=>'<option value="'+key+'" '+(key===value?'selected':'')+'>'+label+'</option>').join('')+'</select>';
-  return '<fieldset class="bill-trigger" data-rule-id="'+esc(rule.id||crypto.randomUUID())+'"><legend>账单金额预设</legend><div class="local-chat-fields">'+
-    '<label>周期'+select('period',billPeriods,rule.period)+'</label>'+
-    '<label>账目类型'+select('direction',billDirections,rule.direction)+'</label>'+
-    '<label>条件'+select('comparison',billComparisons,rule.comparison)+'</label>'+
-    '<label>金额（元）<input name="threshold" type="number" min="0" max="90071992547409" step=".01" required value="'+(rule.cents===undefined?'':rule.cents/100)+'"></label></div>'+
-    '<label>角色回复<input name="billReply" required maxlength="1000" value="'+esc(rule.reply||'')+'"></label><button type="button" data-action="removeBillRule">移除预设</button></fieldset>';
-}
-function billRuleEditor(rules){
-  return '<div class="bill-rule-editor"><h3>账单金额预设</h3><p class="muted">按周期累计金额自动触发，无需发送消息。条件持续成立时只发一次，回到不成立再重新满足时可再次触发。</p>'+
-    '<div id="billRuleFields">'+rules.map(billRuleFields).join('')+'</div><button type="button" data-action="addBillRule">＋ 添加金额条件</button></div>';
-}
-function readBillRules(form,previous){
-  return [...form.querySelectorAll('.bill-trigger')].map(row=>{
-    const val=name=>row.querySelector('[name="'+name+'"]').value;
-    const amount=val('threshold'),reply=val('billReply').trim();
-    const rule={id:row.dataset.ruleId,period:val('period'),direction:val('direction'),comparison:val('comparison'),cents:Math.round(Number(amount)*100),reply};
-    if(!amount||!reply||!validBillRule(rule))throw Error('请为每条账单条件填写有效金额与回复。');
-    const old=previous.find(x=>x.id===rule.id);
-    return old&&['period','direction','comparison','cents','reply'].every(k=>old[k]===rule[k])?old:rule;
-  });
-}
-function validBillRule(x){
-  return x&&typeof x.id==='string'&&Object.hasOwn(billPeriods,x.period)&&Object.hasOwn(billDirections,x.direction)&&Object.hasOwn(billComparisons,x.comparison)&&
-    Number.isSafeInteger(x.cents)&&x.cents>=0&&typeof x.reply==='string'&&x.reply.trim()&&
-    (x.window===undefined||(typeof x.window==='string'&&typeof x.matched==='boolean'));
-}
-function withBillReplies(next,onlyId=''){
-  const today=dateString(),totals=new Map();
-  let changed=false;
-  const contacts=next.contacts.map(c=>{
-    const cfg=localConfig(c);
-    if(cfg.mode!=='keyword'||(onlyId&&c.id!==onlyId)||!cfg.billRules?.length)return c;
-    let updated=false;
-    const replies=[];
-    const billRules=cfg.billRules.map(rule=>{
-      if(!totals.has(rule.period)){
-        const [from,to]=bounds(rule.period,today);
-        totals.set(rule.period,{from,...total(next.bills.filter(x=>x.date>=from&&x.date<=to))});
-      }
-      const tally=totals.get(rule.period),value=tally[rule.direction];
-      const matched=rule.comparison==='gt'?value>rule.cents:value<rule.cents;
-      if(rule.window===tally.from&&rule.matched===matched)return rule;
-      if(matched)replies.push({role:'assistant',content:rule.reply});
-      updated=true;
-      return {...rule,window:tally.from,matched};
-    });
-    if(!updated)return c;
-    changed=true;
-    return {...c,chatModes:{...cfg,billRules,keyword:{...cfg.keyword,messages:[...cfg.keyword.messages,...replies]}}};
-  });
-  return changed?{...next,contacts}:next;
-}
-function refreshBillReplies(id){
-  const next=withBillReplies(state,id);
-  if(next!==state)commit(next);
-}
 
 const billOptions={period:{day:'本日',week:'本周',month:'本月'},direction:{income:'入账',expense:'出账'},comparison:{gt:'大于',lt:'小于'}};
 function billRuleFields(rule={}){
@@ -1247,7 +1192,7 @@ function withBillReplies(next,onlyId=''){
       const tally=totals.get(rule.period),value=tally[rule.direction];
       const matched=rule.comparison==='gt'?value>rule.cents:value<rule.cents;
       if(rule.window===tally.from&&rule.matched===matched)return rule;
-      if(matched)replies.push({role:'assistant',content:rule.reply});
+      if(matched)replies.push(keywordReply(rule.reply));
       updated=true;
       return {...rule,window:tally.from,matched};
     });
@@ -1340,6 +1285,29 @@ function initHomeOrb(){
   window.visualViewport?.addEventListener('resize',resize);
   window.visualViewport?.addEventListener('scroll',resize);
   resize();
+}
+
+
+function keywordReply(content){
+  return {role:'assistant',content,readyAt:Date.now()+3000};
+}
+function replyPending(message,now=Date.now()){
+  return message.role==='assistant'&&Number.isFinite(message.readyAt)&&message.readyAt>now;
+}
+function scheduleTypingReveal(){
+  clearTimeout(typingTimer);
+  if(page!=='chat'||deviceLocked)return;
+  const c=contact(activeContact),now=Date.now();
+  const contacts=c?[c]:state.contacts;
+  let earliest=Infinity;
+  for(const person of contacts){
+    const cfg=localConfig(person);
+    if(cfg.mode!=='keyword')continue;
+    for(const message of cfg.keyword.messages){
+      if(replyPending(message,now))earliest=Math.min(earliest,message.readyAt);
+    }
+  }
+  if(Number.isFinite(earliest))typingTimer=setTimeout(()=>{if(page==='chat'&&!deviceLocked)repaintChat();},Math.min(earliest-now,3000));
 }
 </script>
 <script>
@@ -1446,7 +1414,7 @@ function api(){
   const p=state.profiles.find(x=>x.id===state.profile), img=state.imageApi;
   return heading('CONNECTION SETTINGS','API 连接','保存多个 OpenAI 兼容 API 预设，可切换中转站和模型。')+
   '<section class="panel"><div class="row"><label>已保存预设<select id="profileSelect"><option value="">新建预设</option>'+state.profiles.map(x=>'<option value="'+esc(x.id)+'" '+(x===p?'selected':'')+'>'+esc(x.name)+' · '+esc(x.model)+'</option>').join('')+'</select></label><button data-action="newProfile">＋ 新建</button></div><form id="apiForm"><div class="fields"><label>预设名称<input name="name" required value="'+esc(p?.name)+'" placeholder="常用中转站"></label><label>Base URL<input name="url" type="url" required value="'+esc(p?.url)+'" placeholder="https://example.com/v1"></label><label>API Key<input name="key" type="password" autocomplete="off" value="'+esc(p?.key)+'"></label><label>模型 ID<input name="model" list="models" required value="'+esc(p?.model)+'" placeholder="可手动填写"><datalist id="models"></datalist></label></div><div class="row"><button class="primary">保存预设（含 Key）</button><button type="button" data-action="models">提取模型列表</button>'+(p?'<button type="button" data-action="deleteProfile">删除预设</button>':'')+'</div><p class="notice" id="apiStatus">Key 保存在当前浏览器。中转站需允许此网站通过浏览器访问。</p></form></section>'+
-  '<section class="panel"><h2>流式输出</h2><label class="mode-toggle"><input type="checkbox" id="streamReplies" '+(state.streamReplies?'checked':'')+'><span></span>AI 聊天逐步显示回复</label></section>'+
+  '<section class="panel"><h2>流式输出</h2><label class="mode-toggle"><input type="checkbox" id="streamReplies" '+(state.streamReplies?'checked':'')+'><span></span>使用流式接收，完整回复后显示</label></section>'+
   '<section class="panel"><h2>图片专用 API</h2><form id="imageForm"><div class="fields"><label>图片 API Base URL<input name="url" type="url" value="'+esc(img.url)+'" placeholder="https://example.com/v1"></label><label>图片 API Key<input name="key" type="password" autocomplete="off" value="'+esc(img.key)+'"></label><label>视觉识别模型 ID<input name="model" list="imageModels" value="'+esc(img.model)+'" placeholder="用于读取账单截图"></label><label>生图模型 ID（可选）<input name="generationModel" list="imageModels" value="'+esc(img.generationModel)+'" placeholder="单独保存生图模型配置"></label></div><datalist id="imageModels"></datalist><div class="row"><button class="primary">保存图片 API（含 Key）</button><button type="button" data-action="imageModels">提取图片模型列表</button></div><p class="muted" id="imageModelStatus" role="status"></p><p class="muted">账单识别使用支持图片输入的 OpenAI 兼容对话模型。纯生图模型可单独记录，但无法读取账单。</p></form></section>'+
   '<section class="panel"><h2>皮肤</h2><div class="skin-grid">'+Object.entries(skins).map(([id,label])=>'<button type="button" class="'+(id===state.skin?'active':'')+'" data-skin="'+id+'" aria-pressed="'+(id===state.skin)+'"><span class="swatch '+id+'"></span>'+label+'</button>').join('')+'</div></section>';
 }
@@ -1465,6 +1433,7 @@ function render(){
   const screens={home,report,cards,api,chat,backup,ledger:()=>heading('TRANSACTION REGISTER','收支明细','每一笔交易都会即时计入结余。')+'<section class="panel"><div class="row">'+recordButtons+'</div>'+table(state.bills)+'</section>'};
   $('view').innerHTML=(storageError?'<div class="notice">'+esc(storageError)+'</div>':'')+screens[page]();
   if($('messages')) $('messages').scrollTop=$('messages').scrollHeight;
+  scheduleTypingReveal();
 }
 function dialog(html){$('dialog').innerHTML=html;if(!$('dialog').open)$('dialog').showModal();}
 function billFields(x={}){
@@ -1528,13 +1497,13 @@ function apiEndpoint(base,route){
   u.pathname=u.pathname.replace(/\/+$/,'').replace(/\/(?:chat\/completions|models)$/,'')+'/'+route;
   return u.href;
 }
-async function request(p,route,body,onDelta){
+async function request(p,route,body){
   const headers={};if(p.key)headers.Authorization='Bearer '+p.key;
   if(body)headers['Content-Type']='application/json';
   let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(90000)});}
   catch(e){if(e instanceof TypeError)throw Error('连接失败。请检查 API 地址、中转站的跨域设置与网络。');throw e;}
   if(!response.ok)throw Error('API 返回 HTTP '+response.status+'。请核对地址、模型、密钥和配额。');
-  if(onDelta&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return readChatStream(response,onDelta);
+  if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return readChatStream(response);
   if(route!=='chat/completions')return response.json();
   const bodyText=await response.text();
   try{return JSON.parse(bodyText);}catch(e){
