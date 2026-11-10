@@ -187,6 +187,7 @@ body.full-chat{overflow:hidden}
 .chat-quote{margin:0 0 5px;padding:3px 8px;border-inline-start:2px solid currentColor;font-size:.85em;opacity:.8;white-space:pre-wrap;overflow-wrap:anywhere}.chat-quote-draft{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tea-room{height:100%;min-height:0;max-width:900px;margin:auto;display:flex;flex-direction:column;gap:12px;color:var(--ink);background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--gold) 11%,transparent),transparent 65%)}.tea-top{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:12px}.tea-top h2{margin:4px 0}.tea-meta{text-align:center;color:var(--muted);font-size:.9em}.tea-scroll{flex:1;min-height:0;overflow:auto;padding:10px clamp(6px,4vw,42px);overscroll-behavior:contain}.tea-passage,.tea-cue{white-space:pre-wrap;overflow-wrap:anywhere}.tea-cue{color:var(--muted);font-size:.9em;margin:12px 0 7px}.tea-passage{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:clamp(14px,3vw,26px);font-family:Georgia,'Songti SC',serif;font-size:1.08rem;line-height:1.9;margin-bottom:18px}.tea-room form{display:grid;gap:8px}.tea-room form button{justify-self:end}.tea-card{width:min(310px,92%);margin:10px auto;text-align:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.tea-card strong,.tea-card small{display:block;margin-bottom:5px}.tea-card strong{color:var(--gold)}.tea-card .row{justify-content:center}
 .tea-room{gap:10px;background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--gold) 12%,transparent),transparent 45%)}.tea-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:8px 2px 12px}.tea-heading{text-align:center}.tea-heading .eyebrow{font-size:10px;letter-spacing:.22em}.tea-heading h2{font-family:Georgia,'Songti SC',serif;font-size:clamp(25px,6vw,40px);color:var(--gold)}.tea-back{justify-self:start;border-radius:999px;padding:8px 12px}.tea-emblem{justify-self:end;display:inline-grid;place-items:center;width:44px;height:44px;border:1px solid var(--gold);border-radius:50%;color:var(--gold);background:var(--panel);box-shadow:0 0 18px color-mix(in srgb,var(--gold) 22%,transparent)}.tea-emblem svg{width:27px;height:27px}.tea-card .tea-emblem{width:26px;height:26px;vertical-align:middle}.tea-card .tea-emblem svg{width:18px;height:18px}.tea-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;font-size:.76rem}.tea-meta span{padding:4px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}.tea-room .tea-scroll{padding:8px clamp(0px,2vw,22px)}.tea-empty{text-align:center;padding:clamp(22px,7vh,70px) 14px;border:1px dashed var(--line);border-radius:22px;color:var(--muted)}.tea-empty span,.tea-empty h3{color:var(--gold)}.tea-empty span{font-size:28px}.tea-room .tea-passage{border-radius:14px 14px 14px 4px;border-inline-start:2px solid var(--gold);line-height:1.85}.tea-room .tea-cue{border-inline-start:1px solid var(--line);padding-inline-start:10px}.tea-room form{padding:10px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}.tea-room form textarea{margin:0;resize:vertical}.tea-status{margin:0;color:var(--muted);font-size:.86rem}.tea-live[hidden]{display:none}
+.story-scrubber{position:fixed;z-index:5;right:max(5px,env(safe-area-inset-right));top:26%;height:min(48dvh,360px);display:flex;flex-direction:column;align-items:center;gap:5px;width:24px;color:var(--gold);border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:5px 0}.story-scrubber output{font-size:9px}.story-scrubber input{writing-mode:vertical-lr;direction:ltr;flex:1;min-height:0;width:18px;margin:0;accent-color:var(--gold);touch-action:none;padding:0}.story-shell:has(.story-reader){padding-right:20px}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -377,19 +378,33 @@ function forwardedStoryCard(message){
     (note?'<p>'+esc(note)+'</p>':'')+'<span>点开阅读全文 ›</span></div>';
 }
 function openForwardedStory(index){
-  const message=contact(activeContact)?.messages[index];
+  const group=$('dialog').querySelector('[data-group-room]')?.dataset.groupRoom;
+  const message=(group?groupById(group)?.messages:contact(activeContact)?.messages)?.[index];
   if(!message?.storyForward)return;
   const {title,body}=forwardedStory(message);
   storyDialog(title,'<div class="story-reader-bar"><strong>全文 '+storyCount(body)+' 字</strong></div>'+
     '<article class="story-paper story-reader" style="font-size:'+state.storyFont+'px">'+esc(body)+'</article>'+
-    '<footer class="story-reader-exit"><button type="button" data-action="close">返回聊天</button></footer>');
+    '<footer class="story-reader-exit"><button type="button" '+(group?'data-group-open="'+esc(group)+'"':'data-action="close"')+'>返回聊天</button></footer>');
+  bindStoryScrubber();
+}
+function bindStoryScrubber(){
+  const panel=$('dialog'),article=panel.querySelector('.story-reader');
+  if(!article)return;
+  panel.insertAdjacentHTML('beforeend','<div class="story-scrubber"><output aria-hidden="true">0%</output><input type="range" min="0" max="1000" value="0" aria-label="文章阅读进度"></div>');
+  const rail=panel.querySelector('.story-scrubber'),range=rail.querySelector('input'),output=rail.querySelector('output');
+  const bounds=()=>{const start=panel.scrollTop+article.getBoundingClientRect().top-panel.getBoundingClientRect().top;return [start,Math.max(1,article.offsetHeight-panel.clientHeight+48)];};
+  const sync=()=>{const [start,span]=bounds();range.value=Math.round(Math.min(1,Math.max(0,(panel.scrollTop-start)/span))*1000);output.textContent=Math.round(range.value/10)+'%';range.setAttribute('aria-valuetext',output.textContent);};
+  panel.onscroll=sync;
+  range.oninput=()=>{const [start,span]=bounds();panel.scrollTop=start+span*Number(range.value)/1000;sync();};
+  sync();
 }
 function storyRead(x){
   const parent=state.stories.find(y=>y.id===x.parent);
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
-    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
+    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
+  bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
     $('storyReader').style.fontSize=size+'px';$('storyFontValue').textContent=size+' px';
@@ -491,7 +506,7 @@ async function storyAction(d){
       if(x)storyDialog('自定义续写','<form id="storyContinue" data-id="'+esc(x.id)+'" class="fields"><label>续写指令<textarea name="guide" rows="5" required></textarea></label>'+storyStreamField()+'<button class="primary">开始续写</button></form>');
       break;
     case 'forward':
-      if(x)storyDialog('转发番外','<form id="storyForward" data-id="'+esc(x.id)+'" class="fields"><label>接收角色<select name="contact" required><option value="">请选择 AI 模式角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><label>附言（可留空）<input name="note"></label><button>下一步</button></form>');
+      if(x)storyDialog('转发番外','<form id="storyForward" data-id="'+esc(x.id)+'" class="fields"><label>接收方<select name="recipient" required><option value="">请选择角色或群聊</option><optgroup label="AI 角色">'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc('contact:'+c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</optgroup><optgroup label="群聊">'+state.groups.map(g=>'<option value="'+esc('group:'+g.id)+'">'+esc(g.name)+'</option>').join('')+'</optgroup></select></label><label>附言（可留空）<input name="note"></label><button>下一步</button></form>');
       break;
   }
 }
@@ -537,18 +552,29 @@ async function submitStoryForm(form,submitter){
       if(commit({...state,stories:[...imported,...state.stories]})){storyLibrary();toast('已导入 '+imported.length+' 篇文章');}
       break;
     }
-    case 'storyForward':{
-      const c=contact(value('contact'));
-      if(!x||!c||localConfig(c).mode!=='ai')throw Error('请选择 AI 模式的角色。');
-      storyDialog('确认转发','<p>将《'+esc(x.title)+'》全文发给 '+esc(displayName(c))+'，约 '+Array.from(x.body).length+' 字符。输入 Token 较大，请谨慎选择。</p>'+
-        '<form id="storyConfirm" data-id="'+esc(x.id)+'"><input type="hidden" name="contact" value="'+esc(c.id)+'"><input type="hidden" name="note" value="'+esc(value('note'))+'"><div class="row"><button class="primary">确认转发全文</button>'+storyButton('read','返回文章',x.id)+'</div></form>');
-      break;
-    }
+    case 'storyForward':
     case 'storyConfirm':{
-      const c=contact(value('contact'));
-      if(!x||!c||localConfig(c).mode!=='ai'||!profileFor(c)||threads.has(c.id))throw Error('角色正忙或未配置可用的 AI 模型。');
-      $('dialog').close();activeContact=c.id;go('chat');
-      await send(false,null,{storyForward:true,content:[value('note'),'《'+x.title+'》',x.body].filter(Boolean).join('\n\n')});
+      const recipient=value('recipient'),group=recipient.startsWith('group:')?groupById(recipient.slice(6)):null;
+      const c=recipient.startsWith('contact:')?contact(recipient.slice(8)):null;
+      if(!x||(!group&&(!c||localConfig(c).mode!=='ai')))throw Error('请选择有效的 AI 角色或群聊。');
+      if(form.id==='storyForward'){
+        storyDialog('确认转发','<p>将《'+esc(x.title)+'》全文发给 '+esc(group?.name||displayName(c))+'，约 '+Array.from(x.body).length+' 字符。输入 Token 较大，请谨慎选择。</p>'+
+          '<form id="storyConfirm" data-id="'+esc(x.id)+'"><input type="hidden" name="recipient" value="'+esc(recipient)+'"><input type="hidden" name="note" value="'+esc(value('note'))+'"><div class="row"><button class="primary">确认转发全文</button>'+storyButton('read','返回文章',x.id)+'</div></form>');
+        break;
+      }
+      const content=[value('note'),'《'+x.title+'》',x.body].filter(Boolean).join('\n\n');
+      if(group){
+        const members=group.members.map(contact).filter(Boolean);
+        if(teaSendBlocked(group.members))return;
+        if(groupJobs.has(group.id)||group.pending.length||members.length<2||members.some(role=>!profileFor(role)))throw Error('群聊正在回复，或有成员未配置可用的 AI 模型。');
+        openGroup(group.id);
+        await sendGroup(group.id,content,null,null,true);
+      }else{
+        if(teaSendBlocked([c.id]))return;
+        if(!profileFor(c)||threads.has(c.id))throw Error('角色正忙或未配置可用的 AI 模型。');
+        $('dialog').close();activeContact=c.id;go('chat');
+        await send(false,null,{storyForward:true,content});
+      }
       break;
     }
   }
@@ -602,7 +628,7 @@ function groupBubble(m,g,index,selected){
   if(m.tea)return teaCard(m.tea,index,selected,g.id,'group');
   const mine=!m.roleId,role=mine?'user':'assistant';
   const person=appearance(m.roleId||'user')||{name:m.speaker,avatar:'',frame:{src:'',ring:false}};
-  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+(selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+(i===0?quoteMarkup(m.quote):'')+'<p>'+esc(part)+'</p>'+(i===parts.length-1?imageInMessage(m)+(g.showTime!==false?chatTimestamp(m):''):'')+'</article></div>').join('');
+  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+(selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+(i===0?quoteMarkup(m.quote):'')+(m.storyForward?forwardedStoryCard(m):'<p>'+esc(part)+'</p>')+(i===parts.length-1?imageInMessage(m)+(g.showTime!==false?chatTimestamp(m):''):'')+'</article></div>').join('');
 }
 function openGroup(id){
   const g=groupById(id);if(!g)return;
@@ -635,7 +661,11 @@ async function groupReply(g,c,guide=''){
     gameResult?'本轮小游戏结果已由网页随机确定：'+JSON.stringify(gameResult)+'。根据结果点评，不要重新抽取或重复报出结果。':'',
     worldContext('end',c.id),action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作和旁白，禁止「低吼」和「骨血里」。只返回 JSON 对象 {"dialogue":"角色台词"}。'
   ].filter(Boolean).join('\n\n');
-  const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:groupTranscript(groupMessagesFor(g,c.id).slice(-24)).slice(-12000)}]});
+  const visible=groupMessagesFor(g,c.id).slice(-24),latest=visible.findLast(m=>!m.roleId);
+  const transcript=latest?.storyForward?
+    [groupTranscript(visible.filter(m=>m!==latest)).slice(-12000),groupTranscript([latest])].filter(Boolean).join('\n\n'):
+    groupTranscript(visible).slice(-12000);
+  const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:transcript}]});
   const reply=dialogueReply(response,action?dialogueText:spokenReply);
   if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
   return gameResult?gameResult+'\n'+reply:reply;
@@ -652,7 +682,7 @@ async function rerollGroup(id,index,guide){
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);groupRerolls.delete(id);refreshGroup(id);}
 }
-async function sendGroup(id,message='',file=null,game=null){
+async function sendGroup(id,message='',file=null,game=null,storyForward=false){
   if(groupJobs.has(id))return;
   let g=groupById(id);if(!g||teaSendBlocked(g.members))return;
   groupJobs.add(id);
@@ -663,13 +693,13 @@ async function sendGroup(id,message='',file=null,game=null){
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
       if(members.some(c=>!profileFor(c)))throw Error('请为群成员设置可用的 API 预设。');
-      const quote=!game&&chatQuotes.get(quoteKey(id,'group'));
+      const quote=!game&&!storyForward&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
       const caption=image?await describeChatImage(image):'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
-      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image,caption}:{}),...(game?{gameResult:game.result}:{})}]});
+      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image,caption}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
     }
-    if(!game&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);chatQuotes.delete(quoteKey(id,'group'));}
+    if(!game&&!storyForward&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);chatQuotes.delete(quoteKey(id,'group'));}
     refreshNeeded=true;
     refreshGroup(id);
     while((g=groupById(id))?.pending.length){
@@ -2544,6 +2574,7 @@ function render(){
 }
 function dialog(html,full=false){
   const panel=$('dialog'),orb=$('homeOrb');
+  panel.onscroll=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
   panel.innerHTML=html;
