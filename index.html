@@ -415,7 +415,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
-    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
+    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -531,6 +531,25 @@ async function storyAction(d){
     case 'library':storyLibrary();break;
     case 'read':if(x)storyRead(x);break;
     case 'edit':if(x)storyEdit(x);break;
+    case 'copy':{
+      if(!x)break;
+      const content=x.title+'\n\n'+x.body;
+      const field=document.createElement('textarea');
+      field.value=content;field.readOnly=true;
+      field.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
+      const focused=document.activeElement;
+      $('dialog').append(field);
+      field.select();
+      let copied=false;
+      try{copied=document.execCommand('copy');}catch{}
+      field.remove();focused?.focus({preventScroll:true});
+      if(!copied){
+        try{await navigator.clipboard.writeText(content);copied=true;}catch{}
+      }
+      if(!copied)throw Error('复制失败，请在正文中长按选取文字。');
+      toast('已复制全文。');
+      break;
+    }
     case 'formatEdit':{
       const body=$('storyEdit')?.elements.body;
       if(body){body.value=formatStoryBody(body.value);body.oninput();}
