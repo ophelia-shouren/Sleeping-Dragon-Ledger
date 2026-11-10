@@ -273,7 +273,7 @@ async function readPersona(file){
 
 const frameDefaults=()=>({src:'',scale:1.15,x:0,y:0,ring:true});
 const userDefaults=()=>({avatar:'',frame:frameDefaults()});
-const contactDefaults=(id,name='')=>({id,name,nickname:'',gender:'',personality:'',description:'',relationship:'',preset:'',...userDefaults(),messages:[],draft:'',...memoryDefaults()});
+const contactDefaults=(id,name='')=>({id,name,nickname:'',gender:'',personality:'',description:'',relationship:'',charRelations:[],preset:'',...userDefaults(),messages:[],draft:'',...memoryDefaults()});
 const threads=new Map();
 const replyErrors=new Map();
 let activeContact='', pendingShare='';
@@ -411,7 +411,7 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
   if(!p?.url||!p.model)throw Error('请先配置可用的聊天模型。');
   const chapters=Math.ceil(target/3000);
   let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',category:parent?.category||'',cast,parent:parent?.id||''};
-  const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship}));
+  const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
     '写一篇中文番外，遵守以下约束。'+storySafety,
     '叙事视角：'+(pov||'沿用前文'),
@@ -587,6 +587,15 @@ function cards(){
     '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><button class="primary" data-action="newContact">＋ 新建角色</button></div><button class="directory-item" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong><small>User 人设卡</small></span><b>›</b></button>'+roles+'</section>'+
     '<section class="panel"><div class="row between"><h2>世界书目录</h2><button data-action="newWorld">＋ 新建条目</button></div>'+(worlds||'<p class="empty">还没有世界书条目。</p>')+'</section></div>';
 }
+const charRelations=c=>(Array.isArray(c.charRelations)?c.charRelations:[]).filter(r=>r&&typeof r.roleId==='string'&&typeof r.description==='string'&&r.description.trim());
+const charRelationContext=c=>charRelations(c).flatMap(r=>{
+  const other=contact(r.roleId);
+  return other&&other.id!==c.id?[displayName(other)+'：'+r.description]:[];
+});
+function charRelationRow(id,relation={}){
+  const options=state.contacts.filter(other=>other.id!==id).map(other=>'<option value="'+esc(other.id)+'" '+(other.id===relation.roleId?'selected':'')+'>'+esc(displayName(other))+'</option>').join('');
+  return '<div class="panel" data-char-relation><div class="fields"><label>对方角色<select name="relationRole"><option value="">选择角色</option>'+options+'</select></label><label>关系描述<input name="relationDescription" placeholder="例如：并肩作战多年的搭档" value="'+esc(relation.description||'')+'"></label></div><button type="button" data-remove-char-relation>移除此条</button></div>';
+}
 function openCard(id){
   const isUser=id==='user';
   const c=isUser?{name:state.userName,gender:state.userGender,personality:state.userPersonality,description:state.user}:contact(id)||contactDefaults('');
@@ -595,7 +604,7 @@ function openCard(id){
   const labels=fields.map(([label,k])=>'<label>'+label+(['description','personality'].includes(k)?'<textarea name="'+k+'">'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===c.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
   dialog('<h2>'+(isUser?'User 人设卡':id?'编辑角色':'新建角色')+'</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+
-    (isUser?'':'<label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label>')+
+    (isUser?'':'<section class="panel"><h3>Char 与 Char 的关系</h3><p class="muted">选填。可添加多条，每条选择一位通讯录角色并填写关系。</p><div data-char-relations>'+charRelations(c).filter(r=>contact(r.roleId)&&r.roleId!==id).map(r=>charRelationRow(id,r)).join('')+'</div><button type="button" data-add-char-relation '+(state.contacts.some(other=>other.id!==id)?'':'disabled')+'>＋ 添加角色关系</button></section><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label>')+
     '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对四栏内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+(!isUser&&id?'<button type="button" data-delete-contact="'+esc(id)+'">删除角色</button>':'')+'</div></form>');
 }
 function removeContact(id){
@@ -618,7 +627,12 @@ function saveCard(form){
   if(id==='user')return commit({...state,userName:name,userGender:gender,userPersonality:personality,user:description});
   const nickname=v('nickname'),preset=v('preset');
   if(!name&&!nickname)throw Error('请填写姓名或昵称。');
-  const patch={name,gender,personality,description,nickname,preset,relationship:v('relationship')};
+  const descriptions=data.getAll('relationDescription');
+  const charRelations=data.getAll('relationRole').flatMap((roleId,index)=>{
+    const description=String(descriptions[index]||'').trim();
+    return roleId!==id&&contact(roleId)&&description?[{roleId,description}]:[];
+  });
+  const patch={name,gender,personality,description,nickname,preset,relationship:v('relationship'),charRelations};
   if(id)return !!contact(id)&&replaceContact(id,patch);
   return commit({...state,contacts:[...state.contacts,{...contactDefaults(crypto.randomUUID()),...patch}]});
 }
@@ -665,7 +679,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
   if(!retry&&!reroll&&!gameTurn)chatImages.delete(key);
   const name=c.name||displayName(c);
   const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,
-    'Char 与 User 的关系：'+c.relationship,'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
+    'Char 与 User 的关系：'+c.relationship,...charRelationContext(c).map(line=>'Char 与 Char 的关系：'+line),'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
   const front=worldContext('front',c.id),end=worldContext('end',c.id);
   threads.set(c.id,true);replyErrors.delete(c.id);render();
   try{
@@ -2299,6 +2313,13 @@ document.addEventListener('click',e=>{
   if(d.memory)openMemories(d.memory);
   if(d.retryMemory)summarizeMemories(d.retryMemory);
   if(d.deleteMemory&&$('memoryForm'))deleteMemory($('memoryForm').dataset.id,d.deleteMemory);
+  if(d.addCharRelation!==undefined){
+    const form=$('contactForm');
+    const list=form.querySelector('[data-char-relations]');
+    list.insertAdjacentHTML('beforeend',charRelationRow(form.dataset.id));
+    list.lastElementChild.querySelector('select').focus();
+  }
+  if(d.removeCharRelation!==undefined)e.target.closest('[data-char-relation]')?.remove();
   if(d.card)openCard(d.card);
   if(d.deleteContact)removeContact(d.deleteContact);
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
