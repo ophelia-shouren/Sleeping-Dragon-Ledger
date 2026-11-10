@@ -181,6 +181,7 @@ body.full-chat{overflow:hidden}
 .story-generation .story-reader-bar{flex:none;overflow-wrap:anywhere}
 .story-generation #storyLive{flex:1 1 0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain}
 .forwarded-story-card{display:grid;gap:5px;min-width:min(185px,42vw);max-width:300px}.forwarded-story-card small,.forwarded-story-card span{font-size:.8em;color:var(--gold)}.forwarded-story-card strong{overflow-wrap:anywhere}.forwarded-story-card p{margin:0;overflow-wrap:anywhere}
+.group-room{height:100%;min-height:0;display:flex;flex-direction:column;gap:10px}.group-room .chat-top,.group-room form{flex:none}.group-room .messages{flex:1;min-height:0;max-height:none;overflow:auto}.group-room form textarea{flex:1;min-width:0;min-height:52px}.group-room .messages .panel{margin:0 0 8px;padding:10px 14px}.group-room .messages strong{color:var(--gold)}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -547,6 +548,85 @@ async function submitStoryForm(form,submitter){
     }
   }
 }
+const groupById=id=>state.groups.find(g=>g.id===id);
+const groupJobs=new Set();
+const groupTranscript=messages=>messages.map(m=>m.speaker+'：'+m.content).join('\n');
+function groupMemory(c){
+  const notes=state.groups.filter(g=>g.shared&&g.members.includes(c.id)&&g.messages.length)
+    .map(g=>'【'+g.name+'】\n'+groupTranscript(g.messages.slice(-12)).slice(-6000));
+  return notes.length?'以下是允许互通的近期群聊记录，作为背景资料：\n'+notes.join('\n\n').slice(-16000):'';
+}
+function groupDirectory(){
+  return '<div class="row between"><h3>群聊</h3><button type="button" data-group-edit="">＋ 新建群聊</button></div>'+
+    state.groups.map(g=>'<button class="directory-item" data-group-open="'+esc(g.id)+'"><span><strong>'+esc(g.name)+'</strong><small>'+g.members.filter(id=>contact(id)).length+' 位角色 · '+(g.shared?'记忆互通':'独立记忆')+'</small></span><b>›</b></button>').join('');
+}
+function editGroup(id){
+  const g=groupById(id);
+  if(groupJobs.has(id))return;
+  const members=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="member" value="'+esc(c.id)+'" '+(g?.members.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
+  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，群聊会参考各角色的私聊记忆和近期对话，私聊也会参考这个群的近期消息。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
+}
+function saveGroupSettings(form){
+  const data=new FormData(form),id=form.dataset.id,old=groupById(id);
+  const members=[...new Set(data.getAll('member').filter(roleId=>contact(roleId)))];
+  const name=String(data.get('name')||'').trim();
+  if(!name||members.length<2)throw Error('请填写群聊名称，并选择至少两位角色。');
+  if(groupJobs.has(id))return;
+  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,shared:data.has('shared')};
+  group.pending=group.pending.filter(roleId=>members.includes(roleId));
+  if(commit({...state,groups:old?state.groups.map(g=>g.id===id?group:g):[...state.groups,group]})){render();openGroup(group.id);}
+}
+function openGroup(id){
+  const g=groupById(id);if(!g)return;
+  const busy=groupJobs.has(id);
+  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button><div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div><div id="groupMessages" class="messages">'+
+    (g.messages.map(m=>'<div class="panel"><strong>'+esc(m.speaker)+'</strong><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(m.content)+'</div></div>').join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
+    (busy?'<p class="muted" role="status">角色正在回复…</p>':'')+'</div><form id="groupChatForm" data-id="'+esc(id)+'" class="row"><textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(busy||g.pending.length?'disabled':'required')+'></textarea>'+
+    (g.pending.length?'<button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button>':'<button class="primary" '+(busy?'disabled':'')+'>发送</button>')+'</form></section>',true);
+  $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
+}
+function refreshGroup(id){
+  if($('dialog').open&&$('dialog').querySelector('[data-group-room]')?.dataset.groupRoom===id)openGroup(id);
+}
+function patchGroup(g,patch){
+  if(!commit({...state,groups:state.groups.map(x=>x.id===g.id?{...x,...patch}:x)}))throw Error('群聊保存失败。');
+}
+async function sendGroup(id,message=''){
+  if(groupJobs.has(id))return;
+  let g=groupById(id);if(!g)return;
+  groupJobs.add(id);
+  try{
+    if(message){
+      if(g.pending.length)return;
+      const members=g.members.map(contact).filter(Boolean);
+      if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
+      if(members.some(c=>!profileFor(c)))throw Error('请为群成员设置可用的 API 预设。');
+      patchGroup(g,{pending:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message}]});
+    }
+    refreshGroup(id);
+    while((g=groupById(id))?.pending.length){
+      const [roleId,...pending]=g.pending,c=contact(roleId);
+      if(!c){patchGroup(g,{pending});continue;}
+      const p=profileFor(c);
+      if(!p)throw Error(displayName(c)+'缺少可用的 API 预设。');
+      const action=c.actionWriting===true;
+      const system=[
+        worldContext('front',c.id),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
+        '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
+        '人设：'+c.description,'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
+        g.shared?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
+        worldContext('end',c.id),action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作和旁白，禁止「低吼」和「骨血里」。只返回 JSON 对象 {"dialogue":"角色台词"}。'
+      ].filter(Boolean).join('\n\n');
+      const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:groupTranscript(g.messages.slice(-24))}]});
+      const reply=dialogueReply(response,action?dialogueText:spokenReply);
+      if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
+      if(groupById(id)!==g)throw Error('群聊已更新，请核对后重试。');
+      patchGroup(g,{pending,messages:[...g.messages,{speaker:displayName(c),roleId,content:reply}]});
+      refreshGroup(id);
+    }
+  }catch(error){toast(error.message);}
+  finally{groupJobs.delete(id);refreshGroup(id);}
+}
 function chat(){
   const c=contact(activeContact),user=appearance('user');
   if(!c){
@@ -557,7 +637,7 @@ function chat(){
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
       '<section class="panel contact-list"><div class="row between"><div class="row">'+avatarButton('user',user)+'<div><strong>'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
-      (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
+      groupDirectory()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
   const chatUser={...user,name:'你',nickname:''};
   const mode=localConfig(c).mode,ai=mode==='ai',session=localSession(c);
@@ -692,6 +772,8 @@ async function send(retry=false,reroll=null,gameTurn=null){
       if(localConfig(contact(c.id)).mode!=='ai')return;
     }
     const messages=[{role:'system',content:[front,system,memoryContext(reroll?{...c,memories:c.memories.filter(m=>m.to<=reroll.index)}:c)].filter(Boolean).join('\n\n')},...recentDialogue(history)];
+    const sharedGroupMemory=groupMemory(c);
+    if(sharedGroupMemory)messages.splice(1,0,{role:'system',content:sharedGroupMemory});
     if(end)messages.push({role:'system',content:end});
     if(reroll)messages.push({role:'system',content:'重新生成选中的角色回复，提供一种新的表达。'+(reroll.guide?'本次改写提示：'+reroll.guide:'')});
     const scene=currentScene(c);
@@ -2056,7 +2138,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({stories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({groups:[],stories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -2077,6 +2159,7 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
+  if(!Array.isArray(result.groups)||!result.groups.every(g=>g&&string(g.id)&&string(g.name)&&typeof g.shared==='boolean'&&Array.isArray(g.members)&&g.members.every(string)&&Array.isArray(g.pending)&&g.pending.every(string)&&Array.isArray(g.messages)&&g.messages.every(m=>m&&string(m.speaker)&&string(m.content)&&string(m.roleId)))||!unique(result.groups))throw Error('群聊存档无效');
   if(!Array.isArray(result.customStoryStyles)||!result.customStoryStyles.every(x=>x&&['id','name','content'].every(k=>typeof x[k]==='string'&&x[k].trim()))||!unique(result.customStoryStyles))throw Error('文风存档无效');
   if(!Number.isInteger(result.storyFont)||result.storyFont<14||result.storyFont>32)result.storyFont=18;
   if(!Array.isArray(result.stories)||!result.stories.every(validStory)||!unique(result.stories))throw Error('余晖藏书阁存档无效');
@@ -2320,6 +2403,13 @@ document.addEventListener('click',e=>{
     list.lastElementChild.querySelector('select').focus();
   }
   if(d.removeCharRelation!==undefined)e.target.closest('[data-char-relation]')?.remove();
+  if(d.groupEdit!==undefined)editGroup(d.groupEdit);
+  if(d.groupOpen)openGroup(d.groupOpen);
+  if(d.groupRetry)sendGroup(d.groupRetry);
+  if(d.groupSkip&&!groupJobs.has(d.groupSkip)){
+    const g=groupById(d.groupSkip);
+    if(g){try{patchGroup(g,{pending:[]});refreshGroup(g.id);}catch(error){toast(error.message);}}
+  }
   if(d.card)openCard(d.card);
   if(d.deleteContact)removeContact(d.deleteContact);
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
@@ -2455,6 +2545,11 @@ document.addEventListener('submit',e=>{
     if(f.id==='deckPresetForm')saveDeckPreset(f);
     if(f.id==='localChatForm')saveLocalChatForm(f);
     if(f.id==='memoryForm')mergeMemories(f);
+    if(f.id==='groupSettings')saveGroupSettings(f);
+    if(f.id==='groupChatForm'){
+      const message=f.elements.message.value.trim();
+      if(message)sendGroup(f.dataset.id,message);
+    }
     if(f.id==='contactForm'&&saveCard(f)){$('dialog').close();render();toast('人设卡已保存');}
     if(f.id==='currentSceneForm')saveCurrentScene(f);
     if(f.id==='chatDisplayForm')saveChatDisplay(f);
