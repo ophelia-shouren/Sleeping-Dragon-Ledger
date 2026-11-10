@@ -171,6 +171,7 @@ body.full-chat{overflow:hidden}
 .composer-menu[hidden]{display:none}.composer-menu h3{font-size:13px;color:var(--gold);margin:0 0 5px}
 .composer-menu .composer-tools{margin-top:6px}
 .full-chat #chatForm:has(.composer-menu:not([hidden])){max-height:65%}
+.story-sun{display:inline-grid;place-items:center;min-width:32px;min-height:32px;padding:4px;background:transparent;border:1px solid transparent;color:var(--muted);opacity:.68}.story-sun:hover,.story-sun:focus-visible{opacity:1;color:var(--gold);border-color:var(--line)}.story-sun svg{width:17px;height:17px}.story-choices{display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}.story-choices label{display:flex;align-items:center;gap:5px;padding:4px 7px}.story-choices input,.story-entry input[type=checkbox]{width:auto;margin:0}.story-entry{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line)}.bubble:has(p){overflow-wrap:anywhere}.story-paper{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85;max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:12px}.story-progress{white-space:pre-wrap}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -287,6 +288,183 @@ function avatarMarkup(person,cls=''){
 function avatarButton(id,person,cls=''){
   return '<button type="button" class="avatar-button '+cls+'" data-look="'+esc(id)+'" aria-label="编辑'+esc(person.nickname||person.name||'角色')+'的头像与头像框">'+avatarMarkup(person)+'</button>';
 }
+const storyStyles=['治愈日常','温柔抒情','轻喜剧','慢热浪漫','哥特奇谭','魔法冒险','悬疑推理','复古书信','诗意童话','电影叙事'];
+const storySequelRequest='<Request：以上为故事前文，请以此为序章生成一篇20000字以上的后续发展，请有头有尾并进行扩展续写，不得ooc，禁止照搬原文。内容不能含性暗示，不得输出nsfw剧情。>';
+const storySafety='保持角色设定一致。内容不能含性暗示，不得输出 NSFW 剧情。';
+let storyJob=null;
+function validStory(x){
+  return x&&['id','title','body','category'].every(key=>typeof x[key]==='string')&&x.id&&Array.isArray(x.cast)&&x.cast.every(id=>typeof id==='string')&&typeof x.parent==='string';
+}
+function storySun(){
+  return '<button type="button" class="story-sun" data-story-action="generator" aria-label="日隙拾光" title="日隙拾光"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/></svg></button>';
+}
+function storyButton(action,label,id=''){
+  return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
+}
+function storyDialog(title,body){
+  dialog('<div class="row between"><h2>'+esc(title)+'</h2>'+storyButton('library','余晖藏书阁')+'<button type="button" data-action="close">关闭</button></div>'+body);
+}
+function storyChecks(items,name,legend,selected=''){
+  return '<fieldset class="story-choices"><legend>'+esc(legend)+'</legend>'+items.map(([value,label])=>'<label><input type="checkbox" name="'+name+'" value="'+esc(value)+'" '+(value===selected?'checked':'')+'>'+esc(label)+'</label>').join('')+'</fieldset>';
+}
+function storyStreamField(){
+  return '<div class="story-choices"><label><input type="checkbox" name="stream" '+(state.streamReplies?'checked':'')+'>流式显示</label></div>';
+}
+function storyGenerator(){
+  if(storyJob){storyProgress();return;}
+  storyDialog('日隙拾光','<p class="muted">借一束日光，写下信件之外的故事。</p><form id="storyGenerate" class="fields">'+
+    storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
+    storyChecks(storyStyles.map(style=>[style,style]),'style','内置文风 · 可多选')+
+    '<label>自定义文风<input name="customStyle" maxlength="500"></label><label>标题<input name="title" maxlength="120" placeholder="留空由 AI 拟题"></label>'+
+    '<div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div>'+
+    '<label>叙事视角<select name="pov"><option>第一人称</option><option>第二人称</option><option selected>第三人称</option></select></label>'+
+    '<label>目标字数<input type="number" name="length" min="100" max="100000" placeholder="默认 20000–40000"></label>'+
+    '<label>剧情指令<textarea name="guide" rows="4"></textarea></label>'+storyStreamField()+'<button class="primary">开始写番外</button></form>');
+}
+function storyLibrary(category=''){
+  const categories=[...new Set(state.stories.map(x=>x.category).filter(Boolean))].sort();
+  storyDialog('余晖藏书阁','<div class="row">'+storyButton('generator','回到日隙拾光')+'</div>'+
+    '<form id="storyExport" class="fields"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+
+    (state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
+    '<button>导出所选文章</button></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
+  $('storyFilter').onchange=e=>storyLibrary(e.target.value);
+}
+function storyRead(x){
+  const parent=state.stories.find(y=>y.id===x.parent);
+  storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
+    '<div class="story-paper">'+esc(x.body)+'</div>'+
+    '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
+    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色',x.id)+'</div>');
+}
+function storyProgress(){
+  storyDialog('日隙拾光','<p id="storyStatus" class="story-progress" role="status"></p><div class="story-paper" id="storyLive" tabindex="0"></div>');
+  $('storyStatus').textContent=storyJob.status;
+  $('storyLive').textContent=storyJob.preview;
+}
+function storeStory(x){
+  const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
+  if(!commit({...state,stories}))throw Error('文章保存失败，请检查本机存储空间。');
+}
+async function generateStory({parent,cast,title,guide,stream,target,pov,style,includeUser}){
+  if(storyJob)throw Error('已有一篇番外正在生成。');
+  const people=cast.map(contact).filter(Boolean);
+  if(!parent&&!people.length)throw Error('请至少选择一位登场角色。');
+  const p=people.map(profileFor).find(Boolean)||state.profiles.find(x=>x.id===state.profile);
+  if(!p?.url||!p.model)throw Error('请先配置可用的聊天模型。');
+  const chapters=Math.ceil(target/3000);
+  let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',category:parent?.category||'',cast,parent:parent?.id||''};
+  const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship}));
+  const context=[
+    '写一篇中文番外，遵守以下约束。'+storySafety,
+    '叙事视角：'+(pov||'沿用前文'),
+    '文风：'+(style||'自然流畅，续篇沿用前文文风'),
+    parent?'沿用前文角色。':includeUser?'User 加入剧情，资料：'+JSON.stringify({姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user}):'User 不加入剧情。',
+    '登场角色资料：'+JSON.stringify(roles)
+  ].join('\n');
+  storyJob={status:'正在准备番外…',preview:''};
+  storyProgress();
+  try{
+    for(let part=1;part<=chapters;part++){
+      const job=storyJob, prefix=article.body?article.body+'\n\n':'';
+      job.status='正在写第 '+part+' / '+chapters+' 段 · '+p.model;
+      if($('storyStatus'))$('storyStatus').textContent=job.status;
+      let live='';
+      const onDelta=delta=>{
+        live+=delta;job.preview=prefix+live;
+        const box=$('storyLive');if(box)box.append(document.createTextNode(delta));
+      };
+      const firstTitle=part===1&&!title&&!parent;
+      const previous=part===1?(parent?.body||''):(parent?.body||'').slice(-4500)+'\n'+article.body.slice(-10000);
+      const prompt=[previous?'【前文】\n'+previous:'',guide,
+        '整篇目标约 '+target+' 字。本轮仅写第 '+part+' / '+chapters+' 段，约 '+Math.ceil(target/chapters)+' 字。'+
+        (part===chapters?'本段收束情节，写到结局。':'推进剧情并留下自然的接续点，勿提前写到结局。'),
+        firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
+      ].filter(Boolean).join('\n\n');
+      const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta);
+      let body=dialogueReply(response).trim();
+      if(firstTitle){
+        const match=body.match(/^标题[：:]\s*([^\n]+)\n+/);
+        if(match){article.title=match[1].trim().slice(0,120);body=body.slice(match[0].length).trim();}
+      }
+      if(!body)throw Error('模型返回了空正文。');
+      article={...article,body:prefix+body};
+      storeStory(article);
+      job.preview=article.body;
+      if($('storyLive'))$('storyLive').textContent=job.preview;
+    }
+    if($('storyStatus'))storyRead(article);
+    toast('番外已存入余晖藏书阁 · 实际 '+Array.from(article.body.replace(/\s/g,'')).length+' 字符');
+  }catch(error){
+    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(article.body?'。已保存成功生成的段落。':'');
+    throw error;
+  }finally{storyJob=null;}
+}
+async function storyAction(d){
+  const x=state.stories.find(y=>y.id===d.storyId);
+  switch(d.storyAction){
+    case 'generator':storyGenerator();break;
+    case 'library':storyLibrary();break;
+    case 'read':if(x)storyRead(x);break;
+    case 'continue':
+      if(x)await generateStory({parent:x,cast:x.cast,guide:storySequelRequest,stream:state.streamReplies,target:22000});
+      break;
+    case 'custom':
+      if(x)storyDialog('自定义续写','<form id="storyContinue" data-id="'+esc(x.id)+'" class="fields"><label>续写指令<textarea name="guide" rows="5" required></textarea></label>'+storyStreamField()+'<button class="primary">开始续写</button></form>');
+      break;
+    case 'forward':
+      if(x)storyDialog('转发番外','<form id="storyForward" data-id="'+esc(x.id)+'" class="fields"><label>接收角色<select name="contact" required><option value="">请选择 AI 模式角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><label>附言（可留空）<input name="note"></label><button>下一步</button></form>');
+      break;
+  }
+}
+async function submitStoryForm(form){
+  const data=new FormData(form),value=k=>String(data.get(k)||'').trim();
+  const x=state.stories.find(y=>y.id===form.dataset.id);
+  switch(form.id){
+    case 'storyGenerate':
+      await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),style:[...data.getAll('style'),value('customStyle')].filter(Boolean).join('、'),stream:data.has('stream'),target:Number(value('length'))||30000,pov:value('pov'),includeUser:data.has('includeUser')});
+      break;
+    case 'storyContinue':
+      if(x)await generateStory({parent:x,cast:x.cast,guide:value('guide'),stream:data.has('stream'),target:22000});
+      break;
+    case 'storyCategory':
+      if(x){const updated={...x,category:value('category')};storeStory(updated);storyRead(updated);}
+      break;
+    case 'storyExport':{
+      const picked=state.stories.filter(y=>data.getAll('picked').includes(y.id));
+      if(!picked.length)throw Error('请先勾选要导出的文章。');
+      const url=URL.createObjectURL(new Blob([JSON.stringify(picked,null,2)],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;link.download='余晖藏书阁-'+dateString()+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
+      break;
+    }
+    case 'storyImport':{
+      const files=[...form.elements.files.files], imported=[];
+      if(!files.length)throw Error('请先选择文件。');
+      for(const file of files){
+        const text=await file.text();
+        const rows=/\.json$/i.test(file.name)?JSON.parse(text):[{id:crypto.randomUUID(),title:file.name.replace(/\.txt$/i,''),body:text,category:'',cast:[],parent:''}];
+        if(!Array.isArray(rows)||(!rows.every(validStory)||new Set(rows.map(y=>y.id)).size!==rows.length))throw Error(file.name+' 的文章格式有误。');
+        const ids=new Map(rows.map(y=>[y.id,crypto.randomUUID()]));
+        imported.push(...rows.map(y=>({...y,id:ids.get(y.id),parent:ids.get(y.parent)||''})));
+      }
+      if(commit({...state,stories:[...imported,...state.stories]})){storyLibrary();toast('已导入 '+imported.length+' 篇文章');}
+      break;
+    }
+    case 'storyForward':{
+      const c=contact(value('contact'));
+      if(!x||!c||localConfig(c).mode!=='ai')throw Error('请选择 AI 模式的角色。');
+      storyDialog('确认转发','<p>将《'+esc(x.title)+'》全文发给 '+esc(displayName(c))+'，约 '+Array.from(x.body).length+' 字符。输入 Token 较大，请谨慎选择。</p>'+
+        '<form id="storyConfirm" data-id="'+esc(x.id)+'"><input type="hidden" name="contact" value="'+esc(c.id)+'"><input type="hidden" name="note" value="'+esc(value('note'))+'"><div class="row"><button class="primary">确认转发全文</button>'+storyButton('read','返回文章',x.id)+'</div></form>');
+      break;
+    }
+    case 'storyConfirm':{
+      const c=contact(value('contact'));
+      if(!x||!c||localConfig(c).mode!=='ai'||!profileFor(c)||threads.has(c.id))throw Error('角色正忙或未配置可用的 AI 模型。');
+      $('dialog').close();activeContact=c.id;go('chat');
+      await send(false,null,{storyForward:true,content:[value('note'),'《'+x.title+'》',x.body].filter(Boolean).join('\n\n')});
+      break;
+    }
+  }
+}
 function chat(){
   const c=contact(activeContact),user=appearance('user');
   if(!c){
@@ -295,7 +473,7 @@ function chat(){
       return '<div class="contact-row">'+avatarButton(x.id,x)+'<button class="contact-link" data-chat="'+esc(x.id)+'"><strong>'+esc(displayName(x))+'</strong><span>'+esc(last?(last.role==='user'?'你：':'')+(last.content||'[图片]'):'还没有对话')+'</span></button><span class="muted">›</span></div>';
     }).join('');
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
-      '<section class="panel contact-list"><div class="row between"><div class="row">'+avatarButton('user',user)+'<div><strong>'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><button class="primary" data-action="newContact">＋ 新建角色</button></div>'+
+      '<section class="panel contact-list"><div class="row between"><div class="row">'+avatarButton('user',user)+'<div><strong>'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
       (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
@@ -304,7 +482,7 @@ function chat(){
   const busy=ai&&threads.has(c.id),name=displayName(c),prefs=chatDisplay(c);
   const typing=busy||(mode==='cards'&&localRuns.has(c.id));
   const now=Date.now(),selected=messageSelection(c,mode,session.messages);
-  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开聊天目录" title="聊天目录">★</button></div></div>'+
+  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools">'+storySun()+'<button class="star-button" data-action="chatDirectory" aria-label="打开聊天目录" title="聊天目录">★</button></div></div>'+
     messageActionBar(selected)+'<div id="messages" class="messages">'+(session.messages.length?session.messages.map((x,i)=>{
       if(mode==='keyword'&&replyPending(x,now))return typingBubble(c);
       const mine=x.role==='user',person=mine?chatUser:c,image=imageInMessage(x);
@@ -400,7 +578,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
   if(image&&(!state.imageApi.url||!state.imageApi.model)&&(!retry||!c.messages.at(-1)?.caption)){
     toast('请先配置图片专用 API 和视觉识别模型。');return;
   }
-  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,...(image?{image}:{}),...(gameTurn?{gameResult:gameTurn.result}:{})}];
+  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,...(image?{image}:{}),...(gameTurn?.result?{gameResult:gameTurn.result}:{}),...(gameTurn?.storyForward?{storyForward:true}:{})}];
   if(!retry&&!reroll&&!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
   if(!retry&&!reroll&&!gameTurn)chatImages.delete(key);
   const name=c.name||displayName(c);
@@ -1267,7 +1445,7 @@ async function describeChatImage(image){
   if(!caption)throw Error('图片 API 没有返回可用的描述。');
   return caption;
 }
-async function readChatStream(response){
+async function readChatStream(response,onDelta){
   const reader=response.body.getReader(),decoder=new TextDecoder();
   let buffer='',message='',done=false;
   function line(value){
@@ -1278,8 +1456,8 @@ async function readChatStream(response){
     const event=JSON.parse(data);
     if(event.error)dialogueReply(event);
     const choice=event.choices?.[0],part=choice?.delta?.content??choice?.text;
-    if(typeof part==='string'){message+=part;}
-    else if(Array.isArray(part)){message+=part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join('');}
+    const delta=typeof part==='string'?part:Array.isArray(part)?part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join(''):'';
+    if(delta){message+=delta;onDelta?.(delta);}
   }
   try{
     while(!done){
@@ -1498,7 +1676,7 @@ function saveChatDisplay(form){
 }
 function chatBubbleParts(message,prefs){
   const content=message.content;
-  if(message.role==='assistant'&&!prefs.split)return [content];
+  if(message.storyForward||message.role==='assistant'&&!prefs.split)return [content];
   const lines=content.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(message.role==='user')return lines.length?lines:[''];
   const segmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter('zh',{granularity:'sentence'}):null;
@@ -1765,7 +1943,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({stories:[],opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -1786,6 +1964,7 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
+  if(!Array.isArray(result.stories)||!result.stories.every(validStory)||!unique(result.stories))throw Error('余晖藏书阁存档无效');
   if(!Object.hasOwn(skins,result.skin))throw Error('存档皮肤无效');
   if(!result.imageApi||!Object.keys(imageDefaults()).every(k=>string(result.imageApi[k])))throw Error('图片 API 存档无效');
   const validLook=x=>x&&string(x.avatar)&&x.frame&&string(x.frame.src)&&typeof x.frame.ring==='boolean'&&
@@ -1948,13 +2127,13 @@ function apiEndpoint(base,route){
   u.pathname=u.pathname.replace(/\/+$/,'').replace(/\/(?:chat\/completions|models)$/,'')+'/'+route;
   return u.href;
 }
-async function request(p,route,body){
+async function request(p,route,body,onDelta){
   const headers={};if(p.key)headers.Authorization='Bearer '+p.key;
   if(body)headers['Content-Type']='application/json';
-  let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(90000)});}
+  let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(onDelta?240000:90000)});}
   catch(e){if(e instanceof TypeError)throw Error('连接失败。请检查 API 地址、中转站的跨域设置与网络。');throw e;}
   if(!response.ok)throw Error('API 返回 HTTP '+response.status+'。请核对地址、模型、密钥和配额。');
-  if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return readChatStream(response);
+  if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return readChatStream(response,onDelta);
   if(route!=='chat/completions')return response.json();
   const bodyText=await response.text();
   try{return JSON.parse(bodyText);}catch(e){
@@ -1994,6 +2173,7 @@ function archive(includeKeys){
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
+  if(d.storyAction)storyAction(d).catch(error=>toast(error.message));
   if(d.page){if(d.page==='chat')activeContact='';go(d.page);}
   if(d.calcKey)calculatorAction(d.calcKey);
   if(d.chat)openThread(d.chat);
@@ -2138,6 +2318,7 @@ document.addEventListener('submit',e=>{
   e.preventDefault();
   const f=e.target;
   try{
+    if(f.id.startsWith('story'))submitStoryForm(f).catch(error=>toast(error.message));
     if(f.id==='chatGameForm')playChatGame('options',f.elements.options.value);
     if(f.id==='messageEditForm')submitMessageEdit(f);
     if(f.id==='deckPresetForm')saveDeckPreset(f);
