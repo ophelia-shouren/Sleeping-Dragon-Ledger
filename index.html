@@ -442,7 +442,6 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
   if(!parent&&!people.length)throw Error('请至少选择一位登场角色。');
   const p=people.map(profileFor).find(Boolean)||state.profiles.find(x=>x.id===state.profile);
   if(!p?.url||!p.model)throw Error('请先配置可用的聊天模型。');
-  const chapters=Math.ceil(target/3000);
   let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',category:parent?.category||'',cast,parent:parent?.id||''};
   const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
@@ -455,40 +454,37 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
   storyJob={status:'正在准备番外…',preview:''};
   storyProgress();
   try{
-    for(let part=1;part<=chapters;part++){
-      const job=storyJob, prefix=article.body?article.body+'\n\n':'';
-      job.status='正在写第 '+part+' / '+chapters+' 段 · '+p.model;
-      if($('storyStatus'))$('storyStatus').textContent=job.status;
-      let live='';
-      const onDelta=delta=>{
-        live+=delta;job.preview=prefix+live;
-        const box=$('storyLive');if(box)box.append(document.createTextNode(delta));
-        updateStoryCount(job.preview);
-      };
-      const firstTitle=part===1&&!title&&!parent;
-      const previous=part===1?(parent?.body||''):(parent?.body||'').slice(-4500)+'\n'+article.body.slice(-10000);
-      const prompt=['【写作预设】参考叙事结构与氛围，尊重用户选择的人物、视角和剧情。不要复述预设。\n'+storyWritingPreset,previous?'【前文】\n'+previous:'',guide,
-        '整篇目标约 '+target+' 字。本轮仅写第 '+part+' / '+chapters+' 段，约 '+Math.ceil(target/chapters)+' 字。'+
-        (part===chapters?'本段收束情节，写到结局。':'推进剧情并留下自然的接续点，勿提前写到结局。'),
-        firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
-      ].filter(Boolean).join('\n\n');
-      const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta);
-      let body=dialogueReply(response).trim();
-      if(firstTitle){
-        const match=body.match(/^标题[：:]\s*([^\n]+)\n+/);
-        if(match){article.title=match[1].trim().slice(0,120);body=body.slice(match[0].length).trim();}
-      }
-      if(!body)throw Error('模型返回了空正文。');
-      article={...article,body:prefix+body};
-      storeStory(article);
-      job.preview=article.body;
-      if($('storyLive'))$('storyLive').textContent=job.preview;
+    const job=storyJob;
+    job.status='正在生成全文 · '+p.model;
+    if($('storyStatus'))$('storyStatus').textContent=job.status;
+    let live='';
+    const onDelta=delta=>{
+      live+=delta;job.preview=live;
+      const box=$('storyLive');if(box)box.append(document.createTextNode(delta));
       updateStoryCount(job.preview);
+    };
+    const firstTitle=!title&&!parent;
+    const previous=parent?.body||'';
+    const prompt=['【写作预设】参考叙事结构与氛围，尊重用户选择的人物、视角和剧情。不要复述预设。\n'+storyWritingPreset,previous?'【前文】\n'+previous:'',guide,
+      '请一次输出完整正文，目标约 '+target+' 字。自然分段，写到结局。',
+      firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
+    ].filter(Boolean).join('\n\n');
+    const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta);
+    let body=dialogueReply(response).trim();
+    if(firstTitle){
+      const match=body.match(/^标题[：:]\s*([^\n]+)\n+/);
+      if(match){article.title=match[1].trim().slice(0,120);body=body.slice(match[0].length).trim();}
     }
+    if(!body)throw Error('模型返回了空正文。');
+    article={...article,body};
+    storeStory(article);
+    job.preview=article.body;
+    if($('storyLive'))$('storyLive').textContent=job.preview;
+    updateStoryCount(job.preview);
     if($('storyStatus'))storyRead(article);
     toast('番外已存入余晖藏书阁 · 实际 '+storyCount(article.body)+' 字');
   }catch(error){
-    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(article.body?'。已保存成功生成的段落。':'');
+    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message;
     throw error;
   }finally{storyJob=null;}
 }
