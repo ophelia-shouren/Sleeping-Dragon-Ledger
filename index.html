@@ -1550,21 +1550,29 @@ function readTeaCard(id,mode,index){
   const x=findTeaCard(id,mode,index);if(!x)return;
   dialog('<section class="tea-room">'+teaHeader('data-tea-back="'+esc(id)+'" data-tea-mode="'+esc(mode)+'"','‹ 返回')+teaMeta(x,false)+'<div class="tea-scroll">'+teaNarrative(x)+'</div></section>',true);
 }
-async function exportTeaCard(id,mode,index){
-  const x=findTeaCard(id,mode,index);if(!x)return;
+function exportTeaCard(id,mode,index){
+  const x=findTeaCard(id,mode,index);if(!x){toast('找不到这场茶叙。');return;}
   const text=['茶叙',x.pov+' · '+x.style,...x.turns.map(t=>'【你的输入】\n'+t.input+'\n\n【续写】\n'+t.output)].join('\n\n');
   const name='茶叙-'+dateString()+'.txt';
-  const file=typeof File==='function'?new File(['\uFEFF',text],name,{type:'text/plain'}):null;
-  const android=/Android/i.test(navigator.userAgent);
-  if(android&&file&&navigator.canShare?.({files:[file]})){
-    try{await navigator.share({files:[file]});return;}
-    catch(error){if(error.name==='AbortError')return;}
+  dialog('<h2>导出茶叙 TXT</h2><p class="muted">如果下载没有弹出，可复制全文，或通过系统分享保存。</p><label>纯文本预览<textarea id="teaExportText" rows="9" readonly></textarea></label><div class="row"><a id="teaDownload">下载 TXT</a><button type="button" id="teaCopy">复制全文</button><button type="button" id="teaShare" hidden>分享 TXT</button><button type="button" data-tea-back="'+esc(id)+'" data-tea-mode="'+esc(mode)+'">返回聊天</button></div>');
+  const preview=$('teaExportText'),download=$('teaDownload'),share=$('teaShare');
+  preview.value=text;
+  const contents=['\uFEFF',text],options={type:'text/plain'};
+  const url=URL.createObjectURL(new Blob(contents,options));
+  download.href=url;download.download=name;
+  const observer=new MutationObserver(()=>{if(!download.isConnected||!$('dialog').open){observer.disconnect();setTimeout(()=>URL.revokeObjectURL(url),15000);}});
+  observer.observe($('dialog'),{childList:true,attributes:true,attributeFilter:['open']});
+  $('teaCopy').onclick=async()=>{
+    try{await navigator.clipboard.writeText(text);toast('已复制茶叙全文。');}
+    catch{preview.focus();preview.select();toast('已选中全文，请在系统菜单中选择复制。');}
+  };
+  if(typeof File==='function'){
+    const files=[new File(contents,name,options)];
+    if(navigator.canShare?.({files})){
+      share.hidden=false;
+      share.onclick=async()=>{try{await navigator.share({files});}catch(error){if(error.name!=='AbortError')toast('分享未完成，可以复制全文。');}};
+    }
   }
-  // A data URL exposes the text MIME type to Android download handlers.
-  const url=android?'data:text/plain;charset=utf-8,'+encodeURIComponent('\uFEFF'+text):URL.createObjectURL(file||new Blob(['\uFEFF',text],{type:'text/plain'}));
-  const link=document.createElement('a');link.href=url;link.download=name;
-  document.body.append(link);link.click();link.remove();
-  if(!android)setTimeout(()=>URL.revokeObjectURL(url),15000);
 }
 function chatAttachments(c,busy,group){
   const mode=group?'ai':localConfig(c).mode,src=group?groupImages.get(group.id):chatImages.get(imageKey(c.id,mode));
