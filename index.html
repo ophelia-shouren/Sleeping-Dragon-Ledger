@@ -572,7 +572,7 @@ function editGroup(id){
   const g=groupById(id);
   if(groupJobs.has(id))return;
   const members=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="member" value="'+esc(c.id)+'" '+(g?.members.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
-  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="showTime" '+(g?.showTime!==false?'checked':'')+'>显示消息时间戳</label><label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，每个角色可参考自己的近期 AI 私聊与已保存记忆，私聊也可参考该角色参与过的近期群聊。角色可能在群里提到私聊内容。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
+  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="showTime" '+(g?.showTime!==false?'checked':'')+'>显示消息时间戳</label><label class="world-scope-choice"><input type="checkbox" name="split" '+(g?.split===true?'checked':'')+'>角色分句显示</label><label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，每个角色可参考自己的近期 AI 私聊与已保存记忆，私聊也可参考该角色参与过的近期群聊。角色可能在群里提到私聊内容。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
 }
 function saveGroupSettings(form){
   const data=new FormData(form),id=form.dataset.id,old=groupById(id);
@@ -580,7 +580,7 @@ function saveGroupSettings(form){
   const name=String(data.get('name')||'').trim();
   if(!name||members.length<2)throw Error('请填写群聊名称，并选择至少两位角色。');
   if(groupJobs.has(id))return;
-  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,shared:data.has('shared'),showTime:data.has('showTime')};
+  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,shared:data.has('shared'),showTime:data.has('showTime'),split:data.has('split')};
   if(old)group.messages=old.messages.map(m=>m.audience?m:{...m,audience:old.members});
   group.pending=group.pending.filter(roleId=>members.includes(roleId));
   if(commit({...state,groups:old?state.groups.map(g=>g.id===id?group:g):[...state.groups,group]})){render();openGroup(group.id);}
@@ -590,16 +590,16 @@ function openGroupGames(id){
   if(!g||groupJobs.has(id)||g.pending.length)return;
   dialog('<h2>群聊小游戏</h2><p class="muted">选择一位角色参加这一局，结果和点评会发到群里。</p><form id="groupGameForm" data-id="'+esc(id)+'"><label>参与角色<select name="member">'+g.members.map(contact).filter(Boolean).map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><div class="row"><button name="kind" value="dice">掷骰子</button><button name="kind" value="rps">猜拳</button></div><label>自定义 N 选一<textarea name="options" maxlength="2000" placeholder="每行一个选项，至少两项"></textarea></label><div class="row"><button name="kind" value="options">抽一个</button><button type="button" data-group-open="'+esc(id)+'">返回群聊</button></div></form>');
 }
-function groupBubble(m,showTime){
+function groupBubble(m,g){
   const mine=!m.roleId,role=mine?'user':'assistant';
   const person=appearance(m.roleId||'user')||{name:m.speaker,avatar:'',frame:{src:'',ring:false}};
-  return chatBubbleParts({...m,role},mine?{}:chatDisplay(person)).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+'<p>'+esc(part)+'</p>'+(i===parts.length-1?imageInMessage(m)+(showTime?chatTimestamp(m):''):'')+'</article></div>').join('');
+  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+'<p>'+esc(part)+'</p>'+(i===parts.length-1?imageInMessage(m)+(g.showTime!==false?chatTimestamp(m):''):'')+'</article></div>').join('');
 }
 function openGroup(id){
   const g=groupById(id);if(!g)return;
   const busy=groupJobs.has(id),speaker=busy&&contact(g.pending[0]),locked=busy||g.pending.length;
   dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button><div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div><div id="groupMessages" class="messages">'+
-    (g.messages.map(m=>groupBubble(m,g.showTime!==false)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
+    (g.messages.map(m=>groupBubble(m,g)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
     (speaker?typingBubble(speaker,true,true):'')+'</div><form id="groupChatForm" data-id="'+esc(id)+'"><textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form></section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
