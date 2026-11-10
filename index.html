@@ -180,6 +180,7 @@ body.full-chat{overflow:hidden}
 .story-generation{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0}
 .story-generation .story-reader-bar{flex:none;overflow-wrap:anywhere}
 .story-generation #storyLive{flex:1 1 0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain}
+.forwarded-story-card{display:grid;gap:5px;min-width:min(185px,42vw);max-width:300px}.forwarded-story-card small,.forwarded-story-card span{font-size:.8em;color:var(--gold)}.forwarded-story-card strong{overflow-wrap:anywhere}.forwarded-story-card p{margin:0;overflow-wrap:anywhere}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -359,6 +360,23 @@ function storyLibrary(category=''){
     (state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
     '<button>导出所选文章</button></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
   $('storyFilter').onchange=e=>storyLibrary(e.target.value);
+}
+function forwardedStory(message){
+  const match=message.content.match(/^(?:([^\n]*)\n\n)?《([^\n]+?)》\n\n([\s\S]*)$/);
+  return match?{note:match[1]||'',title:match[2],body:match[3]}:{note:'',title:'转发的番外',body:message.content};
+}
+function forwardedStoryCard(message){
+  const {title,note}=forwardedStory(message);
+  return '<div class="forwarded-story-card"><small>✦　番外来信</small><strong>'+esc(title)+'</strong>'+
+    (note?'<p>'+esc(note)+'</p>':'')+'<span>点开阅读全文 ›</span></div>';
+}
+function openForwardedStory(index){
+  const message=contact(activeContact)?.messages[index];
+  if(!message?.storyForward)return;
+  const {title,body}=forwardedStory(message);
+  storyDialog(title,'<div class="story-reader-bar"><strong>全文 '+storyCount(body)+' 字</strong></div>'+
+    '<article class="story-paper story-reader" style="font-size:'+state.storyFont+'px">'+esc(body)+'</article>'+
+    '<footer class="story-reader-exit"><button type="button" data-action="close">返回聊天</button></footer>');
 }
 function storyRead(x){
   const parent=state.stories.find(y=>y.id===x.parent);
@@ -542,7 +560,7 @@ function chat(){
       if(mode==='keyword'&&replyPending(x,now))return typingBubble(c);
       const mine=x.role==='user',person=mine?chatUser:c,image=imageInMessage(x);
       const parts=chatBubbleParts(x,prefs);
-      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+'<p>'+esc(part)+'</p>'+(j===parts.length-1?image:'')+'</article></div>').join('');
+      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(x.storyForward?forwardedStoryCard(x):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image:'')+'</article></div>').join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
     '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+chatAttachments(c,busy)+'</form></section>';
@@ -1901,11 +1919,19 @@ function initMessageTools(){
   });
   document.addEventListener('click',e=>{
     const node=bubble(e);
-    if(node&&selection&&Date.now()>=suppressUntil)activateMessage(Number(node.dataset.messageIndex));
+    if(!node||Date.now()<suppressUntil||$('dialog').open)return;
+    const index=Number(node.dataset.messageIndex);
+    if(selection)activateMessage(index);
+    else if(node.querySelector('.forwarded-story-card'))openForwardedStory(index);
   });
   document.addEventListener('keydown',e=>{
     const node=bubble(e);
-    if(node&&['Enter',' ','ContextMenu'].includes(e.key)){e.preventDefault();activateMessage(Number(node.dataset.messageIndex));}
+    if(node&&['Enter',' ','ContextMenu'].includes(e.key)){
+      e.preventDefault();
+      const index=Number(node.dataset.messageIndex);
+      if(!selection&&e.key!=='ContextMenu'&&node.querySelector('.forwarded-story-card'))openForwardedStory(index);
+      else activateMessage(index);
+    }
   });
 }
 </script>
