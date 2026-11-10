@@ -551,9 +551,15 @@ async function submitStoryForm(form,submitter){
 const groupById=id=>state.groups.find(g=>g.id===id);
 const groupJobs=new Set();
 const groupTranscript=messages=>messages.map(m=>m.speaker+'：'+m.content).join('\n');
+function groupMessagesFor(g,id){
+  return g.messages.filter(m=>!m.audience||m.audience.includes(id));
+}
 function groupMemory(c){
   const notes=state.groups.filter(g=>g.shared&&g.members.includes(c.id)&&g.messages.length)
-    .map(g=>'【'+g.name+'】\n'+groupTranscript(g.messages.slice(-12)).slice(-6000));
+    .flatMap(g=>{
+      const messages=groupMessagesFor(g,c.id).slice(-12);
+      return messages.length?['【'+g.name+'】\n'+groupTranscript(messages).slice(-6000)]:[];
+    });
   return notes.length?'以下是允许互通的近期群聊记录，作为背景资料：\n'+notes.join('\n\n').slice(-16000):'';
 }
 function groupDirectory(){
@@ -564,7 +570,7 @@ function editGroup(id){
   const g=groupById(id);
   if(groupJobs.has(id))return;
   const members=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="member" value="'+esc(c.id)+'" '+(g?.members.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
-  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，群聊会参考各角色的私聊记忆和近期对话，私聊也会参考这个群的近期消息。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
+  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，每个角色可参考自己的近期 AI 私聊与已保存记忆，私聊也可参考该角色参与过的近期群聊。角色可能在群里提到私聊内容。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
 }
 function saveGroupSettings(form){
   const data=new FormData(form),id=form.dataset.id,old=groupById(id);
@@ -573,6 +579,7 @@ function saveGroupSettings(form){
   if(!name||members.length<2)throw Error('请填写群聊名称，并选择至少两位角色。');
   if(groupJobs.has(id))return;
   const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,shared:data.has('shared')};
+  if(old)group.messages=old.messages.map(m=>m.audience?m:{...m,audience:old.members});
   group.pending=group.pending.filter(roleId=>members.includes(roleId));
   if(commit({...state,groups:old?state.groups.map(g=>g.id===id?group:g):[...state.groups,group]})){render();openGroup(group.id);}
 }
@@ -601,7 +608,7 @@ async function sendGroup(id,message=''){
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
       if(members.some(c=>!profileFor(c)))throw Error('请为群成员设置可用的 API 预设。');
-      patchGroup(g,{pending:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message}]});
+      patchGroup(g,{pending:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,audience:members.map(c=>c.id)}]});
     }
     refreshGroup(id);
     while((g=groupById(id))?.pending.length){
@@ -617,11 +624,11 @@ async function sendGroup(id,message=''){
         g.shared?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
         worldContext('end',c.id),action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作和旁白，禁止「低吼」和「骨血里」。只返回 JSON 对象 {"dialogue":"角色台词"}。'
       ].filter(Boolean).join('\n\n');
-      const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:groupTranscript(g.messages.slice(-24))}]});
+      const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:groupTranscript(groupMessagesFor(g,c.id).slice(-24)).slice(-12000)}]});
       const reply=dialogueReply(response,action?dialogueText:spokenReply);
       if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
       if(groupById(id)!==g)throw Error('群聊已更新，请核对后重试。');
-      patchGroup(g,{pending,messages:[...g.messages,{speaker:displayName(c),roleId,content:reply}]});
+      patchGroup(g,{pending,messages:[...g.messages,{speaker:displayName(c),roleId,content:reply,audience:g.members.slice()}]});
       refreshGroup(id);
     }
   }catch(error){toast(error.message);}
@@ -2159,7 +2166,7 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
-  if(!Array.isArray(result.groups)||!result.groups.every(g=>g&&string(g.id)&&string(g.name)&&typeof g.shared==='boolean'&&Array.isArray(g.members)&&g.members.every(string)&&Array.isArray(g.pending)&&g.pending.every(string)&&Array.isArray(g.messages)&&g.messages.every(m=>m&&string(m.speaker)&&string(m.content)&&string(m.roleId)))||!unique(result.groups))throw Error('群聊存档无效');
+  if(!Array.isArray(result.groups)||!result.groups.every(g=>g&&string(g.id)&&string(g.name)&&typeof g.shared==='boolean'&&Array.isArray(g.members)&&g.members.every(string)&&Array.isArray(g.pending)&&g.pending.every(string)&&Array.isArray(g.messages)&&g.messages.every(m=>m&&string(m.speaker)&&string(m.content)&&string(m.roleId)&&(m.audience===undefined||(Array.isArray(m.audience)&&m.audience.every(string)))))||!unique(result.groups))throw Error('群聊存档无效');
   if(!Array.isArray(result.customStoryStyles)||!result.customStoryStyles.every(x=>x&&['id','name','content'].every(k=>typeof x[k]==='string'&&x[k].trim()))||!unique(result.customStoryStyles))throw Error('文风存档无效');
   if(!Number.isInteger(result.storyFont)||result.storyFont<14||result.storyFont>32)result.storyFont=18;
   if(!Array.isArray(result.stories)||!result.stories.every(validStory)||!unique(result.stories))throw Error('余晖藏书阁存档无效');
