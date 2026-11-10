@@ -358,7 +358,7 @@ function storyLibrary(category=''){
   storyDialog('余晖藏书阁','<header class="story-shelf-hero"><span aria-hidden="true">✧</span><p>故事在余晖里落款</p><small>馆藏 '+state.stories.length+' 篇</small>'+storyButton('generator','回到日隙拾光')+'</header>'+
     '<form id="storyExport" class="fields"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+
     (state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
-    '<button>导出所选文章</button></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
+    '<div class="row"><button type="submit">导出所选文章</button><button type="submit" value="delete">删除所选</button></div></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
   $('storyFilter').onchange=e=>storyLibrary(e.target.value);
 }
 function forwardedStory(message){
@@ -489,7 +489,7 @@ async function storyAction(d){
       break;
   }
 }
-async function submitStoryForm(form){
+async function submitStoryForm(form,submitter){
   const data=new FormData(form),value=k=>String(data.get(k)||'').trim();
   const x=state.stories.find(y=>y.id===form.dataset.id);
   switch(form.id){
@@ -504,7 +504,16 @@ async function submitStoryForm(form){
       break;
     case 'storyExport':{
       const picked=state.stories.filter(y=>data.getAll('picked').includes(y.id));
-      if(!picked.length)throw Error('请先勾选要导出的文章。');
+      const deleting=submitter?.value==='delete';
+      if(!picked.length)throw Error(deleting?'请先勾选要删除的文章。':'请先勾选要导出的文章。');
+      if(deleting){
+        if(!confirm('确定删除所选的 '+picked.length+' 篇文章？删除后无法撤销。'))break;
+        const ids=new Set(picked.map(article=>article.id));
+        if(commit({...state,stories:state.stories.filter(article=>!ids.has(article.id))})){
+          storyLibrary(value('filter'));toast('已删除 '+picked.length+' 篇文章');
+        }
+        break;
+      }
       const url=URL.createObjectURL(new Blob([JSON.stringify(picked,null,2)],{type:'application/json'}));
       const link=document.createElement('a');link.href=url;link.download='余晖藏书阁-'+dateString()+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
       break;
@@ -2413,7 +2422,7 @@ document.addEventListener('submit',e=>{
   e.preventDefault();
   const f=e.target;
   try{
-    if(f.id.startsWith('story'))submitStoryForm(f).catch(error=>toast(error.message));
+    if(f.id.startsWith('story'))submitStoryForm(f,e.submitter).catch(error=>toast(error.message));
     if(f.id==='chatGameForm')playChatGame('options',f.elements.options.value);
     if(f.id==='messageEditForm')submitMessageEdit(f);
     if(f.id==='deckPresetForm')saveDeckPreset(f);
