@@ -145,6 +145,12 @@ body.full-chat{overflow:hidden}
 .message-menu button:hover,.message-menu button:focus-visible{background:var(--selected)}
 .message-menu-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;border:1px solid var(--line);border-radius:9px;color:var(--gold);font-size:18px}
 .message-menu small{display:block;color:var(--muted);margin-top:2px;font-size:12px}
+.world-scope-button{margin:4px 0 8px;padding:5px 9px;color:var(--gold);font-size:12px;border-color:var(--line);background:var(--control);border-radius:9px}
+.world-scope-options,.world-scope-roles{border:1px solid var(--line);border-radius:10px;margin:10px 0;padding:8px 10px}
+.world-scope-options legend,.world-scope-roles legend{color:var(--gold);padding:0 5px}
+.world-scope-choice{display:flex;align-items:center;gap:8px;padding:4px 0}.world-scope-choice input{width:auto;margin:0;accent-color:var(--gold)}
+.world-scope-roles{display:none;max-height:210px;overflow:auto}
+#worldScopeForm:has(input[name="scopeMode"][value="selected"]:checked) .world-scope-roles{display:block}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog>
@@ -295,7 +301,7 @@ function cards(){
     if(!groups.has(group))groups.set(group,[]);
     groups.get(group).push(entry);
   }
-  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3><label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+entries.map(x=>'<div class="world-row"><button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button><button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
+  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3><label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name)+entries.map(x=>'<div class="world-row"><button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button><button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
   return heading('CHARACTER ARCHIVE','人设与世界书','从目录打开卡片。开启的世界书条目会加入角色对话。')+
     '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><button class="primary" data-action="newContact">＋ 新建角色</button></div><button class="directory-item" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong><small>User 人设卡</small></span><b>›</b></button>'+roles+'</section>'+
     '<section class="panel"><div class="row between"><h2>世界书目录</h2><button data-action="newWorld">＋ 新建条目</button></div>'+(worlds||'<p class="empty">还没有世界书条目。</p>')+'</section></div>';
@@ -379,7 +385,7 @@ async function send(retry=false,reroll=null){
   const name=c.name||displayName(c);
   const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,
     'Char 与 User 的关系：'+c.relationship,'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
-  const front=worldContext('front'),end=worldContext('end');
+  const front=worldContext('front',c.id),end=worldContext('end',c.id);
   threads.set(c.id,true);replyErrors.delete(c.id);render();
   try{
     if(image&&!history.at(-1).caption){
@@ -396,10 +402,11 @@ async function send(retry=false,reroll=null){
     const allowActions=c.actionWriting===true;
     messages.push({role:'system',content:allowActions
       ?'回复格式：可以将角色台词与简短动作描写一同写入回复。'
-      :'回复格式：只写角色实际说出口的话。禁止动作、神态、环境、心理、旁白、拟声叙事和舞台说明。即使角色设定、世界书或之前的回复包含描写，也必须遵守。只返回 JSON 对象 {"dialogue":"角色说出口的话"}，不要添加其他字段或解释。'});
+      :'回复格式：只写角色实际说出口的话。默认用一两句简短自然的口语，像这个角色本人在聊天。贴合人设、称呼和关系，避免 OOC、AI 式套话、重复解释和夸张辞藻。禁止使用「低吼」和「骨血里」。禁止动作、神态、环境、心理、旁白、拟声叙事和舞台说明。即使角色设定、世界书或之前的回复包含描写，也必须遵守。只返回 JSON 对象 {"dialogue":"角色说出口的话"}，不要添加其他字段或解释。'});
     const streaming=state.streamReplies;
     const response=await request(p,'chat/completions',{model:p.model,messages,stream:streaming});
     const reply=dialogueReply(response,allowActions?dialogueText:spokenReply);
+    if(!allowActions&&/低吼|骨血里/.test(reply))throw Error('回复包含仅台词模式的禁用词，请点「重试回信」。');
     if(typeof reply!=='string'||!reply.trim())throw Error(allowActions?'模型返回了空回复或不兼容的回复格式。':'模型没有按台词格式返回，请点「重试回信」。');
     const latest=contact(c.id);
     if(!latest||JSON.stringify(latest.messages)!==JSON.stringify(reroll?c.messages:history))throw Error('会话记录已在另一标签页更新，请核对后再发送。');
@@ -425,8 +432,8 @@ async function send(retry=false,reroll=null){
 function worldPosition(group){
   return Object.hasOwn(state.worldPlacement,group)&&state.worldPlacement[group]==='front'?'front':'end';
 }
-function worldContext(position){
-  const entries=state.worlds.filter(x=>x.enabled&&worldPosition(x.group)===position);
+function worldContext(position,roleId){
+  const entries=state.worlds.filter(x=>x.enabled&&worldPosition(x.group)===position&&worldGroupApplies(x.group,roleId));
   return entries.length?'世界书\n'+entries.map(x=>'【'+[x.group,x.title].filter(Boolean).join(' / ')+'】\n'+x.content).join('\n\n'):'';
 }
 function showModelError(message){
@@ -478,7 +485,7 @@ function typingBubble(c){
 
 
 function actionWritingControl(c){
-  return '<label class="action-writing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 20l7-7m-2 5c-2-5 2-12 11-14-1 9-6 14-11 14Z"/><path d="m13 13 3-1"/></svg><span class="action-writing-copy"><strong>动作描写</strong><small class="speech-only-label">仅台词</small><small class="actions-on-label">台词与动作</small></span><input type="checkbox" role="switch" aria-label="允许动作描写" data-action-writing="'+esc(c.id)+'" '+(c.actionWriting===true?'checked':'')+'><span class="action-writing-track" aria-hidden="true"></span></label>';
+  return '<label class="action-writing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 20l7-7m-2 5c-2-5 2-12 11-14-1 9-6 14-11 14Z"/><path d="m13 13 3-1"/></svg><span class="action-writing-copy"><strong>动作描写</strong><small class="speech-only-label">简短口语 · 仅台词</small><small class="actions-on-label">台词与动作</small></span><input type="checkbox" role="switch" aria-label="允许动作描写" data-action-writing="'+esc(c.id)+'" '+(c.actionWriting===true?'checked':'')+'><span class="action-writing-track" aria-hidden="true"></span></label>';
 }
 function spokenReply(value){
   if(Array.isArray(value)){
@@ -497,6 +504,37 @@ function spokenReply(value){
     }
   }
   return value&&typeof value.dialogue==='string'?value.dialogue.trim():'';
+}
+
+
+const worldScopeLabels={all:'全局使用',selected:'特定角色使用',off:'不使用'};
+function worldScope(group){
+  return Object.hasOwn(state.worldScopes,group)?state.worldScopes[group]:{mode:'all',roles:[]};
+}
+function worldGroupApplies(group,roleId){
+  const {mode,roles}=worldScope(group);
+  return mode==='all'||(mode==='selected'&&roles.includes(roleId));
+}
+function worldScopeButton(group){
+  const {mode,roles}=worldScope(group);
+  const count=mode==='selected'?' · '+state.contacts.filter(c=>roles.includes(c.id)).length+' 位':'';
+  return '<button type="button" class="world-scope-button" data-world-scope="'+esc(group)+'">使用范围 · '+worldScopeLabels[mode]+count+'</button>';
+}
+function openWorldScope(group){
+  const scope=worldScope(group);
+  const modes=Object.entries(worldScopeLabels).map(([value,label])=>'<label class="world-scope-choice"><input type="radio" name="scopeMode" value="'+value+'" '+(scope.mode===value?'checked':'')+'>'+label+'</label>').join('');
+  const roles=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="scopeRole" value="'+esc(c.id)+'" '+(scope.roles.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
+  dialog('<h2>世界书使用范围</h2><p class="muted">'+esc(group||'未分组')+'</p><form id="worldScopeForm" data-group="'+esc(group)+'"><fieldset class="world-scope-options"><legend>应用范围</legend>'+modes+'</fieldset>'+
+    '<fieldset class="world-scope-roles"><legend>选择角色 · 可多选</legend>'+(roles||'<p class="muted">还没有可选角色。</p>')+'</fieldset><div class="row actions"><button class="primary">保存范围</button><button type="button" data-action="close">取消</button></div></form>');
+}
+function saveWorldScope(form){
+  const data=new FormData(form),mode=data.get('scopeMode');
+  if(!Object.hasOwn(worldScopeLabels,mode))return;
+  const roles=data.getAll('scopeRole').filter(id=>contact(id));
+  if(mode==='selected'&&!roles.length)throw Error('请至少选择一位角色。');
+  if(commit({...state,worldScopes:{...state.worldScopes,[form.dataset.group]:{mode,roles}}})){
+    $('dialog').close();render();toast('世界书使用范围已保存');
+  }
 }
 </script>
 <script>
@@ -1512,7 +1550,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -1550,6 +1588,8 @@ function validate(data){
   if(!result.contacts.every(validMemories))throw Error('记忆档案存档无效');
   if(!result.worldPlacement||Array.isArray(result.worldPlacement)||typeof result.worldPlacement!=='object'||
     !Object.values(result.worldPlacement).every(x=>x==='front'||x==='end'))throw Error('世界书位置存档无效');
+  if(!result.worldScopes||Array.isArray(result.worldScopes)||typeof result.worldScopes!=='object'||
+    !Object.values(result.worldScopes).every(x=>x&&['all','selected','off'].includes(x.mode)&&Array.isArray(x.roles)&&x.roles.every(string)))throw Error('世界书使用范围存档无效');
   Object.assign(result,{messages:[],draft:'',charName:'',character:'',charGender:'',charPersonality:'',lore:''});
   return result;
 }
@@ -1758,6 +1798,7 @@ document.addEventListener('click',e=>{
   if(d.deleteContact)removeContact(d.deleteContact);
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
   if(d.world)openWorld(d.world);
+  if(b.hasAttribute('data-world-scope'))openWorldScope(d.worldScope);
   if(d.toggleWorld&&commit({...state,worlds:state.worlds.map(x=>x.id===d.toggleWorld?{...x,enabled:!x.enabled}:x)}))render();
   if(d.removeWorld&&confirm('删除这个世界书条目？')&&commit({...state,worlds:state.worlds.filter(x=>x.id!==d.removeWorld)})){$('dialog').close();render();}
   if(d.clearLook){
@@ -1880,6 +1921,7 @@ document.addEventListener('submit',e=>{
     if(f.id==='localChatForm')saveLocalChatForm(f);
     if(f.id==='memoryForm')mergeMemories(f);
     if(f.id==='contactForm'&&saveCard(f)){$('dialog').close();render();toast('人设卡已保存');}
+    if(f.id==='worldScopeForm')saveWorldScope(f);
     if(f.id==='worldForm'&&saveWorld(f)){$('dialog').close();render();toast('世界书条目已保存');}
     if(f.id==='lookForm'){
       if(f.look.loading)return;
