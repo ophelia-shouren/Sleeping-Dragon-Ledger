@@ -165,6 +165,11 @@ body.full-chat{overflow:hidden}
 .scene-button svg{width:17px;height:17px;flex:none}.scene-button strong{font-size:12px}.scene-button small{font-size:11px;margin-left:6px;color:var(--muted)}
 .scene-button i{width:5px;height:5px;border-radius:50%;background:var(--gold)}
 .scene-editor h2{margin:2px 0 8px}.scene-editor form{margin-top:10px}.scene-editor textarea{min-height:120px}
+.composer-icon{width:42px;min-height:38px;padding:4px}.composer-icon svg{width:21px;height:21px}
+.composer-menu{padding:8px;margin-top:6px;border:1px solid var(--line);border-radius:10px;background:var(--field)}
+.composer-menu[hidden]{display:none}.composer-menu h3{font-size:13px;color:var(--gold);margin:0 0 5px}
+.composer-menu .composer-tools{margin-top:6px}
+.full-chat #chatForm:has(.composer-menu:not([hidden])){max-height:65%}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -306,7 +311,7 @@ function chat(){
       return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+'<p>'+esc(part)+'</p>'+(j===parts.length-1?image:'')+'</article></div>').join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
-    '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+(ai?'<div class="chat-story-controls">'+currentSceneButton(c)+actionWritingControl(c)+'</div>':'')+chatAttachments(c,busy)+'</form></section>';
+    '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+chatAttachments(c,busy)+'</form></section>';
 }
 function cards(){
   const roles=state.contacts.map(c=>'<button class="directory-item" data-card="'+esc(c.id)+'">'+avatarMarkup(c)+'<span><strong>'+esc(displayName(c))+'</strong><small>角色人设与模型预设</small></span><b>›</b></button>').join('');
@@ -990,12 +995,16 @@ function chatAttachments(c,busy){
   const icon=(paths)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
   const photo=icon('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/>');
   const emoji=icon('<circle cx="12" cy="12" r="9"/><path d="M8 14c1.5 3 6.5 3 8 0m-7-4h.01m6 0h.01"/>');
-  const letter=icon('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/>');
+  const star=icon('<path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/>');
+  const tools=icon('<path d="M12 4v16M4 12h16"/>');
   return '<div id="chatImagePreview">'+(src?renderChatImagePreview(src):'')+'</div>'+
-    '<div id="chatEmojis" class="chat-emojis" hidden>'+['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙'].map(x=>'<button type="button" data-emoji="'+x+'">'+x+'</button>').join('')+'</div>'+
-    '<div class="composer-actions"><div class="composer-tools"><label class="chat-file composer-tool">'+photo+'<span>图片／表情包</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
-    '<button type="button" class="composer-tool" data-action="emojiPicker" aria-expanded="false" aria-controls="chatEmojis">'+emoji+'<span>表情</span></button></div>'+
-    '<button type="submit" class="composer-send" '+(busy?'disabled':'')+'>'+letter+'<span>寄出信件</span></button></div>';
+    '<div id="composerMenu" class="composer-menu" hidden><h3>聊天工具</h3>'+
+    (mode==='ai'?'<div class="chat-story-controls">'+currentSceneButton(c)+actionWritingControl(c)+'</div>':'')+
+    '<div class="composer-tools"><label class="chat-file composer-tool">'+photo+'<span>图片／表情包</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
+    '<button type="button" class="composer-tool" data-action="emojiPicker" aria-expanded="false" aria-controls="chatEmojis">'+emoji+'<span>插入表情</span></button></div>'+
+    '<div id="chatEmojis" class="chat-emojis" hidden>'+['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙'].map(x=>'<button type="button" data-emoji="'+x+'">'+x+'</button>').join('')+'</div></div>'+
+    '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" data-action="composerMenu" aria-label="聊天工具" aria-controls="composerMenu" aria-expanded="false">'+tools+'</button>'+
+    '<button type="submit" class="composer-send composer-icon" aria-label="寄出信件" title="寄出信件" '+(busy?'disabled':'')+'>'+star+'</button></div>';
 }
 function renderChatImagePreview(src){return '<div class="chat-image-preview"><img alt="待发送图片" src="'+esc(src)+'"><button type="button" data-action="removeChatImage">移除</button></div>';}
 function imageInMessage(m){
@@ -2008,6 +2017,7 @@ document.addEventListener('click',e=>{
       const form=$('localChatForm');try{localFormPreview(form,parseLocalForm(form));}catch(e){toast(e.message);}
       break;
     }
+    case 'composerMenu':{const menu=$('composerMenu');menu.hidden=!menu.hidden;b.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)b.scrollIntoView({block:'nearest'});break;}
     case 'emojiPicker':{const list=$('chatEmojis');list.hidden=!list.hidden;b.setAttribute('aria-expanded',String(!list.hidden));break;}
     case 'removeChatImage':{
       const c=contact(activeContact);if(c)chatImages.delete(imageKey(c.id,localConfig(c).mode));
