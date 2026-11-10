@@ -186,6 +186,7 @@ body.full-chat{overflow:hidden}
 .bubble .chat-timestamp{display:block;margin-top:4px;font-size:11px;color:inherit;opacity:.75;text-align:right;font-variant-numeric:tabular-nums}
 .chat-quote{margin:0 0 5px;padding:3px 8px;border-inline-start:2px solid currentColor;font-size:.85em;opacity:.8;white-space:pre-wrap;overflow-wrap:anywhere}.chat-quote-draft{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tea-room{height:100%;min-height:0;max-width:900px;margin:auto;display:flex;flex-direction:column;gap:12px;color:var(--ink);background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--gold) 11%,transparent),transparent 65%)}.tea-top{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:12px}.tea-top h2{margin:4px 0}.tea-meta{text-align:center;color:var(--muted);font-size:.9em}.tea-scroll{flex:1;min-height:0;overflow:auto;padding:10px clamp(6px,4vw,42px);overscroll-behavior:contain}.tea-passage,.tea-cue{white-space:pre-wrap;overflow-wrap:anywhere}.tea-cue{color:var(--muted);font-size:.9em;margin:12px 0 7px}.tea-passage{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:clamp(14px,3vw,26px);font-family:Georgia,'Songti SC',serif;font-size:1.08rem;line-height:1.9;margin-bottom:18px}.tea-room form{display:grid;gap:8px}.tea-room form button{justify-self:end}.tea-card{width:min(310px,92%);margin:10px auto;text-align:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.tea-card strong,.tea-card small{display:block;margin-bottom:5px}.tea-card strong{color:var(--gold)}.tea-card .row{justify-content:center}
+.tea-room{gap:10px;background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--gold) 12%,transparent),transparent 45%)}.tea-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:8px 2px 12px}.tea-heading{text-align:center}.tea-heading .eyebrow{font-size:10px;letter-spacing:.22em}.tea-heading h2{font-family:Georgia,'Songti SC',serif;font-size:clamp(25px,6vw,40px);color:var(--gold)}.tea-back{justify-self:start;border-radius:999px;padding:8px 12px}.tea-emblem{justify-self:end;display:inline-grid;place-items:center;width:44px;height:44px;border:1px solid var(--gold);border-radius:50%;color:var(--gold);background:var(--panel);box-shadow:0 0 18px color-mix(in srgb,var(--gold) 22%,transparent)}.tea-emblem svg{width:27px;height:27px}.tea-card .tea-emblem{width:26px;height:26px;vertical-align:middle}.tea-card .tea-emblem svg{width:18px;height:18px}.tea-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;font-size:.76rem}.tea-meta span{padding:4px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}.tea-room .tea-scroll{padding:8px clamp(0px,2vw,22px)}.tea-empty{text-align:center;padding:clamp(22px,7vh,70px) 14px;border:1px dashed var(--line);border-radius:22px;color:var(--muted)}.tea-empty span,.tea-empty h3{color:var(--gold)}.tea-empty span{font-size:28px}.tea-room .tea-passage{border-radius:14px 14px 14px 4px;border-inline-start:2px solid var(--gold);line-height:1.85}.tea-room .tea-cue{border-inline-start:1px solid var(--line);padding-inline-start:10px}.tea-room form{padding:10px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}.tea-room form textarea{margin:0;resize:vertical}.tea-status{margin:0;color:var(--muted);font-size:.86rem}.tea-live[hidden]{display:none}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1436,11 +1437,37 @@ function startTea(form){
 function teaNarrative(x){
   return x.turns.map(t=>'<div class="tea-cue">'+esc(t.input)+'</div>'+(t.output?'<div class="tea-passage">'+esc(t.output)+'</div>':'')).join('');
 }
+const teaPartial=new Map();
+function teaEmblem(){
+  return '<span class="tea-emblem" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 13h15v3a6 6 0 0 1-6 6h-3a6 6 0 0 1-6-6v-3Zm15 1h2a2.5 2.5 0 0 1 0 5h-2M6 25h20M12 9c-2-2 2-3 0-5m6 5c-2-2 2-3 0-5"/></svg></span>';
+}
+function teaHeader(back,label){
+  return '<header class="tea-top"><button type="button" class="tea-back" '+back+'>'+label+'</button><div class="tea-heading"><div class="eyebrow">TEA INTERLUDE</div><h2>茶叙</h2></div>'+teaEmblem()+'</header>';
+}
+function teaMeta(x,live){
+  const tags=[x.pov,storyStyles.includes(x.style)?x.style:'自定义文风','约 '+x.words+' 字／段',...(live?['流式续写']:[])];
+  return '<div class="tea-meta">'+tags.map(tag=>'<span>'+esc(tag)+'</span>').join('')+'</div>';
+}
 function renderTea(id){
   const x=teaById(id);if(!x)return;
-  const busy=teaBusy.has(id),pending=x.turns.at(-1)?.output==='';
-  dialog('<section class="tea-room" data-tea-room="'+esc(id)+'"><header class="tea-top"><button type="button" data-tea-cancel="'+esc(id)+'" '+(busy?'disabled':'')+'>‹ 结束茶叙</button><div><div class="eyebrow">TEA INTERLUDE</div><h2>茶叙</h2></div><span aria-hidden="true">☕</span></header><div class="tea-meta">'+esc(x.pov+' · '+x.style+' · 约 '+x.words+' 字／段')+'</div><div id="teaScroll" class="tea-scroll">'+(teaNarrative(x)||'<div class="tea-passage muted">茶已沏好。写下你说的话、做的事，或从旁观视角交代故事如何开始。</div>')+(busy?'<p role="status" class="muted">正在续写…</p>':'')+'</div><form id="teaWriteForm" data-id="'+esc(id)+'">'+(pending?'<p class="muted">这段尚未收到续写，可重试。</p>':'<textarea name="cue" rows="3" maxlength="10000" aria-label="续写输入" placeholder="以自己或旁观者的视角写下下一步…" required '+(busy?'disabled':'')+'></textarea>')+'<button class="primary" '+(busy?'disabled':'')+'>'+(pending?'重试续写':'继续茶叙')+'</button></form></section>',true);
+  const busy=teaBusy.has(id),pending=x.turns.at(-1)?.output==='',partial=teaPartial.get(id)||'';
+  dialog('<section class="tea-room" data-tea-room="'+esc(id)+'">'+teaHeader('data-tea-cancel="'+esc(id)+'" '+(busy?'disabled':''),'‹ 结束')+teaMeta(x,true)+
+    '<div id="teaScroll" class="tea-scroll">'+(teaNarrative(x)||'<div class="tea-empty"><span aria-hidden="true">✧</span><h3>茶已沏好</h3><p>写下你说的话、做的事，或从旁观视角展开这一幕。</p></div>')+
+    (busy||partial?'<div id="teaLive" class="tea-passage tea-live" '+(partial?'':'hidden')+'>'+esc(partial)+'</div>':'')+'</div>'+
+    '<form id="teaWriteForm" data-id="'+esc(id)+'">'+(pending?'<p class="tea-status" role="status">'+(busy?'正在续写…':partial?'续写中断，以上为本次预览。可重新生成这一段。':'这一段尚未完成，可以重试。')+'</p>':
+    '<textarea name="cue" rows="3" maxlength="10000" aria-label="续写输入" placeholder="以自己或旁观者的视角写下下一步…" required></textarea>')+
+    '<button class="primary" '+(busy?'disabled':'')+'>'+(busy?'续写中':pending?'重试续写':'继续茶叙')+'</button></form></section>',true);
   $('teaScroll').scrollTop=$('teaScroll').scrollHeight;
+}
+function showTeaDelta(id,delta){
+  const partial=(teaPartial.get(id)||'')+delta;
+  teaPartial.set(id,partial);
+  if($('dialog').querySelector('[data-tea-room]')?.dataset.teaRoom!==id)return;
+  const live=$('teaLive'),scroll=$('teaScroll');
+  if(!live||!scroll)return;
+  const follow=scroll.scrollHeight-scroll.scrollTop-scroll.clientHeight<48;
+  live.hidden=false;live.textContent=partial;
+  if(follow)scroll.scrollTop=scroll.scrollHeight;
 }
 function updateTea(x){
   return commit({...state,teaSessions:state.teaSessions.map(t=>t.id===x.id?x:t)});
@@ -1456,21 +1483,21 @@ async function writeTea(form){
   if(previous?.output!==''&&!input)return;
   const current=previous?.output===''?x:{...x,turns:[...x.turns,{input,output:''}]};
   if(current!==x&&!updateTea(current))return;
-  teaBusy.add(id);renderTea(id);
+  teaPartial.delete(id);teaBusy.add(id);renderTea(id);
   try{
     const roles=cast.map(c=>({姓名:displayName(c),人设:c.description,性格:c.personality,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
     const context=group?groupTranscript(group.messages.filter(m=>cast.every(c=>(!m.audience||m.audience.includes(c.id))&&(!Array.isArray(m.quote?.audience)||m.quote.audience.includes(c.id)))).slice(-10)).slice(-6000):
       JSON.stringify(recentDialogue((x.mode==='ai'?cast[0]:localConfig(cast[0])[x.mode]).messages)).slice(-6000);
     const world=cast.length===1?[worldContext('front',cast[0].id),worldContext('end',cast[0].id)].filter(Boolean).join('\n'):'';
     const system='你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。第一人称默认从用户角色的视角叙述。不得输出 NSFW 内容。\n'+chatTimeContext();
-    const response=await request(p,'chat/completions',{model:p.model,stream:false,messages:[
+    const response=await request(p,'chat/completions',{model:p.model,stream:true,messages:[
       {role:'system',content:system},
       {role:'user',content:JSON.stringify({参与角色:roles,用户:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1)).slice(-32000),最新输入:current.turns.at(-1).input})}
-    ]});
+    ]},delta=>showTeaDelta(id,delta));
     const output=dialogueReply(response).trim();
     if(!output)throw Error('模型没有返回正文，可重试。');
     if(teaById(id)!==current)throw Error('茶叙存档已变化，请重新打开。');
-    updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output}]});
+    if(updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output}]}))teaPartial.delete(id);
   }catch(error){toast(error.message);}
   finally{teaBusy.delete(id);if($('dialog').open&&$('dialog').querySelector('[data-tea-room]')?.dataset.teaRoom===id)renderTea(id);}
 }
@@ -1492,13 +1519,13 @@ function finishTea(id){
     const cfg=localConfig(c),session=x.mode==='ai'?c:cfg[x.mode],messages=[...session.messages,{...message,role:'assistant'}];
     next.contacts=state.contacts.map(role=>role!==c?role:x.mode==='ai'?{...role,messages}:{...role,chatModes:{...cfg,[x.mode]:{...session,messages}}});
   }
-  if(commit(next))teaBack(x.owner,x.mode);
+  if(commit(next)){teaPartial.delete(id);teaBack(x.owner,x.mode);}
 }
 function teaCard(x,index,selected,id,mode){
   if(!validTeaSession(x))return '';
   const key=' data-message-index="'+index+'" tabindex="0"'+(selected?' role="checkbox" aria-checked="'+selected.indices.has(index)+'"':'');
   const actions=' data-tea-mode="'+esc(mode)+'" data-tea-index="'+index+'"';
-  return '<article class="tea-card'+(selected?.indices.has(index)?' message-picked':'')+'"'+key+'><strong>☕ 茶叙</strong><small>'+esc(x.pov+' · '+x.turns.length+' 段')+'</small>'+(selected?'':'<div class="row"><button type="button" data-tea-read="'+esc(id)+'"'+actions+'>打开</button><button type="button" data-tea-export="'+esc(id)+'"'+actions+'>导出 TXT</button></div>')+'</article>';
+  return '<article class="tea-card'+(selected?.indices.has(index)?' message-picked':'')+'"'+key+'><strong>'+teaEmblem()+' 茶叙</strong><small>'+esc(x.pov+' · '+x.turns.length+' 段')+'</small>'+(selected?'':'<div class="row"><button type="button" data-tea-read="'+esc(id)+'"'+actions+'>打开</button><button type="button" data-tea-export="'+esc(id)+'"'+actions+'>导出 TXT</button></div>')+'</article>';
 }
 function findTeaCard(id,mode,index){
   const c=contact(id);
@@ -1507,7 +1534,7 @@ function findTeaCard(id,mode,index){
 }
 function readTeaCard(id,mode,index){
   const x=findTeaCard(id,mode,index);if(!x)return;
-  dialog('<section class="tea-room"><header class="tea-top"><button type="button" data-tea-back="'+esc(id)+'" data-tea-mode="'+esc(mode)+'">‹ 返回聊天</button><h2>☕ 茶叙</h2></header><div class="tea-scroll">'+teaNarrative(x)+'</div></section>',true);
+  dialog('<section class="tea-room">'+teaHeader('data-tea-back="'+esc(id)+'" data-tea-mode="'+esc(mode)+'"','‹ 返回')+teaMeta(x,false)+'<div class="tea-scroll">'+teaNarrative(x)+'</div></section>',true);
 }
 function exportTeaCard(id,mode,index){
   const x=findTeaCard(id,mode,index);if(!x)return;
