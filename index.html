@@ -567,23 +567,28 @@ function groupMemory(c){
     });
   return notes.length?'以下是允许互通的近期群聊记录，作为背景资料：\n'+notes.join('\n\n').slice(-16000):'';
 }
+function groupAvatar(g){
+  return avatarMarkup({name:g?.name||'群',avatar:typeof g?.avatar==='string'?g.avatar:'',frame:{src:'',ring:false}},'group-avatar');
+}
 function groupDirectory(){
   return '<div class="row between"><h3>群聊</h3><button type="button" data-group-edit="">＋ 新建群聊</button></div>'+
-    state.groups.map(g=>'<button class="directory-item" data-group-open="'+esc(g.id)+'"><span><strong>'+esc(g.name)+'</strong><small>'+g.members.filter(id=>contact(id)).length+' 位角色 · '+(g.shared?'记忆互通':'独立记忆')+'</small></span><b>›</b></button>').join('');
+    state.groups.map(g=>'<button class="directory-item" data-group-open="'+esc(g.id)+'">'+groupAvatar(g)+'<span><strong>'+esc(g.name)+'</strong><small>'+g.members.filter(id=>contact(id)).length+' 位角色 · '+(g.shared?'记忆互通':'独立记忆')+'</small></span><b>›</b></button>').join('');
 }
 function editGroup(id){
   const g=groupById(id);
   if(groupJobs.has(id))return;
   const members=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="member" value="'+esc(c.id)+'" '+(g?.members.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
-  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="showTime" '+(g?.showTime!==false?'checked':'')+'>显示消息时间戳</label><label class="world-scope-choice"><input type="checkbox" name="split" '+(g?.split===true?'checked':'')+'>角色分句显示</label><label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，每个角色可参考自己的近期 AI 私聊与已保存记忆，私聊也可参考该角色参与过的近期群聊。角色可能在群里提到私聊内容。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
+  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><div class="row"><span id="groupAvatarPreview">'+groupAvatar(g)+'</span><label>群聊头像<input id="groupAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" data-action="removeGroupAvatar">移除头像</button></div><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="showTime" '+(g?.showTime!==false?'checked':'')+'>显示消息时间戳</label><label class="world-scope-choice"><input type="checkbox" name="split" '+(g?.split===true?'checked':'')+'>角色分句显示</label><label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，每个角色可参考自己的近期 AI 私聊与已保存记忆，私聊也可参考该角色参与过的近期群聊。角色可能在群里提到私聊内容。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
+  $('groupSettings').avatarDraft=g?.avatar||'';
 }
 function saveGroupSettings(form){
+  if($('groupAvatarFile').dataset.loading)throw Error('头像正在处理，请稍候。');
   const data=new FormData(form),id=form.dataset.id,old=groupById(id);
   const members=[...new Set(data.getAll('member').filter(roleId=>contact(roleId)))];
   const name=String(data.get('name')||'').trim();
   if(!name||members.length<2)throw Error('请填写群聊名称，并选择至少两位角色。');
   if(groupJobs.has(id))return;
-  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,shared:data.has('shared'),showTime:data.has('showTime'),split:data.has('split')};
+  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,avatar:form.avatarDraft||'',shared:data.has('shared'),showTime:data.has('showTime'),split:data.has('split')};
   if(old)group.messages=old.messages.map(m=>m.audience?m:{...m,audience:old.members});
   group.pending=group.pending.filter(roleId=>members.includes(roleId));
   if(commit({...state,groups:old?state.groups.map(g=>g.id===id?group:g):[...state.groups,group]})){render();openGroup(group.id);}
@@ -603,7 +608,7 @@ function openGroup(id){
   const g=groupById(id);if(!g)return;
   const selected=messageSelection(g,'group',g.messages);
   const lock=teaLock(g.members),busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
-  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button><div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
+  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
     (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
     (speaker?typingBubble(speaker,true,true):'')+'</div>'+ (lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
@@ -1637,14 +1642,14 @@ async function readChatImage(input){
   const src=await encodeChatImage(file);
   if(input.isConnected){chatImages.set(k,src);$('chatImagePreview').innerHTML=renderChatImagePreview(src);}
 }
-async function encodeChatImage(file){
+async function encodeChatImage(file,maxSize=960){
   if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size>10_000_000)throw Error('请选择不超过 10 MB 的 PNG、JPG、WebP 或 GIF。');
   if(file.type==='image/gif'){
     if(file.size>400_000)throw Error('动态表情包请使用不超过 400 KB 的 GIF。');
     return billImageData(file);
   }else{
     const image=await createImageBitmap(file);
-    const ratio=Math.min(1,960/Math.max(image.width,image.height));
+    const ratio=Math.min(1,maxSize/Math.max(image.width,image.height));
     const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.width*ratio));canvas.height=Math.max(1,Math.round(image.height*ratio));
     canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);image.close();
     return canvas.toDataURL('image/webp',.8);
@@ -2747,6 +2752,9 @@ document.addEventListener('click',e=>{
     case 'rollChatDice':playChatGame('dice');break;
     case 'playChatRps':playChatGame('rps');break;
     case 'emojiPicker':{const list=$('chatEmojis');list.hidden=!list.hidden;b.setAttribute('aria-expanded',String(!list.hidden));break;}
+    case 'removeGroupAvatar':{
+      const form=$('groupSettings'),input=$('groupAvatarFile');input.value='';form.avatarDraft='';$('groupAvatarPreview').innerHTML=groupAvatar({name:form.elements.name.value});break;
+    }
     case 'removeChatImage':{
       const room=b.closest('[data-group-room]'),c=contact(activeContact);
       if(room)groupImages.delete(room.dataset.groupRoom);else if(c)chatImages.delete(imageKey(c.id,localConfig(c).mode));
@@ -2792,6 +2800,14 @@ document.addEventListener('change',async e=>{
     if(t.id==='streamReplies'&&!commit({...state,streamReplies:t.checked}))t.checked=state.streamReplies;
     if(t.dataset.groupActionWriting!==undefined){
       const g=groupById(t.dataset.groupActionWriting);if(g&&!groupJobs.has(g.id))patchGroup(g,{actionWriting:t.checked});
+    }
+    if(t.id==='groupAvatarFile'&&t.files[0]){
+      const file=t.files[0],form=t.form;
+      t.dataset.loading='true';
+      try{
+        const avatar=await encodeChatImage(file,256);
+        if(t.isConnected&&t.files[0]===file){form.avatarDraft=avatar;$('groupAvatarPreview').innerHTML=groupAvatar({name:form.elements.name.value,avatar});}
+      }finally{delete t.dataset.loading;}
     }
     if(t.id==='chatImage'){
       const room=t.closest('[data-group-room]'),file=t.files[0];
