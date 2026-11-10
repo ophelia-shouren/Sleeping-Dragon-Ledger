@@ -154,9 +154,14 @@ body.full-chat{overflow:hidden}
 .chat-display-settings{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--control)}
 .chat-display-settings .chat-bubble-limit{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}.chat-bubble-limit input{width:68px;margin:0}
 .quick-model-heading{margin:15px 0 3px;color:var(--gold)}
+.amount-control{display:flex;align-items:flex-end;gap:6px;min-width:0}.amount-control label{flex:1;min-width:0}.amount-control button{margin-bottom:10px;white-space:nowrap;color:var(--gold)}
+#calculator{width:min(330px,calc(100vw - 24px))}#calculator h2{margin-bottom:10px}
+.calculator-result{display:block;padding:8px 10px;margin:0 0 10px;border-radius:8px;border:1px solid var(--line);background:var(--field);color:var(--gold);overflow-wrap:anywhere}
+.calculator-keys{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.calculator-keys button{padding:7px 2px;min-height:38px}
+.calculator-keys button:nth-child(4n),.calculator-keys button[data-calc-key="="]{color:var(--gold);background:var(--selected)}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
-<main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog>
+<main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
 'use strict';
 
@@ -689,7 +694,7 @@ function engageDeviceLock(){
   deviceLocked=true;
   $('homeOrb').hidden=true;
   document.body.classList.remove('full-chat');
-  for(const id of ['dialog','modelError'])if($(id).open)$(id).close();
+  for(const id of ['calculator','dialog','modelError'])if($(id).open)$(id).close();
   $('view').replaceChildren();
   $('toast').textContent='';$('toast').style.display='none';
   document.querySelector('main').inert=true;
@@ -1597,6 +1602,92 @@ function initMessageTools(){
 </script>
 <script>
 'use strict';
+
+function calculateAmount(expression){
+  const source=expression.trim().replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/（/g,'(').replace(/）/g,')');
+  if(!source||source.length>120)throw Error('请输入 120 字以内的算式。');
+  const tokenPattern=/\s*(?:(\d+(?:\.\d*)?|\.\d+)|([()+*/-]))/y;
+  const tokens=[];
+  while(tokenPattern.lastIndex<source.length){
+    const token=tokenPattern.exec(source);
+    if(!token)throw Error('算式中有无法识别的字符。');
+    tokens.push(token[1]===undefined?token[2]:Number(token[1]));
+  }
+  let i=0;
+  function operand(){
+    const token=tokens[i++];
+    if(typeof token==='number')return token;
+    if(token==='-'||token==='+')return (token==='-'?-1:1)*operand();
+    if(token==='('){
+      const n=sum();
+      if(tokens[i++]!==')')throw Error('括号不匹配。');
+      return n;
+    }
+    throw Error('请检查算式是否完整。');
+  }
+  function product(){
+    let n=operand();
+    while(tokens[i]==='*'||tokens[i]==='/'){
+      const op=tokens[i++],rhs=operand();
+      if(op==='/'&&rhs===0)throw Error('除数不能为零。');
+      n=op==='*'?n*rhs:n/rhs;
+    }
+    return n;
+  }
+  function sum(){
+    let n=product();
+    while(tokens[i]==='+'||tokens[i]==='-'){
+      const op=tokens[i++],rhs=product();
+      n=op==='+'?n+rhs:n-rhs;
+    }
+    return n;
+  }
+  const result=sum();
+  if(i!==tokens.length)throw Error('请检查运算符和括号。');
+  if(!Number.isFinite(result))throw Error('结果超出可计算范围。');
+  return result;
+}
+function openCalculator(button){
+  const modal=$('calculator'),amount=button.closest('.amount-control').querySelector('[name=amount]');
+  modal.amount=amount;
+  const keys=['(',')','清空','⌫','7','8','9','÷','4','5','6','×','1','2','3','−','0','.','=','+'];
+  modal.innerHTML='<h2 id="calculatorTitle">金额计算器</h2><label>算式<input id="calcExpression" maxlength="120" inputmode="none" autocomplete="off" placeholder="例如 (24+16)÷2" value="'+esc(amount.value)+'"></label>'+
+    '<output id="calcResult" class="calculator-result" aria-live="polite">输入算式后按等号</output>'+
+    '<div class="calculator-keys">'+keys.map(key=>'<button type="button" data-calc-key="'+key+'">'+key+'</button>').join('')+'</div>'+
+    '<div class="row actions"><button type="button" class="primary" data-calc-key="apply">填入金额</button><button type="button" data-calc-key="cancel">取消</button></div>';
+  modal.showModal();
+  const input=$('calcExpression');input.focus();input.select();
+}
+function calculatorAction(key){
+  const modal=$('calculator'),input=$('calcExpression'),result=$('calcResult');
+  if(key==='cancel'){modal.close();return;}
+  if(key==='='||key==='apply'){
+    try{
+      const n=calculateAmount(input.value);
+      result.textContent=String(Number(n.toPrecision(15)));
+      if(key==='apply'){
+        const cents=Math.round(Number((n*100).toPrecision(15)));
+        if(!Number.isSafeInteger(cents)||cents<=0)throw Error('账目金额须大于 0，并保留两位小数。');
+        if(!modal.amount?.isConnected){modal.close();return;}
+        modal.amount.value=(cents/100).toFixed(2);
+        modal.close();
+        modal.amount.focus();
+      }
+    }catch(error){result.textContent=error.message;}
+    return;
+  }
+  if(key==='清空')input.value='';
+  else{
+    const start=input.selectionStart,end=input.selectionEnd;
+    if(key==='⌫')input.setRangeText('',start===end?Math.max(0,start-1):start,end,'end');
+    else if(input.value.length-(end-start)<120)input.setRangeText(key,start,end,'end');
+  }
+  result.textContent='输入算式后按等号';
+  input.focus();
+}
+</script>
+<script>
+'use strict';
 const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
@@ -1724,7 +1815,7 @@ function render(){
 }
 function dialog(html){$('dialog').innerHTML=html;if(!$('dialog').open)$('dialog').showModal();}
 function billFields(x={}){
-  return '<div class="fields"><label>项目<input name="title" required value="'+esc(x.title)+'"></label><label>金额（元）<input name="amount" type="number" required min="0.01" step="0.01" value="'+(x.cents?x.cents/100:'')+'"></label><label>方向<select name="type"><option value="expense">支出</option><option value="income" '+(x.type==='income'?'selected':'')+'>收入</option></select></label><label>日期<input name="date" type="date" required value="'+esc(x.date||dateString())+'"></label><label>分类<input name="category" required value="'+esc(x.category||'其他')+'"></label></div>';
+  return '<div class="fields"><label>项目<input name="title" required value="'+esc(x.title)+'"></label><div class="amount-control"><label>金额（元）<input name="amount" type="number" required min="0.01" step="0.01" value="'+(x.cents?x.cents/100:'')+'"></label><button type="button" data-action="calculator" aria-haspopup="dialog">计算器</button></div><label>方向<select name="type"><option value="expense">支出</option><option value="income" '+(x.type==='income'?'selected':'')+'>收入</option></select></label><label>日期<input name="date" type="date" required value="'+esc(x.date||dateString())+'"></label><label>分类<input name="category" required value="'+esc(x.category||'其他')+'"></label></div>';
 }
 function editor(id){
   const x=state.bills.find(x=>x.id===id);
@@ -1831,6 +1922,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
   if(d.page){if(d.page==='chat')activeContact='';go(d.page);}
+  if(d.calcKey)calculatorAction(d.calcKey);
   if(d.chat)openThread(d.chat);
   if(d.messageCommand)messageCommand(d.messageCommand);
   if(d.chatMode){
@@ -1876,6 +1968,7 @@ document.addEventListener('click',e=>{
     case 'exportMessages':exportSelectedMessages();break;
     case 'deleteMessages':deleteSelectedMessages();break;
     case 'exitMessages':selection=null;renderMessageTools();break;
+    case 'calculator':openCalculator(b);break;
     case 'chatDirectory':openChatDirectory();break;
     case 'homeOrb':openHomeOrb();break;
     case 'orbHome':$('dialog').close();activeContact='';go('home');break;
@@ -2035,6 +2128,9 @@ window.addEventListener('storage',e=>{
     state=next;
     if(!document.activeElement?.matches('input,textarea,select')&&!$('dialog').open)render();
   }catch{toast('另一个标签页的存档无法读取。');}
+});
+$('calculator').addEventListener('keydown',e=>{
+  if(e.target.id==='calcExpression'&&e.key==='Enter'&&!e.isComposing){e.preventDefault();calculatorAction('=');}
 });
 initHomeOrb();
 initMessageTools();
