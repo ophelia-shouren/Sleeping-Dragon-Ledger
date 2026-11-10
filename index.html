@@ -174,9 +174,10 @@ body.full-chat{overflow:hidden}
 .story-sun{display:inline-grid;place-items:center;min-width:32px;min-height:32px;padding:4px;background:transparent;border:1px solid transparent;color:var(--muted);opacity:.68}.story-sun:hover,.story-sun:focus-visible{opacity:1;color:var(--gold);border-color:var(--line)}.story-sun svg{width:17px;height:17px}.story-choices{display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}.story-choices label{display:flex;align-items:center;gap:5px;padding:4px 7px}.story-choices input,.story-entry input[type=checkbox]{width:auto;margin:0}.story-entry{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line)}.bubble:has(p){overflow-wrap:anywhere}.story-paper{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85;max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:12px}.story-progress{white-space:pre-wrap}
 #dialog.story-fullscreen{position:fixed;inset:0;margin:0;width:100%;height:100%;height:100dvh;max-width:none;max-height:none;border:0;border-radius:0;box-sizing:border-box;overflow:auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 .story-shell{width:min(100%,840px);margin:0 auto}.story-shelf-hero{text-align:center;border:1px solid var(--line);border-radius:18px;padding:24px;background:radial-gradient(ellipse at top,var(--line),transparent 75%)}.story-shelf-hero span{color:var(--gold);font-size:34px}.story-shelf-hero p{font-size:1.35rem;margin:.3em}.story-shelf-hero button{display:block;margin:14px auto 0}.story-shell .story-entry{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--field)}.story-entry button{flex:1;text-align:left;overflow-wrap:anywhere}.story-reader-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;color:var(--gold);margin:10px 0}.story-reader-bar label{display:flex;align-items:center;gap:6px}.story-reader-bar input{width:min(30vw,150px);padding:0}.story-shell .story-reader{max-height:none;padding:clamp(14px,4vw,44px);line-height:1.95;background:var(--field)}.story-style-chip{border:1px solid var(--line);border-radius:999px;touch-action:pan-y;user-select:none}.story-style-chip:has(input:checked){border-color:var(--gold)}.story-style-editor{border:1px solid var(--line);border-radius:10px;padding:12px}.story-style-editor label{margin-block:8px}
+.story-reader-exit{display:flex;justify-content:center;padding:18px 0 56px}.story-reader-exit button{border-color:var(--gold);color:var(--gold);padding:10px 20px}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
-<main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
+<main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
 'use strict';
 
@@ -359,7 +360,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
-    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色',x.id)+'</div>');
+    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
     $('storyReader').style.fontSize=size+'px';$('storyFontValue').textContent=size+' px';
@@ -937,7 +938,7 @@ function engageDeviceLock(){
   deviceLocked=true;
   $('homeOrb').hidden=true;
   document.body.classList.remove('full-chat');
-  for(const id of ['calculator','dialog','modelError'])if($(id).open)$(id).close();
+  for(const id of ['orbQuickDialog','calculator','dialog','modelError'])if($(id).open)$(id).close();
   $('view').replaceChildren();
   $('toast').textContent='';$('toast').style.display='none';
   document.querySelector('main').inert=true;
@@ -1627,9 +1628,12 @@ function saveDeckPreset(form){
 function openHomeOrb(){
   const c=page==='chat'?contact(activeContact):null,current=c?c.preset:state.profile;
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===current?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
-  dialog('<h2>快捷导航</h2><div class="row"><button type="button" class="primary" data-action="orbHome">回到主页</button><button type="button" data-action="close">取消</button></div>'+
+  const panel=$('orbQuickDialog'),insideStory=$('dialog').open&&$('dialog').classList.contains('story-fullscreen');
+  const html='<h2>快捷导航</h2><div class="row"><button type="button" class="primary" data-action="orbHome">回到主页</button><button type="button" data-action="'+(insideStory?'orbCancel':'close')+'">取消</button></div>'+
     '<h3 class="quick-model-heading">快速更换 API 预设</h3><p class="muted">'+(c?'应用于 '+esc(displayName(c)):'应用于全局默认预设')+'</p>'+
-    (options?'<form id="quickProfileForm" data-contact="'+esc(c?.id||'')+'"><label>API 预设<select name="profile"><option value="">'+(c?'跟随全局预设':'未选择预设')+'</option>'+options+'</select></label><button class="primary">应用预设</button></form>':'<p class="muted">还没有已保存的 API 预设。</p>'));
+    (options?'<form id="quickProfileForm" data-contact="'+esc(c?.id||'')+'"><label>API 预设<select name="profile"><option value="">'+(c?'跟随全局预设':'未选择预设')+'</option>'+options+'</select></label><button class="primary">应用预设</button></form>':'<p class="muted">还没有已保存的 API 预设。</p>');
+  if(insideStory){panel.innerHTML=html;panel.showModal();}
+  else dialog(html);
 }
 function saveQuickProfile(form){
   const id=form.elements.profile.value;
@@ -1637,7 +1641,7 @@ function saveQuickProfile(form){
   const c=form.dataset.contact?contact(form.dataset.contact):null;
   if(form.dataset.contact&&!c)return;
   const saved=c?replaceContact(c.id,{preset:id}):commit({...state,profile:id});
-  if(saved){$('dialog').close();render();toast('API 预设已切换');}
+  if(saved){form.closest('dialog').close();render();toast('API 预设已切换');}
 }
 function initHomeOrb(){
   const orb=$('homeOrb');
@@ -2116,7 +2120,15 @@ function render(){
   if($('messages')) $('messages').scrollTop=$('messages').scrollHeight;
   scheduleTypingReveal();
 }
-function dialog(html,full=false){$('dialog').classList.toggle('story-fullscreen',full);$('dialog').innerHTML=html;$('dialog').scrollTop=0;if(!$('dialog').open)$('dialog').showModal();}
+function dialog(html,full=false){
+  const panel=$('dialog'),orb=$('homeOrb');
+  if(panel.contains(orb))panel.before(orb);
+  panel.classList.toggle('story-fullscreen',full);
+  panel.innerHTML=html;
+  if(full)panel.append(orb);
+  panel.scrollTop=0;
+  if(!panel.open)panel.showModal();
+}
 function billFields(x={}){
   return '<div class="fields"><label>项目<input name="title" required value="'+esc(x.title)+'"></label><div class="amount-control"><label>金额（元）<input name="amount" type="number" required min="0.01" step="0.01" value="'+(x.cents?x.cents/100:'')+'"></label><button type="button" data-action="calculator" aria-haspopup="dialog">计算器</button></div><label>方向<select name="type"><option value="expense">支出</option><option value="income" '+(x.type==='income'?'selected':'')+'>收入</option></select></label><label>日期<input name="date" type="date" required value="'+esc(x.date||dateString())+'"></label><label>分类<input name="category" required value="'+esc(x.category||'其他')+'"></label></div>';
 }
@@ -2276,7 +2288,8 @@ document.addEventListener('click',e=>{
     case 'currentScene':openCurrentScene();break;
     case 'chatDirectory':openChatDirectory();break;
     case 'homeOrb':openHomeOrb();break;
-    case 'orbHome':$('dialog').close();activeContact='';go('home');break;
+    case 'orbCancel':$('orbQuickDialog').close();break;
+    case 'orbHome':$('orbQuickDialog').close();$('dialog').close();activeContact='';go('home');break;
     case 'localChatSettings':openLocalChatSettings();break;
     case 'localChatPreview':{
       const form=$('localChatForm');try{localFormPreview(form,parseLocalForm(form));}catch(e){toast(e.message);}
@@ -2448,7 +2461,11 @@ initHomeOrb();
 initMessageTools();
 initDeviceLock();
 document.addEventListener('visibilitychange',resetIdleTimer);
-$('dialog').addEventListener('close',resetIdleTimer);
+$('dialog').addEventListener('close',()=>{
+  const panel=$('dialog'),orb=$('homeOrb');
+  if(!panel.open&&panel.contains(orb))panel.before(orb);
+  resetIdleTimer();
+});
 render();
 
 function billImageData(file){
