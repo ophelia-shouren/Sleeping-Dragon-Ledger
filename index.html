@@ -1765,8 +1765,14 @@ function chatBubbleParts(message,prefs){
   const lines=content.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(message.role==='user')return lines.length?lines:[''];
   const segmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter('zh',{granularity:'sentence'}):null;
-  const parts=lines.flatMap(line=>segmenter?Array.from(segmenter.segment(line),x=>x.segment.trim()):
-    (line.match(/[^。！？!?]+[。！？!?]*|[。！？!?]+/g)||[line]));
+  const titleDot=/\b(?:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Rev|Sr|Jr|St)\.(?=[ \t]*\p{L})/giu;
+  const placeholder='\uE000';
+  const parts=lines.flatMap(line=>{
+    const protectedLine=line.replace(titleDot,title=>title.slice(0,-1)+placeholder);
+    const segments=segmenter?Array.from(segmenter.segment(protectedLine),x=>x.segment.trim()):
+      (protectedLine.match(/[^。！？!?]+[。！？!?]*|[。！？!?]+/g)||[protectedLine]);
+    return segments.map(segment=>segment.replace(/\b(Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Rev|Sr|Jr|St)\uE000/gi,'$1.'));
+  });
   if(parts.length>prefs.limit)return [...parts.slice(0,prefs.limit-1),parts.slice(prefs.limit-1).join('\n')];
   return parts.length?parts:[''];
 }
