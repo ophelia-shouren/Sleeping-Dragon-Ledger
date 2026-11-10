@@ -184,6 +184,7 @@ body.full-chat{overflow:hidden}
 .group-room{height:100%;min-height:0;display:flex;flex-direction:column;gap:10px}.group-room .chat-top,.group-room form{flex:none}.group-room .messages{flex:1;min-height:0;max-height:none;overflow:auto}.group-room form textarea{flex:1;min-width:0;min-height:52px}.group-room .messages .panel{margin:0 0 8px;padding:10px 14px}.group-room .messages strong{color:var(--gold)}
 .group-room .messages{padding:8px 3px}.group-room #groupChatForm textarea{width:100%}.group-room #groupChatForm{min-width:0}
 .bubble .chat-timestamp{display:block;margin-top:4px;font-size:11px;color:inherit;opacity:.75;text-align:right;font-variant-numeric:tabular-nums}
+.chat-quote{margin:0 0 5px;padding:3px 8px;border-inline-start:2px solid currentColor;font-size:.85em;opacity:.8;white-space:pre-wrap;overflow-wrap:anywhere}.chat-quote-draft{display:flex;align-items:center;justify-content:space-between;gap:8px}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -551,10 +552,10 @@ async function submitStoryForm(form,submitter){
   }
 }
 const groupById=id=>state.groups.find(g=>g.id===id);
-const groupJobs=new Set(),groupImages=new Map(),groupDrafts=new Map();
-const groupTranscript=messages=>messages.map(m=>(chatTime(m.sentAt)?'['+chatTime(m.sentAt)+'] ':'')+m.speaker+'：'+[m.content,m.caption?'[图片描述] '+m.caption:m.image?'[图片]':''].filter(Boolean).join('\n')).join('\n');
+const groupRerolls=new Map(),groupJobs=new Set(),groupImages=new Map(),groupDrafts=new Map();
+const groupTranscript=messages=>messages.map(m=>(chatTime(m.sentAt)?'['+chatTime(m.sentAt)+'] ':'')+m.speaker+'：'+[quoteText(m.quote)?'[引用消息] '+quoteText(m.quote):'',m.content,m.caption?'[图片描述] '+m.caption:m.image?'[图片]':''].filter(Boolean).join('\n')).join('\n');
 function groupMessagesFor(g,id){
-  return g.messages.filter(m=>!m.audience||m.audience.includes(id));
+  return g.messages.filter(m=>!m.audience||m.audience.includes(id)).map(m=>Array.isArray(m.quote?.audience)&&!m.quote.audience.includes(id)?{...m,quote:undefined}:m);
 }
 function groupMemory(c){
   const notes=state.groups.filter(g=>g.shared&&g.members.includes(c.id)&&g.messages.length)
@@ -590,17 +591,18 @@ function openGroupGames(id){
   if(!g||groupJobs.has(id)||g.pending.length)return;
   dialog('<h2>群聊小游戏</h2><p class="muted">选择一位角色参加这一局，结果和点评会发到群里。</p><form id="groupGameForm" data-id="'+esc(id)+'"><label>参与角色<select name="member">'+g.members.map(contact).filter(Boolean).map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><div class="row"><button name="kind" value="dice">掷骰子</button><button name="kind" value="rps">猜拳</button></div><label>自定义 N 选一<textarea name="options" maxlength="2000" placeholder="每行一个选项，至少两项"></textarea></label><div class="row"><button name="kind" value="options">抽一个</button><button type="button" data-group-open="'+esc(id)+'">返回群聊</button></div></form>');
 }
-function groupBubble(m,g){
+function groupBubble(m,g,index,selected){
   const mine=!m.roleId,role=mine?'user':'assistant';
   const person=appearance(m.roleId||'user')||{name:m.speaker,avatar:'',frame:{src:'',ring:false}};
-  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+'<p>'+esc(part)+'</p>'+(i===parts.length-1?imageInMessage(m)+(g.showTime!==false?chatTimestamp(m):''):'')+'</article></div>').join('');
+  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+(selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+(i===0?quoteMarkup(m.quote):'')+'<p>'+esc(part)+'</p>'+(i===parts.length-1?imageInMessage(m)+(g.showTime!==false?chatTimestamp(m):''):'')+'</article></div>').join('');
 }
 function openGroup(id){
   const g=groupById(id);if(!g)return;
-  const busy=groupJobs.has(id),speaker=busy&&contact(g.pending[0]),locked=busy||g.pending.length;
-  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button><div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div><div id="groupMessages" class="messages">'+
-    (g.messages.map(m=>groupBubble(m,g)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
-    (speaker?typingBubble(speaker,true,true):'')+'</div><form id="groupChatForm" data-id="'+esc(id)+'"><textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
+  const selected=messageSelection(g,'group',g.messages);
+  const busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
+  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button><div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
+    (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
+    (speaker?typingBubble(speaker,true,true):'')+'</div><form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form></section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
 }
@@ -609,6 +611,37 @@ function refreshGroup(id){
 }
 function patchGroup(g,patch){
   if(!commit({...state,groups:state.groups.map(x=>x.id===g.id?{...x,...patch}:x)}))throw Error('群聊保存失败。');
+}
+async function groupReply(g,c,guide=''){
+  const p=profileFor(c);
+  if(!p)throw Error(displayName(c)+'缺少可用的 API 预设。');
+  const action=g.actionWriting===true;
+  const gameResult=groupMessagesFor(g,c.id).findLast(m=>!m.roleId)?.gameResult;
+  const system=[
+    worldContext('front',c.id),chatTimeContext(),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
+    '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
+    '人设：'+c.description,'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
+    g.shared?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
+    guide?'重新生成这条回复。用户给出的改写提示：'+guide:'',
+    g.scene?'【当前场景】\n'+g.scene:'',
+    gameResult?'本轮小游戏结果已由网页随机确定：'+JSON.stringify(gameResult)+'。根据结果点评，不要重新抽取或重复报出结果。':'',
+    worldContext('end',c.id),action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作和旁白，禁止「低吼」和「骨血里」。只返回 JSON 对象 {"dialogue":"角色台词"}。'
+  ].filter(Boolean).join('\n\n');
+  const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:groupTranscript(groupMessagesFor(g,c.id).slice(-24)).slice(-12000)}]});
+  const reply=dialogueReply(response,action?dialogueText:spokenReply);
+  if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
+  return gameResult?gameResult+'\n'+reply:reply;
+}
+async function rerollGroup(id,index,guide){
+  const g=groupById(id),m=g?.messages[index],c=m&&contact(m.roleId);
+  if(!g||!c||!g.members.includes(c.id)){toast('该角色已不在群聊中。');return;}
+  groupJobs.add(id);groupRerolls.set(id,c.id);refreshGroup(id);
+  try{
+    const content=await groupReply({...g,messages:g.messages.slice(0,index)},c,guide||'请换一种表达。');
+    if(groupById(id)!==g)throw Error('群聊已更新，请重试。');
+    patchGroup(g,{messages:g.messages.map((message,i)=>i===index?{...message,content}:message)});
+  }catch(error){toast(error.message);}
+  finally{groupJobs.delete(id);groupRerolls.delete(id);refreshGroup(id);}
 }
 async function sendGroup(id,message='',file=null,game=null){
   if(groupJobs.has(id))return;
@@ -621,35 +654,21 @@ async function sendGroup(id,message='',file=null,game=null){
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
       if(members.some(c=>!profileFor(c)))throw Error('请为群成员设置可用的 API 预设。');
+      const quote=!game&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
       const caption=image?await describeChatImage(image):'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
-      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(image?{image,caption}:{}),...(game?{gameResult:game.result}:{})}]});
+      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image,caption}:{}),...(game?{gameResult:game.result}:{})}]});
     }
-    if(!game&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);}
+    if(!game&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);chatQuotes.delete(quoteKey(id,'group'));}
     refreshNeeded=true;
     refreshGroup(id);
     while((g=groupById(id))?.pending.length){
       const [roleId,...pending]=g.pending,c=contact(roleId);
       if(!c){patchGroup(g,{pending});continue;}
-      const p=profileFor(c);
-      if(!p)throw Error(displayName(c)+'缺少可用的 API 预设。');
-      const action=g.actionWriting===true;
-      const gameResult=g.messages.findLast(m=>!m.roleId)?.gameResult;
-      const system=[
-        worldContext('front',c.id),chatTimeContext(),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
-        '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
-        '人设：'+c.description,'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
-        g.shared?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
-        g.scene?'【当前场景】\n'+g.scene:'',
-        gameResult?'本轮小游戏结果已由网页随机确定：'+JSON.stringify(gameResult)+'。根据结果点评，不要重新抽取或重复报出结果。':'',
-        worldContext('end',c.id),action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作和旁白，禁止「低吼」和「骨血里」。只返回 JSON 对象 {"dialogue":"角色台词"}。'
-      ].filter(Boolean).join('\n\n');
-      const response=await request(p,'chat/completions',{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:groupTranscript(groupMessagesFor(g,c.id).slice(-24)).slice(-12000)}]});
-      const reply=dialogueReply(response,action?dialogueText:spokenReply);
-      if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
+      const content=await groupReply(g,c);
       if(groupById(id)!==g)throw Error('群聊已更新，请核对后重试。');
-      patchGroup(g,{pending,messages:[...g.messages,{speaker:displayName(c),roleId,content:gameResult?gameResult+'\n'+reply:reply,sentAt:Date.now(),audience:g.members.slice()}]});
+      patchGroup(g,{pending,messages:[...g.messages,{speaker:displayName(c),roleId,content,sentAt:Date.now(),audience:g.members.slice()}]});
       refreshGroup(id);
     }
   }catch(error){toast(error.message);}
@@ -677,10 +696,10 @@ function chat(){
       if(mode==='keyword'&&replyPending(x,now))return typingBubble(c);
       const mine=x.role==='user',person=mine?chatUser:c,image=imageInMessage(x);
       const parts=chatBubbleParts(x,prefs);
-      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(x.storyForward?forwardedStoryCard(x):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
+      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
-    '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+chatAttachments(c,busy)+'</form></section>';
+    '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form></section>';
 }
 function cards(){
   const roles=state.contacts.map(c=>'<button class="directory-item" data-card="'+esc(c.id)+'">'+avatarMarkup(c)+'<span><strong>'+esc(displayName(c))+'</strong><small>角色人设与模型预设</small></span><b>›</b></button>').join('');
@@ -777,14 +796,15 @@ async function send(retry=false,reroll=null,gameTurn=null){
   const p=profileFor(c);
   if(!p){toast('请为该角色选择可用的模型预设。');return;}
   const content=gameTurn?.content??c.draft.trim();
+  const qKey=quoteKey(c.id,'ai'),quote=!gameTurn&&chatQuotes.get(qKey);
   const key=imageKey(c.id,'ai'),image=reroll||gameTurn?null:retry?c.messages.at(-1)?.image:chatImages.get(key);
   if(reroll?c.messages[reroll.index]?.role!=='assistant':retry?c.messages.at(-1)?.role!=='user':!content&&!image)return;
   if(image&&(!state.imageApi.url||!state.imageApi.model)&&(!retry||!c.messages.at(-1)?.caption)){
     toast('请先配置图片专用 API 和视觉识别模型。');return;
   }
-  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,sentAt:Date.now(),...(image?{image}:{}),...(gameTurn?.result?{gameResult:gameTurn.result}:{}),...(gameTurn?.storyForward?{storyForward:true}:{})}];
+  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(image?{image}:{}),...(gameTurn?.result?{gameResult:gameTurn.result}:{}),...(gameTurn?.storyForward?{storyForward:true}:{})}];
   if(!retry&&!reroll&&!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
-  if(!retry&&!reroll&&!gameTurn)chatImages.delete(key);
+  if(!retry&&!reroll&&!gameTurn){chatImages.delete(key);chatQuotes.delete(qKey);}
   const name=c.name||displayName(c);
   const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,
     'Char 与 User 的关系：'+c.relationship,...charRelationContext(c).map(line=>'Char 与 Char 的关系：'+line),'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
@@ -1635,16 +1655,16 @@ function repaintChat(){
 }
 function sendLocalChat(c){
   const cfg=localConfig(c),session=cfg[cfg.mode],k=imageKey(c.id,cfg.mode);
-  const image=chatImages.get(k),content=session.draft.trim();
+  const image=chatImages.get(k),content=session.draft.trim(),qKey=quoteKey(c.id,cfg.mode),quote=chatQuotes.get(qKey);
   if(!image&&!content)return;
-  const messages=[...session.messages,{role:'user',content,sentAt:Date.now(),...(image?{image}:{})}];
+  const messages=[...session.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(image?{image}:{})}];
   if(cfg.mode==='keyword'&&content){
     const normalized=content.normalize('NFKC').toLowerCase();
     const rule=cfg.rules.find(r=>r.triggers.some(t=>normalized.includes(t.normalize('NFKC').toLowerCase())));
     if(rule)messages.push(keywordReply(rule.reply));
   }
   if(!patchSession(c,cfg.mode,{messages,draft:''}))return;
-  chatImages.delete(k);
+  chatImages.delete(k);chatQuotes.delete(qKey);
   if(cfg.mode==='cards')queueLocalCards(contact(c.id));
   else repaintChat();
 }
@@ -1697,7 +1717,7 @@ const chatClock=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',
 const chatTime=at=>Number.isFinite(at)&&Math.abs(at)<=8640000000000000?chatClock.format(at):'';
 function chatTimestamp(m){const label=chatTime(m.sentAt);return label?'<time class="chat-timestamp" datetime="'+new Date(m.sentAt).toISOString()+'">'+esc(label)+'</time>':'';}
 function chatTimeContext(){return '【真实聊天时间】设备当前本地时间：'+chatTime(Date.now())+'（'+chatClock.resolvedOptions().timeZone+'）。消息上的发送时间也是设备本地时间，可用来理解时间间隔。仅在自然相关时提及时间。虚构剧情时间以场景为准。';}
-function chatTextRecord({role,content,image,caption,sentAt}){const time=chatTime(sentAt);return {role,content:[time?'[发送时间 '+time+']':'',content,caption?'[图片描述] '+caption:image?'[图片]':''].filter(Boolean).join('\n')};}
+function chatTextRecord({role,content,image,caption,sentAt,quote}){const time=chatTime(sentAt);return {role,content:[time?'[发送时间 '+time+']':'',quoteText(quote)?'[引用消息] '+quoteText(quote):'',content,caption?'[图片描述] '+caption:image?'[图片]':''].filter(Boolean).join('\n')};}
 
 const billOptions={period:{day:'本日',week:'本周',month:'本月'},direction:{income:'入账',expense:'出账'},comparison:{gt:'大于',lt:'小于'}};
 function billRuleFields(rule={}){
@@ -1940,7 +1960,19 @@ function saveCurrentScene(form){
 'use strict';
 
 let selection=null;
+const chatQuotes=new Map();
+const quoteKey=(id,mode)=>JSON.stringify([id,mode]);
+const quoteText=q=>q&&typeof q.speaker==='string'&&typeof q.content==='string'?q.speaker+'：'+q.content:'';
+const quoteMarkup=q=>quoteText(q)?'<blockquote class="chat-quote">'+esc(quoteText(q))+'</blockquote>':'';
+function quoteDraft(id,mode){
+  const markup=quoteMarkup(chatQuotes.get(quoteKey(id,mode)));
+  return markup?'<div class="chat-quote-draft">'+markup+'<button type="button" data-action="clearQuote" aria-label="取消引用">×</button></div>':'';
+}
 function messageScope(){
+  const panel=$('dialog');
+  const id=panel.open&&(panel.querySelector('[data-group-room]')?.dataset.groupRoom||$('messageMenu')?.scope?.group?.id||$('messageEditForm')?.scope?.group?.id);
+  const group=id&&groupById(id);
+  if(group&&!deviceLocked)return {c:group,group,mode:'group',messages:group.messages};
   const c=page==='chat'&&contact(activeContact);
   if(!c||deviceLocked)return null;
   const mode=localConfig(c).mode;
@@ -1959,35 +1991,48 @@ function messageActionBar(selected){
 function openMessageMenu(index){
   const scope=messageScope(),m=scope?.messages[index];
   if(!m||replyPending(m))return;
-  const ai=scope.mode==='ai',generated=m.role==='assistant';
-  const canReroll=generated&&(scope.mode==='cards'||(ai&&scope.messages.slice(0,index).some(x=>x.role==='user')));
+  const ai=scope.mode==='ai'||!!scope.group,generated=scope.group?!!m.roleId:m.role==='assistant';
+  const canReroll=generated&&(scope.mode==='cards'||(ai&&scope.messages.slice(0,index).some(x=>scope.group?!x.roleId:x.role==='user')));
   const actions=[
+    ['quote','❝','引用回复','附在下一条消息里'],
     ['select','☷','多选消息','批量导出为 TXT 或删除'],
     ...(canReroll?[['reroll','↻','重新生成','只替换这条回复']]:[]),
     ...(canReroll&&ai?[['guide','✦','带提示重新生成','告诉角色这次怎么回复']]:[]),
     ...(generated?[['edit','✎','编辑回复','直接修改这条消息的文字']]:[])
   ];
-  dialog('<h2>消息操作</h2><div class="message-menu" id="messageMenu">'+actions.map(([key,icon,title,detail])=>'<button type="button" data-message-command="'+key+'"><span class="message-menu-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+detail+'</small></span></button>').join('')+'</div><div class="row actions"><button type="button" data-action="close">取消</button></div>');
+  dialog('<h2>消息操作</h2><div class="message-menu" id="messageMenu">'+actions.map(([key,icon,title,detail])=>'<button type="button" data-message-command="'+key+'"><span class="message-menu-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+detail+'</small></span></button>').join('')+'</div><div class="row actions"><button type="button" data-action="cancelMessageMenu">取消</button></div>');
   $('messageMenu').scope=scope;$('messageMenu').index=index;
 }
 function messageCommand(command){
   const menu=$('messageMenu'),scope=messageScope();
-  if(!menu||!sameMessageScope(menu.scope,scope)){$('dialog').close();toast('消息已变化，请重新选择。');return;}
+  if(!menu||!sameMessageScope(menu.scope,scope)){closeMessageTools(scope);toast('消息已变化，请重新选择。');return;}
   const index=menu.index;
-  if(command==='select'){
-    selection={...scope,indices:new Set([index])};$('dialog').close();renderMessageTools();return;
+  if(command==='quote'){
+    const m=scope.messages[index],speaker=m.speaker||(m.role==='user'?state.userName||'你':displayName(scope.c));
+    const text=m.content.trim(),content=(text.length>300?text.slice(0,300)+'…':text)||(m.image?'[图片]':'[消息]');
+    chatQuotes.set(quoteKey(scope.c.id,scope.mode),{speaker,content,...(scope.group&&m.audience?{audience:m.audience.slice()}:{})});
+    closeMessageTools(scope);renderMessageTools(scope);
+    document.querySelector((scope.group?'#groupChatForm':'#chatForm')+' textarea[name=message]')?.focus();return;
   }
-  if(command==='reroll'){$('dialog').close();regenerateMessage(scope,index);return;}
+  if(command==='select'){
+    selection={...scope,indices:new Set([index])};closeMessageTools(scope);renderMessageTools();return;
+  }
+  if(command==='reroll'){closeMessageTools(scope);regenerateMessage(scope,index);return;}
   if(command!=='edit'&&command!=='guide')return;
   const editing=command==='edit';
   dialog('<h2>'+(editing?'编辑回复':'带提示重新生成')+'</h2><form id="messageEditForm"><label>'+(editing?'回复内容':'本次生成提示')+'<textarea name="messageText" rows="6" required placeholder="'+(editing?'':'例如：用更简短、温柔的语气回复')+'">'+(editing?esc(scope.messages[index].content):'')+'</textarea></label>'+
-    '<div class="row actions"><button class="primary">'+(editing?'保存修改':'重新生成')+'</button><button type="button" data-action="close">取消</button></div></form>');
+    '<div class="row actions"><button class="primary">'+(editing?'保存修改':'重新生成')+'</button><button type="button" data-action="cancelMessageMenu">取消</button></div></form>');
   const form=$('messageEditForm');form.scope=scope;form.index=index;form.editing=editing;
 }
 function messageBusy(c,mode){
+  if(mode==='group')return groupJobs.has(c.id)||!!groupById(c.id)?.pending.length;
   return mode==='ai'?(threads.has(c.id)||memoryJobs.has(c.id)||mergeJobs.has(c.id)):mode==='cards'&&localRuns.has(c.id);
 }
 function updateMessageList(scope,messages,firstChanged){
+  if(scope.group){
+    if(!sameMessageScope(scope,messageScope())||messageBusy(scope.c,scope.mode)){toast('消息正在更新，请稍后重试。');return false;}
+    try{patchGroup(groupById(scope.c.id),{messages});return true;}catch(error){toast(error.message);return false;}
+  }
   const c=contact(scope.c.id);
   if(!c||!sameMessageScope(scope,messageScope())||messageBusy(c,scope.mode)){
     toast('消息正在更新，请稍后重试。');return false;
@@ -2005,12 +2050,13 @@ function submitMessageEdit(form){
   if(!value)return;
   const {scope,index}=form;
   if(!sameMessageScope(scope,messageScope())){toast('消息已变化，请重新打开。');return;}
-  if(!form.editing){$('dialog').close();regenerateMessage(scope,index,value);return;}
+  if(!form.editing){closeMessageTools(scope);regenerateMessage(scope,index,value);return;}
   const messages=scope.messages.map((m,i)=>i===index?{...m,content:value}:m);
-  if(updateMessageList(scope,messages,index)){$('dialog').close();renderMessageTools();toast('回复已修改');}
+  if(updateMessageList(scope,messages,index)){closeMessageTools(scope);renderMessageTools();toast('回复已修改');}
 }
 function regenerateMessage(scope,index,guide=''){
   if(!sameMessageScope(scope,messageScope())||messageBusy(scope.c,scope.mode)){toast('消息正在更新，请稍后重试。');return;}
+  if(scope.group){rerollGroup(scope.c.id,index,guide);return;}
   if(scope.mode==='ai'){send(false,{index,guide});return;}
   if(scope.mode!=='cards')return;
   const cfg=localConfig(scope.c),pool=[...new Set(cfg.decks.filter(d=>d.enabled).flatMap(d=>d.items))];
@@ -2023,7 +2069,7 @@ function regenerateMessage(scope,index,guide=''){
 function exportSelectedMessages(){
   if(!sameMessageScope(selection,messageScope())||!selection.indices.size)return;
   const {c,messages,indices}=selection;
-  const text=messages.flatMap((m,i)=>indices.has(i)?[(m.role==='user'?'我':displayName(c))+'\n'+[m.content,m.image?'[图片]':''].filter(Boolean).join('\n')]:[]).join('\n\n');
+  const text=messages.flatMap((m,i)=>indices.has(i)?[(m.speaker||(m.role==='user'?'我':displayName(c)))+'\n'+[quoteText(m.quote),m.content,m.image?'[图片]':''].filter(Boolean).join('\n')]:[]).join('\n\n');
   const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download='眠龙记账-聊天选段-'+dateString()+'.txt';link.click();
   setTimeout(()=>URL.revokeObjectURL(url),15000);
@@ -2038,7 +2084,9 @@ function deleteSelectedMessages(){
     selection=null;renderMessageTools();toast('已删除所选消息');
   }
 }
-function renderMessageTools(){
+function closeMessageTools(scope){if(scope?.group)openGroup(scope.group.id);else $('dialog').close();}
+function renderMessageTools(scope=messageScope()){
+  if(scope?.group){const top=$('groupMessages')?.scrollTop;openGroup(scope.group.id);if(top!==undefined)$('groupMessages').scrollTop=top;return;}
   const top=$('messages')?.scrollTop;
   render();
   if(top!==undefined&&$('messages'))$('messages').scrollTop=top;
@@ -2055,25 +2103,26 @@ function activateMessage(index){
 function initMessageTools(){
   let press=null,timer,suppressUntil=0;
   const bubble=e=>e.target.closest?.('[data-message-index]');
+  const available=node=>!$('dialog').open||!!node.closest('[data-group-room]');
   const cancel=()=>{clearTimeout(timer);press=null;};
   document.addEventListener('pointerdown',e=>{
     const node=bubble(e);
-    if(!node||e.button!==0||selection)return;
+    if(!node||e.button!==0||sameMessageScope(selection,messageScope()))return;
     cancel();press={id:e.pointerId,x:e.clientX,y:e.clientY};
-    timer=setTimeout(()=>{if(node.isConnected&&!$('dialog').open){suppressUntil=Date.now()+800;activateMessage(Number(node.dataset.messageIndex));}cancel();},500);
+    timer=setTimeout(()=>{if(node.isConnected&&available(node)){suppressUntil=Date.now()+800;activateMessage(Number(node.dataset.messageIndex));}cancel();},500);
   });
   document.addEventListener('pointermove',e=>{if(press?.id===e.pointerId&&Math.hypot(e.clientX-press.x,e.clientY-press.y)>10)cancel();});
   for(const type of ['pointerup','pointercancel','scroll'])document.addEventListener(type,cancel,true);
   document.addEventListener('contextmenu',e=>{
     const node=bubble(e);if(!node)return;
     e.preventDefault();
-    if(Date.now()>=suppressUntil&&!$('dialog').open){cancel();activateMessage(Number(node.dataset.messageIndex));}
+    if(Date.now()>=suppressUntil&&available(node)){cancel();activateMessage(Number(node.dataset.messageIndex));}
   });
   document.addEventListener('click',e=>{
     const node=bubble(e);
-    if(!node||Date.now()<suppressUntil||$('dialog').open)return;
+    if(!node||Date.now()<suppressUntil||!available(node))return;
     const index=Number(node.dataset.messageIndex);
-    if(selection)activateMessage(index);
+    if(sameMessageScope(selection,messageScope()))activateMessage(index);
     else if(node.querySelector('.forwarded-story-card'))openForwardedStory(index);
   });
   document.addEventListener('keydown',e=>{
@@ -2482,6 +2531,8 @@ document.addEventListener('click',e=>{
     }
     case 'exportMessages':exportSelectedMessages();break;
     case 'deleteMessages':deleteSelectedMessages();break;
+    case 'cancelMessageMenu':closeMessageTools(messageScope());break;
+    case 'clearQuote':{const scope=messageScope();if(scope){chatQuotes.delete(quoteKey(scope.c.id,scope.mode));renderMessageTools(scope);}break;}
     case 'exitMessages':selection=null;renderMessageTools();break;
     case 'calculator':openCalculator(b);break;
     case 'currentScene':openCurrentScene();break;
