@@ -364,7 +364,7 @@ function storyLibrary(category=''){
   const categories=[...new Set(state.stories.map(x=>x.category).filter(Boolean))].sort();
   storyDialog('余晖藏书阁','<header class="story-shelf-hero"><span aria-hidden="true">✧</span><p>故事在余晖里落款</p><small>馆藏 '+state.stories.length+' 篇</small>'+storyButton('generator','回到日隙拾光')+'</header>'+
     '<form id="storyExport" class="fields"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+
-    (state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
+    (state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+(x.partial?' · 未完稿':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
     '<div class="row"><button type="submit">导出所选文章</button><button type="submit" value="delete">删除所选</button></div></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
   $('storyFilter').onchange=e=>storyLibrary(e.target.value);
 }
@@ -453,40 +453,53 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
   ].join('\n');
   storyJob={status:'正在准备番外…',preview:''};
   storyProgress();
+  let live='',saved='',timer;
+  const firstTitle=!title&&!parent;
+  function save(raw,partial){
+    let body=raw.trim(),name=article.title;
+    if(firstTitle){
+      const match=body.match(/^标题[：:][ \t]*([^\n]+)\n+/);
+      if(match){name=match[1].trim().slice(0,120);body=body.slice(match[0].length).trim();}
+      else if(/^(?:标|标题|标题[：:][^\n]*)$/.test(body))body='';
+    }
+    if(!body)return false;
+    if(partial&&body===saved)return true;
+    const next={...article,...state.stories.find(x=>x.id===article.id),title:name,body,partial};
+    storeStory(next);article=next;saved=body;return true;
+  }
+  const checkpoint=()=>{try{save(live,true);}catch{/* Retry on the next update. */}};
+  const visibility=()=>{if(document.hidden)checkpoint();};
+  window.addEventListener('pagehide',checkpoint);
+  document.addEventListener('visibilitychange',visibility);
   try{
     const job=storyJob;
     job.status='正在生成全文 · '+p.model;
     if($('storyStatus'))$('storyStatus').textContent=job.status;
-    let live='';
     const onDelta=delta=>{
       live+=delta;job.preview=live;
+      if(!saved)checkpoint();else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;checkpoint();},1000);
       const box=$('storyLive');if(box)box.append(document.createTextNode(delta));
       updateStoryCount(job.preview);
     };
-    const firstTitle=!title&&!parent;
     const previous=parent?.body||'';
     const prompt=['【写作预设】参考叙事结构与氛围，尊重用户选择的人物、视角和剧情。不要复述预设。\n'+storyWritingPreset,previous?'【前文】\n'+previous:'',guide,
       '请一次输出完整正文，目标约 '+target+' 字。自然分段，写到结局。',
       firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
     ].filter(Boolean).join('\n\n');
     const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta);
-    let body=dialogueReply(response).trim();
-    if(firstTitle){
-      const match=body.match(/^标题[：:]\s*([^\n]+)\n+/);
-      if(match){article.title=match[1].trim().slice(0,120);body=body.slice(match[0].length).trim();}
-    }
-    if(!body)throw Error('模型返回了空正文。');
-    article={...article,body};
-    storeStory(article);
+    const reason=response?.choices?.[0]?.finish_reason;
+    const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
+    if(!save(dialogueReply(response),partial))throw Error('模型返回了空正文。');
     job.preview=article.body;
     if($('storyLive'))$('storyLive').textContent=job.preview;
     updateStoryCount(job.preview);
     if($('storyStatus'))storyRead(article);
-    toast('番外已存入余晖藏书阁 · 实际 '+storyCount(article.body)+' 字');
+    toast((partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
   }catch(error){
-    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message;
-    throw error;
-  }finally{storyJob=null;}
+    checkpoint();
+    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(saved?'。已保存未完稿。':'');
+    if(saved)toast('生成中断，已保存未完稿。');else throw error;
+  }finally{clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;}
 }
 async function storyAction(d){
   const x=state.stories.find(y=>y.id===d.storyId);
@@ -1903,7 +1916,7 @@ async function describeChatImage(image){
 }
 async function readChatStream(response,onDelta){
   const reader=response.body.getReader(),decoder=new TextDecoder();
-  let buffer='',message='',done=false;
+  let buffer='',message='',done=false,finishReason=null;
   function line(value){
     if(!value.startsWith('data:'))return;
     const data=value.slice(5).trim();
@@ -1912,6 +1925,7 @@ async function readChatStream(response,onDelta){
     const event=JSON.parse(data);
     if(event.error)dialogueReply(event);
     const choice=event.choices?.[0],part=choice?.delta?.content??choice?.text;
+    if(choice?.finish_reason)finishReason=choice.finish_reason;
     const delta=typeof part==='string'?part:Array.isArray(part)?part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join(''):'';
     if(delta){message+=delta;onDelta?.(delta);}
   }
@@ -1924,7 +1938,7 @@ async function readChatStream(response,onDelta){
       while(!done&&(newline=buffer.indexOf('\n'))!==-1){line(buffer.slice(0,newline));buffer=buffer.slice(newline+1);}
     }
   }finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
-  return {choices:[{message:{content:message}}]};
+  return {choices:[{message:{content:message},finish_reason:finishReason}],streamInterrupted:!done&&!finishReason};
 }
 function validateChatModes(cfg){
   const strings=x=>Array.isArray(x)&&x.every(y=>typeof y==='string'&&y.trim());
