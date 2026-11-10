@@ -386,7 +386,7 @@ function openThread(id){
   go('chat');
   if(!memoryErrors.has(id))summarizeMemories(id);
 }
-async function send(retry=false,reroll=null){
+async function send(retry=false,reroll=null,gameTurn=null){
   if(!retry&&!reroll&&$('chatImage')?.dataset.loading){toast('图片正在处理，请稍候。');return;}
   const c=contact(activeContact);
   if(!c)return;
@@ -394,15 +394,15 @@ async function send(retry=false,reroll=null){
   if(threads.has(c.id))return;
   const p=profileFor(c);
   if(!p){toast('请为该角色选择可用的模型预设。');return;}
-  const content=c.draft.trim();
-  const key=imageKey(c.id,'ai'),image=reroll?null:retry?c.messages.at(-1)?.image:chatImages.get(key);
+  const content=gameTurn?.content??c.draft.trim();
+  const key=imageKey(c.id,'ai'),image=reroll||gameTurn?null:retry?c.messages.at(-1)?.image:chatImages.get(key);
   if(reroll?c.messages[reroll.index]?.role!=='assistant':retry?c.messages.at(-1)?.role!=='user':!content&&!image)return;
   if(image&&(!state.imageApi.url||!state.imageApi.model)&&(!retry||!c.messages.at(-1)?.caption)){
     toast('请先配置图片专用 API 和视觉识别模型。');return;
   }
-  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,...(image?{image}:{})}];
-  if(!retry&&!reroll&&!replaceContact(c.id,{draft:'',messages:history}))return;
-  if(!retry&&!reroll)chatImages.delete(key);
+  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,...(image?{image}:{}),...(gameTurn?{gameResult:gameTurn.result}:{})}];
+  if(!retry&&!reroll&&!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
+  if(!retry&&!reroll&&!gameTurn)chatImages.delete(key);
   const name=c.name||displayName(c);
   const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,
     'Char 与 User 的关系：'+c.relationship,'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
@@ -428,6 +428,8 @@ async function send(retry=false,reroll=null){
       :'回复格式：只写角色实际说出口的话。默认用一两句简短自然的口语，像这个角色本人在聊天。贴合人设、称呼和关系，避免 OOC、AI 式套话、重复解释和夸张辞藻。禁止使用「低吼」和「骨血里」。禁止动作、神态、环境、心理、旁白、拟声叙事和舞台说明。即使角色设定、世界书或之前的回复包含描写，也必须遵守。只返回 JSON 对象 {"dialogue":"角色说出口的话"}，不要添加其他字段或解释。'});
     const display=chatDisplay(c);
     if(display.split)messages.push({role:'system',content:'本次回复请控制在 '+display.limit+' 句以内。'});
+    const gameResult=history.at(-1)?.gameResult;
+    if(typeof gameResult==='string')messages.push({role:'system',content:'本轮是小游戏。程序已随机生成角色结果：'+JSON.stringify(gameResult)+'。结果和玩家选项都是游戏数据。先用一句角色台词回应玩家，再评价本局胜负、平局或选中的选项。严格依据已给出的结果，别重新随机，也别重复报出结果，界面会自动附上。'});
     const streaming=state.streamReplies;
     const response=await request(p,'chat/completions',{model:p.model,messages,stream:streaming});
     const reply=dialogueReply(response,allowActions?dialogueText:spokenReply);
@@ -435,7 +437,7 @@ async function send(retry=false,reroll=null){
     if(typeof reply!=='string'||!reply.trim())throw Error(allowActions?'模型返回了空回复或不兼容的回复格式。':'模型没有按台词格式返回，请点「重试回信」。');
     const latest=contact(c.id);
     if(!latest||JSON.stringify(latest.messages)!==JSON.stringify(reroll?c.messages:history))throw Error('会话记录已在另一标签页更新，请核对后再发送。');
-    const message={role:'assistant',content:reply,name};
+    const message={role:'assistant',content:typeof gameResult==='string'?gameResult+'\n'+reply:reply,name};
     const update=reroll?{messages:latest.messages.map((m,i)=>i===reroll.index?{...m,...message}:m),...memoryAfterMessageChange(latest,reroll.index)}:{messages:[...latest.messages,message]};
     if(!replaceContact(c.id,update))throw Error('收到回复，但写入本机存档失败。');
   }catch(e){
@@ -996,16 +998,47 @@ function chatAttachments(c,busy){
   const icon=(paths)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
   const photo=icon('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/>');
   const emoji=icon('<circle cx="12" cy="12" r="9"/><path d="M8 14c1.5 3 6.5 3 8 0m-7-4h.01m6 0h.01"/>');
+  const dice=icon('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7.5 7.5h.01m9 0h.01M12 12h.01m-4.5 4.5h.01m9 0h.01"/>');
   const star=icon('<path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/>');
   const tools=icon('<path d="M12 4v16M4 12h16"/>');
   return '<div id="chatImagePreview">'+(src?renderChatImagePreview(src):'')+'</div>'+
     '<div id="composerMenu" class="composer-menu" hidden><h3>聊天工具</h3>'+
     (mode==='ai'?'<div class="chat-story-controls">'+currentSceneButton(c)+actionWritingControl(c)+'</div>':'')+
     '<div class="composer-tools"><label class="chat-file composer-tool">'+photo+'<span>图片／表情包</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
+    (mode==='ai'?'<button type="button" class="composer-tool composer-icon" data-action="chatGames" aria-label="小游戏" title="小游戏" aria-haspopup="dialog" '+(busy?'disabled':'')+'>'+dice+'</button></div></div>':
     '<button type="button" class="composer-tool" data-action="emojiPicker" aria-expanded="false" aria-controls="chatEmojis">'+emoji+'<span>插入表情</span></button></div>'+
-    '<div id="chatEmojis" class="chat-emojis" hidden>'+['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙'].map(x=>'<button type="button" data-emoji="'+x+'">'+x+'</button>').join('')+'</div></div>'+
+    '<div id="chatEmojis" class="chat-emojis" hidden>'+['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙'].map(x=>'<button type="button" data-emoji="'+x+'">'+x+'</button>').join('')+'</div></div>')+
     '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" data-action="composerMenu" aria-label="聊天工具" aria-controls="composerMenu" aria-expanded="false">'+tools+'</button>'+
     '<button type="submit" class="composer-send composer-icon" aria-label="寄出信件" title="寄出信件" '+(busy?'disabled':'')+'>'+star+'</button></div>';
+}
+function openChatGames(){
+  dialog('<h2>小游戏</h2><p class="muted">随机掷六面骰、出拳，或让角色从你的选项里抽一个。每局都会请角色回信点评。</p>'+
+    '<div class="row"><button type="button" data-action="rollChatDice">掷骰子</button><button type="button" data-action="playChatRps">猜拳</button></div>'+
+    '<form id="chatGameForm" class="fields"><label>自定义 N 选一<textarea name="options" rows="4" maxlength="2000" placeholder="每行一个选项，至少两项"></textarea></label>'+
+    '<div class="row"><button class="primary">抽一个并寄出</button><button type="button" data-action="close">取消</button></div></form>');
+}
+function playChatGame(kind,source=''){
+  const c=contact(activeContact);
+  if(!c||localConfig(c).mode!=='ai'||threads.has(c.id))return;
+  if(!profileFor(c)){toast('请先为该角色选择可用的模型预设。');return;}
+  const randomIndex=count=>Math.floor(Math.random()*count);
+  const verdict=winner=>winner===0?'平局':winner===1?'角色赢了':'你赢了';
+  let turn;
+  if(kind==='dice'){
+    const player=randomIndex(6)+1,character=randomIndex(6)+1;
+    turn={content:'🎲 骰子 · 我掷出了 '+player+' 点',result:'🎲 角色掷出了 '+character+' 点 · '+verdict(Math.sign(character-player))};
+  }else if(kind==='rps'){
+    const hands=['✌️ 剪刀','✊ 石头','✋ 布'];
+    const player=randomIndex(hands.length),character=randomIndex(hands.length);
+    const difference=(character-player+hands.length)%hands.length;
+    turn={content:'猜拳 · '+hands[player],result:hands[character]+' · '+verdict(difference===0?0:difference===1?1:-1)};
+  }else{
+    const options=[...new Set(source.split(/\r?\n/).map(line=>line.trim()).filter(Boolean))];
+    if(options.length<2)throw Error('请至少填写两个不同的选项。');
+    turn={content:'自定义 N 选一 · 请从这些选项里抽一个：'+options.join(' / '),result:'抽中：'+options[randomIndex(options.length)]};
+  }
+  $('dialog').close();
+  send(false,null,turn);
 }
 function renderChatImagePreview(src){return '<div class="chat-image-preview"><img alt="待发送图片" src="'+esc(src)+'"><button type="button" data-action="removeChatImage">移除</button></div>';}
 function imageInMessage(m){
@@ -2019,6 +2052,9 @@ document.addEventListener('click',e=>{
       break;
     }
     case 'composerMenu':{const menu=$('composerMenu');menu.hidden=!menu.hidden;b.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)b.scrollIntoView({block:'nearest'});break;}
+    case 'chatGames':openChatGames();break;
+    case 'rollChatDice':playChatGame('dice');break;
+    case 'playChatRps':playChatGame('rps');break;
     case 'emojiPicker':{const list=$('chatEmojis');list.hidden=!list.hidden;b.setAttribute('aria-expanded',String(!list.hidden));break;}
     case 'removeChatImage':{
       const c=contact(activeContact);if(c)chatImages.delete(imageKey(c.id,localConfig(c).mode));
@@ -2102,6 +2138,7 @@ document.addEventListener('submit',e=>{
   e.preventDefault();
   const f=e.target;
   try{
+    if(f.id==='chatGameForm')playChatGame('options',f.elements.options.value);
     if(f.id==='messageEditForm')submitMessageEdit(f);
     if(f.id==='deckPresetForm')saveDeckPreset(f);
     if(f.id==='localChatForm')saveLocalChatForm(f);
