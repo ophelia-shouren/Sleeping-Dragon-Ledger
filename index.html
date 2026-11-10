@@ -1550,12 +1550,21 @@ function readTeaCard(id,mode,index){
   const x=findTeaCard(id,mode,index);if(!x)return;
   dialog('<section class="tea-room">'+teaHeader('data-tea-back="'+esc(id)+'" data-tea-mode="'+esc(mode)+'"','‹ 返回')+teaMeta(x,false)+'<div class="tea-scroll">'+teaNarrative(x)+'</div></section>',true);
 }
-function exportTeaCard(id,mode,index){
+async function exportTeaCard(id,mode,index){
   const x=findTeaCard(id,mode,index);if(!x)return;
   const text=['茶叙',x.pov+' · '+x.style,...x.turns.map(t=>'【你的输入】\n'+t.input+'\n\n【续写】\n'+t.output)].join('\n\n');
-  const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
-  const link=document.createElement('a');link.href=url;link.download='茶叙-'+dateString()+'.txt';link.click();
-  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  const name='茶叙-'+dateString()+'.txt';
+  const file=typeof File==='function'?new File(['\uFEFF',text],name,{type:'text/plain'}):null;
+  const android=/Android/i.test(navigator.userAgent);
+  if(android&&file&&navigator.canShare?.({files:[file]})){
+    try{await navigator.share({files:[file]});return;}
+    catch(error){if(error.name==='AbortError')return;}
+  }
+  // A data URL exposes the text MIME type to Android download handlers.
+  const url=android?'data:text/plain;charset=utf-8,'+encodeURIComponent('\uFEFF'+text):URL.createObjectURL(file||new Blob(['\uFEFF',text],{type:'text/plain'}));
+  const link=document.createElement('a');link.href=url;link.download=name;
+  document.body.append(link);link.click();link.remove();
+  if(!android)setTimeout(()=>URL.revokeObjectURL(url),15000);
 }
 function chatAttachments(c,busy,group){
   const mode=group?'ai':localConfig(c).mode,src=group?groupImages.get(group.id):chatImages.get(imageKey(c.id,mode));
