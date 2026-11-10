@@ -602,11 +602,11 @@ function groupBubble(m,g,index,selected){
 function openGroup(id){
   const g=groupById(id);if(!g)return;
   const selected=messageSelection(g,'group',g.messages);
-  const busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
+  const lock=teaLock(g.members),busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
   dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button><div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
     (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
-    (speaker?typingBubble(speaker,true,true):'')+'</div><form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
-    (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form></section>',true);
+    (speaker?typingBubble(speaker,true,true):'')+'</div>'+ (lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
+    (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
 }
 function refreshGroup(id){
@@ -637,6 +637,7 @@ async function groupReply(g,c,guide=''){
 }
 async function rerollGroup(id,index,guide){
   const g=groupById(id),m=g?.messages[index],c=m&&contact(m.roleId);
+  if(g&&teaSendBlocked(g.members))return;
   if(!g||!c||!g.members.includes(c.id)){toast('该角色已不在群聊中。');return;}
   groupJobs.add(id);groupRerolls.set(id,c.id);refreshGroup(id);
   try{
@@ -648,7 +649,7 @@ async function rerollGroup(id,index,guide){
 }
 async function sendGroup(id,message='',file=null,game=null){
   if(groupJobs.has(id))return;
-  let g=groupById(id);if(!g)return;
+  let g=groupById(id);if(!g||teaSendBlocked(g.members))return;
   groupJobs.add(id);
   let refreshNeeded=!!g.pending.length;
   try{
@@ -689,6 +690,7 @@ function chat(){
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
       groupDirectory()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
+  const lock=teaLock([c.id]);
   const chatUser={...user,name:'你',nickname:''};
   const mode=localConfig(c).mode,ai=mode==='ai',session=localSession(c);
   const busy=ai&&threads.has(c.id),name=displayName(c),prefs=chatDisplay(c);
@@ -702,8 +704,8 @@ function chat(){
       const parts=chatBubbleParts(x,prefs);
       return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
-    (ai&&!busy&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
-    '<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form></section>';
+    (ai&&!busy&&!lock&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
+    (lock?teaLockNotice(lock):'<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form>')+'</section>';
 }
 function cards(){
   const roles=state.contacts.map(c=>'<button class="directory-item" data-card="'+esc(c.id)+'">'+avatarMarkup(c)+'<span><strong>'+esc(displayName(c))+'</strong><small>角色人设与模型预设</small></span><b>›</b></button>').join('');
@@ -794,7 +796,7 @@ function openThread(id){
 async function send(retry=false,reroll=null,gameTurn=null){
   if(!retry&&!reroll&&$('chatImage')?.dataset.loading){toast('图片正在处理，请稍候。');return;}
   const c=contact(activeContact);
-  if(!c)return;
+  if(!c||teaSendBlocked([c.id]))return;
   if(localConfig(c).mode!=='ai'){if(!retry)sendLocalChat(c);return;}
   if(threads.has(c.id))return;
   const p=profileFor(c);
@@ -1405,17 +1407,25 @@ function chatModeBar(c){
 const teaBusy=new Set();
 const teaSession=(id,mode)=>state.teaSessions.find(x=>x.owner===id&&x.mode===mode);
 const teaById=id=>state.teaSessions.find(x=>x.id===id);
+const teaLock=(roles,sessions=state.teaSessions)=>sessions.find(x=>x.cast.some(id=>roles.includes(id)));
+function teaSendBlocked(roles){
+  if(!teaLock(roles))return false;
+  toast('参与角色正在茶叙，结束茶叙后才能发送消息。');return true;
+}
+function teaLockNotice(x){
+  return '<div class="notice" role="status">参与角色正在茶叙，结束后可继续聊天。 <button type="button" data-tea-resume="'+esc(x.id)+'">返回茶叙</button></div>';
+}
 function validTeaSession(x){
   return x&&['id','owner','mode','style','pov'].every(k=>typeof x[k]==='string')&&['group','ai','cards','keyword'].includes(x.mode)&&
     Array.isArray(x.cast)&&x.cast.every(id=>typeof id==='string')&&Number.isInteger(x.words)&&x.words>=300&&x.words<=5000&&
     Array.isArray(x.turns)&&x.turns.every(t=>t&&typeof t.input==='string'&&typeof t.output==='string');
 }
 function teaBack(id,mode){
-  if(mode==='group'){openGroup(id);return;}
+  if(mode==='group'){render();openGroup(id);return;}
   $('dialog').close();render();
 }
 function openTea(id,mode){
-  const saved=teaSession(id,mode);
+  const saved=teaSession(id,mode)||teaLock(mode==='group'?groupById(id)?.members||[]:[id]);
   if(saved){renderTea(saved.id);return;}
   const cast=mode==='group'?(groupById(id)?.members||[]).map(contact).filter(Boolean):[contact(id)].filter(Boolean);
   if(!cast.length)return;
@@ -1427,12 +1437,14 @@ function startTea(form){
   const data=new FormData(form),{owner,mode}=form.dataset;
   const cast=mode==='group'?data.getAll('cast').filter(id=>groupById(owner)?.members.includes(id)&&contact(id)):[owner];
   if(!cast.length)throw Error('请至少选择一位参与角色。');
+  if(teaLock(cast))throw Error('有角色已在茶叙中，请先结束原茶叙。');
+  if(cast.some(id=>threads.has(id)||localRuns.has(id))||state.groups.some(g=>groupJobs.has(g.id)&&g.members.some(id=>cast.includes(id))))throw Error('有角色正在回信，请稍后入席。');
   if(!cast.map(contact).filter(Boolean).some(profileFor))throw Error('请先为参与角色设置可用的模型预设。');
   const style=String(data.get('custom')||'').trim()||data.get('style');
   if(style==='自定义')throw Error('请填写自定义文风。');
   const x={id:crypto.randomUUID(),owner,mode,cast,style,pov:data.get('pov'),words:Number(data.get('words')),turns:[]};
   if(!validTeaSession(x))throw Error('请核对茶叙设置。');
-  if(commit({...state,teaSessions:[...state.teaSessions,x]}))renderTea(x.id);
+  if(commit({...state,teaSessions:[...state.teaSessions,x]})){render();renderTea(x.id);}
 }
 function teaNarrative(x){
   return x.turns.map(t=>'<div class="tea-cue">'+esc(t.input)+'</div>'+(t.output?'<div class="tea-passage">'+esc(t.output)+'</div>':'')).join('');
@@ -1455,7 +1467,7 @@ function renderTea(id){
     '<div id="teaScroll" class="tea-scroll">'+(teaNarrative(x)||'<div class="tea-empty"><span aria-hidden="true">✧</span><h3>茶已沏好</h3><p>写下你说的话、做的事，或从旁观视角展开这一幕。</p></div>')+
     (busy||partial?'<div id="teaLive" class="tea-passage tea-live" '+(partial?'':'hidden')+'>'+esc(partial)+'</div>':'')+'</div>'+
     '<form id="teaWriteForm" data-id="'+esc(id)+'">'+(pending?'<p class="tea-status" role="status">'+(busy?'正在续写…':partial?'续写中断，以上为本次预览。可重新生成这一段。':'这一段尚未完成，可以重试。')+'</p>':
-    '<textarea name="cue" rows="3" maxlength="10000" aria-label="续写输入" placeholder="以自己或旁观者的视角写下下一步…" required></textarea>')+
+    '<textarea name="cue" rows="3" maxlength="10000" aria-label="续写输入" placeholder="以自己或旁观者的视角写下下一步…" required>'+esc(x.draft||'')+'</textarea>')+
     '<button class="primary" '+(busy?'disabled':'')+'>'+(busy?'续写中':pending?'重试续写':'继续茶叙')+'</button></form></section>',true);
   $('teaScroll').scrollTop=$('teaScroll').scrollHeight;
 }
@@ -1481,7 +1493,7 @@ async function writeTea(form){
   if(!p){toast('没有可用的参与角色或模型预设。');return;}
   const previous=x.turns.at(-1),input=form.elements.cue?.value.trim();
   if(previous?.output!==''&&!input)return;
-  const current=previous?.output===''?x:{...x,turns:[...x.turns,{input,output:''}]};
+  const current=previous?.output===''?x:{...x,draft:'',turns:[...x.turns,{input,output:''}]};
   if(current!==x&&!updateTea(current))return;
   teaPartial.delete(id);teaBusy.add(id);renderTea(id);
   try{
@@ -1502,8 +1514,10 @@ async function writeTea(form){
   finally{teaBusy.delete(id);if($('dialog').open&&$('dialog').querySelector('[data-tea-room]')?.dataset.teaRoom===id)renderTea(id);}
 }
 function confirmTeaExit(id){
-  if(teaBusy.has(id)||!teaById(id))return;
-  dialog('<h2>结束这场茶叙？</h2><p>已写下的内容会收进原聊天的一张卡片，可随时打开阅读或整场导出。</p><div class="row"><button type="button" data-tea-resume="'+esc(id)+'">继续茶叙</button><button type="button" class="primary" data-tea-finish="'+esc(id)+'">确认结束并收纳</button></div>');
+  const x=teaById(id);if(teaBusy.has(id)||!x)return;
+  const draft=$('teaWriteForm')?.elements.cue?.value;
+  if(draft!==undefined&&draft!==(x.draft||'')&&!updateTea({...x,draft}))return;
+  dialog('<h2>离开茶叙</h2><p>临时退出会保留当前进度，参与角色相关的聊天仍暂停发送。结束茶叙后才恢复发消息。</p><div class="row"><button type="button" data-tea-resume="'+esc(id)+'">继续茶叙</button><button type="button" data-tea-pause="'+esc(id)+'">临时退出</button><button type="button" class="primary" data-tea-finish="'+esc(id)+'">确认结束并收纳</button></div>');
 }
 function finishTea(id){
   const x=teaById(id);if(!x||teaBusy.has(id))return;
@@ -1768,12 +1782,13 @@ function chooseCard(cfg){
 function resetIdleTimer(){
   clearTimeout(idleTimer);
   const c=page==='chat'&&!deviceLocked&&!document.hidden&&contact(activeContact);
-  if(!c)return;
+  if(!c||teaLock([c.id]))return;
   const cfg=localConfig(c);
   if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!cfg.decks.some(d=>d.enabled&&d.items.length))return;
   idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
 }
 function queueLocalCards(c){
+  if(teaLock([c.id]))return;
   const cfg=localConfig(c),run=Symbol(),id=c.id;
   if(!cfg.decks.some(d=>d.enabled&&d.items.length)){repaintChat();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
@@ -1781,6 +1796,7 @@ function queueLocalCards(c){
   function step(){
     const latest=contact(id);
     if(!latest||localRuns.get(id)!==run)return;
+    if(teaLock([id])){localRuns.delete(id);return;}
     if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&!deviceLocked&&!document.hidden){
       const content=chooseCard(localConfig(latest));
       if(content&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
@@ -1896,7 +1912,7 @@ function withBillReplies(next,onlyId=''){
   let changed=false;
   const contacts=next.contacts.map(c=>{
     const cfg=localConfig(c);
-    if(cfg.mode!=='keyword'||(onlyId&&c.id!==onlyId)||!cfg.billRules?.length)return c;
+    if(teaLock([c.id],next.teaSessions)||cfg.mode!=='keyword'||(onlyId&&c.id!==onlyId)||!cfg.billRules?.length)return c;
     const replies=[];
     let updated=false;
     const billRules=cfg.billRules.map(rule=>{
@@ -2647,6 +2663,7 @@ document.addEventListener('click',e=>{
   if(d.groupEdit!==undefined)editGroup(d.groupEdit);
   if(d.teaOpen)openTea(d.teaOpen,d.teaMode);
   if(d.teaCancel)confirmTeaExit(d.teaCancel);
+  if(d.teaPause){const x=teaById(d.teaPause);if(x&&!teaBusy.has(x.id))teaBack(x.owner,x.mode);}
   if(d.teaFinish)finishTea(d.teaFinish);
   if(d.teaResume)renderTea(d.teaResume);
   if(d.teaRead)readTeaCard(d.teaRead,d.teaMode,Number(d.teaIndex));
