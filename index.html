@@ -415,7 +415,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
-    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
+    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+'</div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -501,6 +501,16 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
     if(saved)toast('生成中断，已保存未完稿。');else throw error;
   }finally{clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;}
 }
+function formatStoryBody(body){
+  return body.replace(/\r\n?/g,'\n').split('\n').map(line=>line.replace(/^[ \t\u3000]+|[ \t\u3000]+$/g,'')).filter(Boolean).join('\n\n');
+}
+function storyEdit(x){
+  storyDialog('编辑文章','<form id="storyEdit" data-id="'+esc(x.id)+'" class="fields"><label>标题<input name="title" required value="'+esc(x.title)+'"></label><label>正文<textarea name="body" rows="16" required></textarea></label><div class="row"><output id="storyEditCount" aria-live="polite"></output><button type="button" data-story-action="formatEdit">一键排版</button><button class="primary">保存文章</button>'+storyButton('read','取消编辑',x.id)+'</div></form>');
+  const body=$('storyEdit').elements.body;
+  body.value=x.body;
+  body.oninput=()=>{$('storyEditCount').textContent='全文 '+storyCount(body.value)+' 字';};
+  body.oninput();
+}
 async function storyAction(d){
   const x=state.stories.find(y=>y.id===d.storyId);
   switch(d.storyAction){
@@ -520,6 +530,12 @@ async function storyAction(d){
     }
     case 'library':storyLibrary();break;
     case 'read':if(x)storyRead(x);break;
+    case 'edit':if(x)storyEdit(x);break;
+    case 'formatEdit':{
+      const body=$('storyEdit')?.elements.body;
+      if(body){body.value=formatStoryBody(body.value);body.oninput();}
+      break;
+    }
     case 'continue':
       if(x)await generateStory({parent:x,cast:x.cast,guide:storySequelRequest,stream:state.streamReplies,target:22000});
       break;
@@ -541,6 +557,13 @@ async function submitStoryForm(form,submitter){
     case 'storyContinue':
       if(x)await generateStory({parent:x,cast:x.cast,guide:value('guide'),stream:data.has('stream'),target:22000});
       break;
+    case 'storyEdit':{
+      const title=value('title'),body=String(data.get('body')??'');
+      if(!x||!title||!body.trim())throw Error('请填写文章标题和正文。');
+      const updated={...x,title,body};
+      storeStory(updated);storyRead(updated);toast('文章已保存 · 全文 '+storyCount(body)+' 字');
+      break;
+    }
     case 'storyCategory':
       if(x){const updated={...x,category:value('category')};storeStory(updated);storyRead(updated);}
       break;
