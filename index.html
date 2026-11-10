@@ -172,6 +172,8 @@ body.full-chat{overflow:hidden}
 .composer-menu .composer-tools{margin-top:6px}
 .full-chat #chatForm:has(.composer-menu:not([hidden])){max-height:65%}
 .story-sun{display:inline-grid;place-items:center;min-width:32px;min-height:32px;padding:4px;background:transparent;border:1px solid transparent;color:var(--muted);opacity:.68}.story-sun:hover,.story-sun:focus-visible{opacity:1;color:var(--gold);border-color:var(--line)}.story-sun svg{width:17px;height:17px}.story-choices{display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}.story-choices label{display:flex;align-items:center;gap:5px;padding:4px 7px}.story-choices input,.story-entry input[type=checkbox]{width:auto;margin:0}.story-entry{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line)}.bubble:has(p){overflow-wrap:anywhere}.story-paper{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85;max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:12px}.story-progress{white-space:pre-wrap}
+#dialog.story-fullscreen{position:fixed;inset:0;margin:0;width:100%;height:100%;height:100dvh;max-width:none;max-height:none;border:0;border-radius:0;box-sizing:border-box;overflow:auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.story-shell{width:min(100%,840px);margin:0 auto}.story-shelf-hero{text-align:center;border:1px solid var(--line);border-radius:18px;padding:24px;background:radial-gradient(ellipse at top,var(--line),transparent 75%)}.story-shelf-hero span{color:var(--gold);font-size:34px}.story-shelf-hero p{font-size:1.35rem;margin:.3em}.story-shelf-hero button{display:block;margin:14px auto 0}.story-shell .story-entry{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--field)}.story-entry button{flex:1;text-align:left;overflow-wrap:anywhere}.story-reader-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;color:var(--gold);margin:10px 0}.story-reader-bar label{display:flex;align-items:center;gap:6px}.story-reader-bar input{width:min(30vw,150px);padding:0}.story-shell .story-reader{max-height:none;padding:clamp(14px,4vw,44px);line-height:1.95;background:var(--field)}.story-style-chip{border:1px solid var(--line);border-radius:999px;touch-action:pan-y;user-select:none}.story-style-chip:has(input:checked){border-color:var(--gold)}.story-style-editor{border:1px solid var(--line);border-radius:10px;padding:12px}.story-style-editor label{margin-block:8px}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -289,6 +291,7 @@ function avatarButton(id,person,cls=''){
   return '<button type="button" class="avatar-button '+cls+'" data-look="'+esc(id)+'" aria-label="编辑'+esc(person.nickname||person.name||'角色')+'的头像与头像框">'+avatarMarkup(person)+'</button>';
 }
 const storyStyles=['治愈日常','温柔抒情','轻喜剧','慢热浪漫','哥特奇谭','魔法冒险','悬疑推理','复古书信','诗意童话','电影叙事'];
+const storyWritingPreset="# The Misted Corridor's Accord\n\n## Part 1: Environmental Opening\nThe Misty Islet Corridor exhales softly. Here, fog moves like breath—neither rising nor falling, simply *being*. The air holds a peculiar weight, as if it remembers every whisper ever spoken within these walls. Light filters through in pale, uncertain threads. Everything exists in gentle suspension, waiting.\n\n## Part 2: Characters Enter with Broken Relic\nThe Echo Guardian arrived first, footsteps soundless on the pearl-grey stone. In her palms rested the Resonance Disc—ancient, crystalline, etched with spiraling patterns. But across its face ran fractures, hairline breaks where the sea-realm echoes had begun to dissolve. The lighthouse keeper emerged next, carrying the Mist-Feather Brush and the Sea-Glass Nameplate. She stopped before the Guardian, regarding the damaged disc with neither pity nor triumph.\n\n## Part 3: Character A Expounds the Philosophy of Preservation\nThe Echo Guardian spoke first, her voice steady as stone: \"All that remains holds weight. These fractures—they are scars, yes, but scars are proof of being. The echoes trapped here, even broken ones, tell us: *this existed*. To let them fade is to unmake what was real. We are the keepers of continuity. Without us, even beauty becomes as if it never drew breath. Memory is the only immortality we possess.\"\n\n## Part 4: Character B Expounds the Philosophy of Openness and Renewal\nThe Mist-Feather Weaver lifted her brush. \"And yet,\" she said softly, \"holding means closing. A hand that grasps cannot receive. These fractures you guard—they are wounds, yes, but wounds are also where light enters. The empty spaces between your echoes are not absence. They are *potential*. There, I can weave new visions. Not to erase what was, but to let what is *become*. Stagnation, beloved Guardian, is a slower forgetting.\"\n\n## Part 5: Four Couplets of Debate\n**Guardian:** \"To preserve is to honor. To break the chain is betrayal.\"\n**Weaver:** \"To open is to breathe. To seal is to suffocate.\"\n\n**Guardian:** \"New forms fade. Old echoes endure.\"\n**Weaver:** \"Old echoes echo only echoes. New forms may bloom.\"\n\n## Part 6: Silence Descends, the Third Enters\nThe Corridor stilled. The fog gathered close, neither taking sides. Then, a threshold shifted—*you* stepped forward from the mist. Both turned to face you, their forms growing translucent, as if they had always been waiting for this moment. The disc's fractures gleamed. The brush held still, bristles trembling faintly.\n\n## Part 7: Both Transfer the Relic, Grant Choice to the Reader\nThe Guardian extended the Resonance Disc toward you. \"Choose to tend what was. We will stand guard with you. The echoes will not fade.\"\n\nThe Weaver offered the Mist-Feather Brush and the Sea-Glass Nameplate. \"Choose to reimagine. We will weave alongside you. The empty canvas awaits your hand.\"\n\nBoth items hovered in the space between them and you. Neither withdrew their offering. The choice remained entirely yours—and the Corridor, patient and boundless, held its breath.\n\n## Part 8: Dual Closure\n**Guardian & Weaver, in unison:** \"We are not enemies, wanderer. We are the breath in and the breath out. Whatever you hold, we remain. The Misted Corridor will echo—or shimmer, or both. And that will be enough.\"\n\nThe fog gentled. Two figures dissolved into mist themselves, becoming indistinguishable from the space around them. But their presence lingered, waiting, in the spaces where you would choose to dwell.";
 const storySequelRequest='<Request：以上为故事前文，请以此为序章生成一篇20000字以上的后续发展，请有头有尾并进行扩展续写，不得ooc，禁止照搬原文。内容不能含性暗示，不得输出nsfw剧情。>';
 const storySafety='保持角色设定一致。内容不能含性暗示，不得输出 NSFW 剧情。';
 let storyJob=null;
@@ -302,7 +305,7 @@ function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
 function storyDialog(title,body){
-  dialog('<div class="row between"><h2>'+esc(title)+'</h2>'+storyButton('library','余晖藏书阁')+'<button type="button" data-action="close">关闭</button></div>'+body);
+  dialog('<div class="row between"><h2>'+esc(title)+'</h2>'+storyButton('library','余晖藏书阁')+'<button type="button" data-action="close">关闭</button></div><div class="story-shell">'+body+'</div>',true);
 }
 function storyChecks(items,name,legend,selected=''){
   return '<fieldset class="story-choices"><legend>'+esc(legend)+'</legend>'+items.map(([value,label])=>'<label><input type="checkbox" name="'+name+'" value="'+esc(value)+'" '+(value===selected?'checked':'')+'>'+esc(label)+'</label>').join('')+'</fieldset>';
@@ -310,20 +313,42 @@ function storyChecks(items,name,legend,selected=''){
 function storyStreamField(){
   return '<div class="story-choices"><label><input type="checkbox" name="stream" '+(state.streamReplies?'checked':'')+'>流式显示</label></div>';
 }
+function storyCount(value){return Array.from(value.replace(/\s/g,'')).length.toLocaleString('zh-CN');}
+function storyStyleChip(id,name,custom=false){
+  return '<label class="story-style-chip"'+(custom?' data-custom-style="'+esc(id)+'"':'')+'><input type="checkbox" name="style" value="'+esc(id)+'">'+esc(name)+'</label>';
+}
+function bindStoryStyleChip(chip){
+  let timer,start;
+  const cancel=()=>clearTimeout(timer);
+  const remove=()=>{
+    cancel();
+    const style=state.customStoryStyles.find(x=>x.id===chip.dataset.customStyle);
+    if(style&&confirm('删除自定义文风「'+style.name+'」？')&&commit({...state,customStoryStyles:state.customStoryStyles.filter(x=>x.id!==style.id)}))chip.remove();
+  };
+  chip.onpointerdown=event=>{
+    if(event.button!==0)return;
+    start=[event.clientX,event.clientY];cancel();timer=setTimeout(remove,650);
+  };
+  chip.onpointermove=event=>{if(start&&Math.hypot(event.clientX-start[0],event.clientY-start[1])>10)cancel();};
+  chip.onpointerup=chip.onpointercancel=chip.onpointerleave=cancel;
+  chip.oncontextmenu=event=>event.preventDefault();
+  chip.onkeydown=event=>{if(event.key==='Delete'){event.preventDefault();remove();}};
+}
 function storyGenerator(){
   if(storyJob){storyProgress();return;}
   storyDialog('日隙拾光','<p class="muted">借一束日光，写下信件之外的故事。</p><form id="storyGenerate" class="fields">'+
     storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
-    storyChecks(storyStyles.map(style=>[style,style]),'style','内置文风 · 可多选')+
-    '<label>自定义文风<input name="customStyle" maxlength="500"></label><label>标题<input name="title" maxlength="120" placeholder="留空由 AI 拟题"></label>'+
+    '<fieldset id="storyStyleChoices" class="story-choices"><legend>文风 · 可多选</legend>'+storyStyles.map(style=>storyStyleChip(style,style)).join('')+state.customStoryStyles.map(x=>storyStyleChip(x.id,x.name,true)).join('')+'</fieldset>'+
+    '<details class="story-style-editor"><summary>＋ 添加自定义文风</summary><p class="muted">长按自定义文风可删除。</p><label>文风名称<input name="styleName" maxlength="60"></label><label>文风内容<textarea name="styleContent" rows="4" maxlength="4000"></textarea></label>'+storyButton('saveStyle','保存文风')+'</details><label>标题<input name="title" maxlength="120" placeholder="留空由 AI 拟题"></label>'+
     '<div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div>'+
     '<label>叙事视角<select name="pov"><option>第一人称</option><option>第二人称</option><option selected>第三人称</option></select></label>'+
     '<label>目标字数<input type="number" name="length" min="100" max="100000" placeholder="默认 20000–40000"></label>'+
     '<label>剧情指令<textarea name="guide" rows="4"></textarea></label>'+storyStreamField()+'<button class="primary">开始写番外</button></form>');
+  $('storyStyleChoices').querySelectorAll('[data-custom-style]').forEach(bindStoryStyleChip);
 }
 function storyLibrary(category=''){
   const categories=[...new Set(state.stories.map(x=>x.category).filter(Boolean))].sort();
-  storyDialog('余晖藏书阁','<div class="row">'+storyButton('generator','回到日隙拾光')+'</div>'+
+  storyDialog('余晖藏书阁','<header class="story-shelf-hero"><span aria-hidden="true">✧</span><p>故事在余晖里落款</p><small>馆藏 '+state.stories.length+' 篇</small>'+storyButton('generator','回到日隙拾光')+'</header>'+
     '<form id="storyExport" class="fields"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+
     (state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
     '<button>导出所选文章</button></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
@@ -332,14 +357,23 @@ function storyLibrary(category=''){
 function storyRead(x){
   const parent=state.stories.find(y=>y.id===x.parent);
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
-    '<div class="story-paper">'+esc(x.body)+'</div>'+
+    '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
     '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色',x.id)+'</div>');
+  $('storyFont').oninput=event=>{
+    const size=Number(event.target.value);
+    $('storyReader').style.fontSize=size+'px';$('storyFontValue').textContent=size+' px';
+  };
+  $('storyFont').onchange=event=>commit({...state,storyFont:Number(event.target.value)});
 }
 function storyProgress(){
-  storyDialog('日隙拾光','<p id="storyStatus" class="story-progress" role="status"></p><div class="story-paper" id="storyLive" tabindex="0"></div>');
+  storyDialog('日隙拾光','<div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong></div><div class="story-paper" id="storyLive" tabindex="0"></div>');
   $('storyStatus').textContent=storyJob.status;
   $('storyLive').textContent=storyJob.preview;
+  updateStoryCount(storyJob.preview);
+}
+function updateStoryCount(body){
+  const count=$('storyLiveCount');if(count)count.textContent='已生成 '+storyCount(body)+' 字';
 }
 function storeStory(x){
   const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
@@ -372,10 +406,11 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
       const onDelta=delta=>{
         live+=delta;job.preview=prefix+live;
         const box=$('storyLive');if(box)box.append(document.createTextNode(delta));
+        updateStoryCount(job.preview);
       };
       const firstTitle=part===1&&!title&&!parent;
       const previous=part===1?(parent?.body||''):(parent?.body||'').slice(-4500)+'\n'+article.body.slice(-10000);
-      const prompt=[previous?'【前文】\n'+previous:'',guide,
+      const prompt=['【写作预设】参考叙事结构与氛围，尊重用户选择的人物、视角和剧情。不要复述预设。\n'+storyWritingPreset,previous?'【前文】\n'+previous:'',guide,
         '整篇目标约 '+target+' 字。本轮仅写第 '+part+' / '+chapters+' 段，约 '+Math.ceil(target/chapters)+' 字。'+
         (part===chapters?'本段收束情节，写到结局。':'推进剧情并留下自然的接续点，勿提前写到结局。'),
         firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
@@ -391,9 +426,10 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
       storeStory(article);
       job.preview=article.body;
       if($('storyLive'))$('storyLive').textContent=job.preview;
+      updateStoryCount(job.preview);
     }
     if($('storyStatus'))storyRead(article);
-    toast('番外已存入余晖藏书阁 · 实际 '+Array.from(article.body.replace(/\s/g,'')).length+' 字符');
+    toast('番外已存入余晖藏书阁 · 实际 '+storyCount(article.body)+' 字');
   }catch(error){
     if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(article.body?'。已保存成功生成的段落。':'');
     throw error;
@@ -403,6 +439,19 @@ async function storyAction(d){
   const x=state.stories.find(y=>y.id===d.storyId);
   switch(d.storyAction){
     case 'generator':storyGenerator();break;
+    case 'saveStyle':{
+      const form=$('storyGenerate'),name=form.elements.styleName.value.trim(),content=form.elements.styleContent.value.trim();
+      if(!name||!content)throw Error('请填写文风名称和内容。');
+      const style={id:crypto.randomUUID(),name,content};
+      if(!commit({...state,customStoryStyles:[...state.customStoryStyles,style]}))break;
+      const choices=$('storyStyleChoices');
+      choices.insertAdjacentHTML('beforeend',storyStyleChip(style.id,style.name,true));
+      bindStoryStyleChip(choices.lastElementChild);
+      choices.lastElementChild.querySelector('input').checked=true;
+      form.elements.styleName.value=form.elements.styleContent.value='';
+      form.querySelector('details').open=false;
+      break;
+    }
     case 'library':storyLibrary();break;
     case 'read':if(x)storyRead(x);break;
     case 'continue':
@@ -421,7 +470,7 @@ async function submitStoryForm(form){
   const x=state.stories.find(y=>y.id===form.dataset.id);
   switch(form.id){
     case 'storyGenerate':
-      await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),style:[...data.getAll('style'),value('customStyle')].filter(Boolean).join('、'),stream:data.has('stream'),target:Number(value('length'))||30000,pov:value('pov'),includeUser:data.has('includeUser')});
+      await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),style:data.getAll('style').map(id=>{const x=state.customStoryStyles.find(y=>y.id===id);return x?x.name+'：'+x.content:id;}).join('\n'),stream:data.has('stream'),target:Number(value('length'))||30000,pov:value('pov'),includeUser:data.has('includeUser')});
       break;
     case 'storyContinue':
       if(x)await generateStory({parent:x,cast:x.cast,guide:value('guide'),stream:data.has('stream'),target:22000});
@@ -1943,7 +1992,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({stories:[],opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({stories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -1964,6 +2013,8 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
+  if(!Array.isArray(result.customStoryStyles)||!result.customStoryStyles.every(x=>x&&['id','name','content'].every(k=>typeof x[k]==='string'&&x[k].trim()))||!unique(result.customStoryStyles))throw Error('文风存档无效');
+  if(!Number.isInteger(result.storyFont)||result.storyFont<14||result.storyFont>32)result.storyFont=18;
   if(!Array.isArray(result.stories)||!result.stories.every(validStory)||!unique(result.stories))throw Error('余晖藏书阁存档无效');
   if(!Object.hasOwn(skins,result.skin))throw Error('存档皮肤无效');
   if(!result.imageApi||!Object.keys(imageDefaults()).every(k=>string(result.imageApi[k])))throw Error('图片 API 存档无效');
@@ -2065,7 +2116,7 @@ function render(){
   if($('messages')) $('messages').scrollTop=$('messages').scrollHeight;
   scheduleTypingReveal();
 }
-function dialog(html){$('dialog').innerHTML=html;if(!$('dialog').open)$('dialog').showModal();}
+function dialog(html,full=false){$('dialog').classList.toggle('story-fullscreen',full);$('dialog').innerHTML=html;$('dialog').scrollTop=0;if(!$('dialog').open)$('dialog').showModal();}
 function billFields(x={}){
   return '<div class="fields"><label>项目<input name="title" required value="'+esc(x.title)+'"></label><div class="amount-control"><label>金额（元）<input name="amount" type="number" required min="0.01" step="0.01" value="'+(x.cents?x.cents/100:'')+'"></label><button type="button" data-action="calculator" aria-haspopup="dialog">计算器</button></div><label>方向<select name="type"><option value="expense">支出</option><option value="income" '+(x.type==='income'?'selected':'')+'>收入</option></select></label><label>日期<input name="date" type="date" required value="'+esc(x.date||dateString())+'"></label><label>分类<input name="category" required value="'+esc(x.category||'其他')+'"></label></div>';
 }
