@@ -202,7 +202,7 @@ body.full-chat{overflow:hidden}
 .story-heading h2{color:var(--ink);font:700 clamp(1.8rem,5vw,3.65rem)/1.22 var(--studio-serif);margin:0;overflow-wrap:anywhere}
 .story-header-actions{display:flex;gap:8px;align-items:center;flex:none}
 .story-header-actions button{min-height:44px;white-space:nowrap}
-.story-header-actions [data-action="close"]{display:grid;place-items:center;width:44px;padding:0}
+.story-header-actions .story-header-exit{display:grid;place-items:center;width:44px;padding:0}
 .story-studio .story-shell{padding-bottom:max(38px,env(safe-area-inset-bottom))}
 .story-studio .story-panel{min-width:0;padding:clamp(14px,3vw,26px);background:var(--panel);border:1px solid var(--line);border-radius:16px}
 .story-panel h3{color:var(--ink);font:700 1.35rem/1.3 var(--studio-serif);margin:0 0 4px}
@@ -242,7 +242,9 @@ body.full-chat{overflow:hidden}
   .story-studio .story-compose{grid-template-columns:minmax(0,1fr)}
   .story-studio .story-header{align-items:flex-start;flex-direction:column;gap:10px}
   .story-header-actions{width:100%;justify-content:space-between}
-  .story-header-actions [data-action="close"]{min-height:40px;width:40px}
+  .story-header-actions .story-header-exit{min-height:40px;width:40px}
+  .story-studio .story-reader-header{flex-direction:row}
+  .story-reader-header .story-header-actions{width:auto}
   .story-books{grid-template-columns:minmax(0,1fr)}
   .story-studio .story-entry{min-height:0}
 }
@@ -387,9 +389,11 @@ function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
 function storyDialog(title,body,view=''){
-  const navigation=view==='shelf'?storyButton('generator','写番外'):storyButton('library','余晖藏书阁');
-  dialog('<header class="story-header"><div class="story-heading"><h2>'+esc(title)+'</h2></div><div class="story-header-actions" role="navigation" aria-label="番外导航">'+navigation+
-    '<button type="button" data-action="close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></header><div class="story-shell">'+body+'</div>',true);
+  const reading=view==='reader';
+  const navigation=reading?'':view==='shelf'?storyButton('generator','写番外'):storyButton('library','余晖藏书阁');
+  const exit=reading?'data-story-action="library" aria-label="返回余晖藏书阁" title="返回余晖藏书阁"':'data-action="close" aria-label="关闭" title="关闭"';
+  dialog('<header class="story-header'+(reading?' story-reader-header':'')+'"><div class="story-heading"><h2>'+esc(title)+'</h2></div><div class="story-header-actions" role="navigation" aria-label="番外导航">'+navigation+
+    '<button type="button" class="story-header-exit" '+exit+'><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></header><div class="story-shell">'+body+'</div>',true);
   $('dialog').classList.add('story-studio');
 }
 function storyChecks(items,name,legend,selected=''){
@@ -549,7 +553,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(storyCategoryKey(x.category))+'" list="storyCategoryOptions" placeholder="输入新分类或已有分类名称"></label><datalist id="storyCategoryOptions">'+storyCategories().map(name=>'<option value="'+esc(name||'未分类')+'"></option>').join('')+'</datalist><button>保存分类</button></form>'+
-    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>');
+    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader');
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
