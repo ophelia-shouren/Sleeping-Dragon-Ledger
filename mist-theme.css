@@ -144,9 +144,10 @@
 }
 [data-skin="mist"] .typing-bubble .typing-dots { color:var(--ink); }
 
-/* The reader controls must stay fixed to the viewport while the dialog scrolls. */
-[data-skin="mist"] #dialog.story-studio:has(.story-scrubber) {
+/* A backdrop filter would make fixed controls move with the story dialog's scroll. */
+[data-skin="mist"] #dialog.story-studio {
   backdrop-filter:none;
+  -webkit-backdrop-filter:none;
 }
 [data-skin="mist"] #dialog.story-studio .story-scrubber {
   background:var(--field);
