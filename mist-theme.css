@@ -135,3 +135,20 @@
 [data-skin="mist"] body :is(.story-paper,#dialog.story-studio .story-draft textarea) {
   font-family:var(--mist-chat-font);
 }
+
+/* Typing uses the same dark paper as a character's reply. */
+[data-skin="mist"] .bubble.assistant.typing-bubble {
+  background:var(--mist-char-paper);
+  border-color:var(--mist-char-edge);
+  color:var(--ink);
+}
+[data-skin="mist"] .typing-bubble .typing-dots { color:var(--ink); }
+
+/* The reader controls must stay fixed to the viewport while the dialog scrolls. */
+[data-skin="mist"] #dialog.story-studio:has(.story-scrubber) {
+  backdrop-filter:none;
+}
+[data-skin="mist"] #dialog.story-studio .story-scrubber {
+  background:var(--field);
+  z-index:13;
+}
