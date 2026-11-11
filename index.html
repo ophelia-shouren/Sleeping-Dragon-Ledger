@@ -365,12 +365,40 @@ function storyGenerator(){
     '<label>剧情指令<textarea name="guide" rows="4"></textarea></label>'+storyStreamField()+'<button class="primary">开始写番外</button></form>');
   $('storyStyleChoices').querySelectorAll('[data-custom-style]').forEach(bindStoryStyleChip);
 }
+function storyEpubBlob(articles){
+  if(articles.length>65531)throw Error('所选文章太多，请分批导出 EPUB。');
+  const xml='<?xml version="1.0" encoding="UTF-8"?>';
+  const escapeXml=text=>esc(String(text).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]/g,''));
+  const title=escapeXml(articles.length===1?articles[0].title:'余晖藏书阁');
+  const xhtml=(name,body)=>xml+'<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="zh" xml:lang="zh"><head><title>'+name+'</title></head><body>'+body+'</body></html>';
+  const chapters=articles.map((article,index)=>{
+    const id='chapter-'+(index+1);
+    const name=escapeXml(article.title);
+    const paragraphs=article.body.split(/\r\n?|\n/).map(line=>'<p>'+ (line?escapeXml(line):'<br/>')+'</p>').join('');
+    return {id,name,body:xhtml(name,'<h1>'+name+'</h1>'+paragraphs)};
+  });
+  const navigation=xhtml('目录','<nav epub:type="toc" id="toc"><h1>目录</h1><ol>'+
+    chapters.map(({id,name})=>'<li><a href="'+id+'.xhtml">'+name+'</a></li>').join('')+'</ol></nav>');
+  const manifest=chapters.map(({id})=>'<item id="'+id+'" href="'+id+'.xhtml" media-type="application/xhtml+xml"/>').join('');
+  const spine=chapters.map(({id})=>'<itemref idref="'+id+'"/>').join('');
+  const modified=new Date().toISOString().replace(/\.\d{3}Z$/,'Z');
+  const packageDoc=xml+'<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="zh">'+
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="book-id">urn:uuid:'+crypto.randomUUID()+'</dc:identifier><dc:title>'+title+'</dc:title><dc:language>zh</dc:language><meta property="dcterms:modified">'+modified+'</meta></metadata>'+
+    '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'+manifest+'</manifest><spine>'+spine+'</spine></package>';
+  return storedZipBlob([
+    ['mimetype','application/epub+zip'],
+    ['META-INF/container.xml',xml+'<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="EPUB/book.opf" media-type="application/oebps-package+xml"/></rootfiles></container>'],
+    ['EPUB/book.opf',packageDoc],
+    ['EPUB/nav.xhtml',navigation],
+    ...chapters.map(({id,body})=>['EPUB/'+id+'.xhtml',body])
+  ],'application/epub+zip');
+}
 function storyLibrary(category=''){
   const categories=[...new Set(state.stories.map(x=>x.category).filter(Boolean))].sort();
   storyDialog('余晖藏书阁','<header class="story-shelf-hero"><span aria-hidden="true">✧</span><p>故事在余晖里落款</p><small>馆藏 '+state.stories.length+' 篇</small>'+storyButton('generator','回到日隙拾光')+'</header>'+
     '<form id="storyExport" class="fields"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+
     selectionTools()+(state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" class="bulk-check" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+(x.partial?' · 未完稿':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
-    '<div class="row"><button type="submit">导出所选文章</button><button type="submit" value="delete">删除所选</button></div></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
+    '<label>导出格式<select name="format"><option value="json">JSON</option><option value="txt">TXT</option><option value="docx">Word（.docx）</option><option value="epub">EPUB</option></select></label><div class="row"><button type="submit">导出所选文章</button><button type="submit" value="delete">删除所选</button></div></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
   $('storyFilter').onchange=e=>storyLibrary(e.target.value);
 }
 function forwardedStory(message){
@@ -620,8 +648,21 @@ async function submitStoryForm(form,submitter){
         }
         break;
       }
-      const url=URL.createObjectURL(new Blob([JSON.stringify(picked,null,2)],{type:'application/json'}));
-      const link=document.createElement('a');link.href=url;link.download='余晖藏书阁-'+dateString()+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
+      const format=data.get('format');
+      let blob, extension;
+      if(format==='epub'){
+        blob=storyEpubBlob(picked);
+        extension=format;
+      }else if(format==='txt'||format==='docx'){
+        const body=picked.map(article=>article.title+'\n\n'+article.body).join('\n\n──────────\n\n');
+        blob=format==='docx'?chatWordBlob(body.replace(/\r\n?/g,'\n')):new Blob(['\uFEFF',body],{type:'text/plain;charset=utf-8'});
+        extension=format;
+      }else{
+        blob=new Blob([JSON.stringify(picked,null,2)],{type:'application/json'});
+        extension='json';
+      }
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement('a');link.href=url;link.download='余晖藏书阁-'+dateString()+'.'+extension;link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
       break;
     }
     case 'storyImport':{
@@ -2283,9 +2324,12 @@ function chatWordBlob(body){
   const rels='<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
   const paragraphs=body.split('\n').map(line=>'<w:p><w:r><w:t xml:space="preserve">'+esc(line.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,''))+'</w:t></w:r></w:p>').join('');
   const xml='<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+paragraphs+'</w:body></w:document>';
+  return storedZipBlob([['[Content_Types].xml',types],['_rels/.rels',rels],['word/document.xml',xml]],'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+}
+function storedZipBlob(entries,type){
   const encoder=new TextEncoder(),parts=[],directory=[];
   let offset=0,centralSize=0;
-  for(const [path,content] of [['[Content_Types].xml',types],['_rels/.rels',rels],['word/document.xml',xml]]){
+  for(const [path,content] of entries){
     const name=encoder.encode(path),data=encoder.encode(content);
     let crc=-1;
     for(const byte of data){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
@@ -2299,8 +2343,8 @@ function chatWordBlob(body){
     offset+=30+name.length+data.length;centralSize+=46+name.length;
   }
   const end=new DataView(new ArrayBuffer(22));
-  end.setUint32(0,0x06054b50,true);end.setUint16(8,3,true);end.setUint16(10,3,true);end.setUint32(12,centralSize,true);end.setUint32(16,offset,true);
-  return new Blob([...parts,...directory,end.buffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  end.setUint32(0,0x06054b50,true);end.setUint16(8,entries.length,true);end.setUint16(10,entries.length,true);end.setUint32(12,centralSize,true);end.setUint32(16,offset,true);
+  return new Blob([...parts,...directory,end.buffer],{type});
 }
 async function submitChatHistory(form){
   const {id,mode}=form.dataset,c=contact(id);if(!c||localConfig(c).mode!==mode)return;
