@@ -2922,7 +2922,7 @@ function messageActionBar(selected){
   if(!selected)return '';
   const n=selected.indices.size,disabled=n?'':' disabled';
   const all=n===selected.messages.filter(m=>!replyPending(m)).length;
-  return '<div class="message-selection bulk-tools"><button type="button" data-action="toggleMessageSelection" aria-pressed="'+all+'">'+(all?'取消全选':'全选')+'</button><strong aria-live="polite">已选 '+n+' 条</strong><div class="row"><button type="button" data-action="exportMessages"'+disabled+'>导出 TXT</button><button type="button" class="message-danger" data-action="deleteMessages"'+disabled+'>删除所选</button><button type="button" data-action="exitMessages">完成</button></div></div>';
+  return '<div class="message-selection bulk-tools"><button type="button" data-action="toggleMessageSelection" aria-pressed="'+all+'">'+(all?'取消全选':'全选')+'</button><strong aria-live="polite">已选 '+n+' 条</strong><div class="row"><button type="button" data-action="exportMessages"'+disabled+'>导出 TXT</button><button type="button" data-action="screenshotMessages"'+disabled+'>截图</button><button type="button" class="message-danger" data-action="deleteMessages"'+disabled+'>删除所选</button><button type="button" data-action="exitMessages">完成</button></div></div>';
 }
 function openMessageMenu(index){
   const scope=messageScope(),m=scope?.messages[index];
@@ -3032,6 +3032,165 @@ function exportSelectedMessages(){
   const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download='眠龙记账-聊天选段-'+dateString()+'.txt';link.click();
   setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+function screenshotLines(ctx,text,width){
+  const lines=[];
+  for(const paragraph of String(text).split(/\r?\n/)){
+    let line='';
+    for(const char of paragraph){
+      if(line&&ctx.measureText(line+char).width>width){lines.push(line);line='';}
+      line+=char;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+function screenshotImage(src){
+  return new Promise(resolve=>{
+    const image=new Image();
+    image.crossOrigin='anonymous';
+    image.referrerPolicy='no-referrer';
+    const done=value=>{
+      clearTimeout(timer);
+      image.onload=image.onerror=null;
+      if(!value)image.removeAttribute('src');
+      resolve(value);
+    };
+    const timer=setTimeout(()=>done(null),6000);
+    image.onload=()=>done(image);
+    image.onerror=()=>done(null);
+    image.src=src;
+  });
+}
+async function screenshotSelectedMessages(button){
+  const scope=messageScope();
+  if(!sameMessageScope(selection,scope)||!selection.indices.size)return;
+  const {c,group,messages}=scope;
+  const selected=messages.filter((_,index)=>selection.indices.has(index));
+  const title=group?group.name:displayName(c);
+  const user=appearance('user');
+  const prefs=chatDisplay(c);
+  const theme=getComputedStyle(document.documentElement);
+  const colors=Object.fromEntries(['bg','panel','ink','muted','line','gold','control','selected','selected-ink','field'].map(key=>[key,theme.getPropertyValue('--'+key).trim()]));
+  const entries=selected.map(message=>{
+    const system=message.role==='system'||!!message.tea;
+    const mine=!system&&(group?!message.roleId:message.role==='user');
+    const person=system?null:mine?user:group?(contact(message.roleId)||{name:message.speaker}):c;
+    const name=message.tea?teaTitle(message.tea):system?'系统提示':group&&!mine?message.speaker||displayName(person):displayName(person);
+    const card=displayedChatCard(message);
+    const text=message.tea?message.tea.pov+' · '+message.tea.turns.length+' 段':card?chatCardText(card):message.content;
+    return {system,mine,person,name,text,quote:quoteText(message.quote),image:safePicture(message.image||''),
+      time:(group?group.showTime!==false:prefs.showTime)?chatTime(message.sentAt):''};
+  });
+  button.disabled=true;
+  const oldLabel=button.textContent;
+  button.textContent='生成中…';
+  try{
+    const sources=new Set();
+    for(const person of [c,...entries.map(entry=>entry.person)]){
+      if(!person)continue;
+      const face=safePicture(person.avatar||''),frame=safePicture(person.frame?.src||'');
+      if(face)sources.add(face);
+      if(frame)sources.add(frame);
+    }
+    entries.forEach(entry=>{if(entry.image)sources.add(entry.image);});
+    const pictures=new Map();
+    // Keep image decoding batches small on mobile.
+    const assets=[...sources];
+    for(let i=0;i<assets.length;i+=8){
+      await Promise.all(assets.slice(i,i+8).map(async src=>pictures.set(src,await screenshotImage(src))));
+    }
+    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+    if(!ctx)throw Error('当前设备无法生成聊天截图。');
+    const width=640, font='system-ui, sans-serif', textWidth=416;
+    const wrapped=(text,size,max=textWidth,weight='')=>{
+      ctx.font=weight+size+'px '+font;
+      return screenshotLines(ctx,text,max);
+    };
+    const titleLines=wrapped(title,30,492,'700 ');
+    const headerHeight=Math.max(104,36+titleLines.length*38);
+    let height=headerHeight+20;
+    for(const entry of entries){
+      entry.names=wrapped(entry.name,18,500);
+      entry.quotes=entry.quote?wrapped('引用 · '+entry.quote,17):[];
+      const picture=pictures.get(entry.image);
+      const text=[entry.text,entry.image&&!picture?'[图片未能载入]':''].filter(Boolean).join('\n');
+      entry.lines=text?wrapped(text,22):[];
+      entry.imageWidth=picture?Math.min(textWidth,picture.naturalWidth,360*picture.naturalWidth/picture.naturalHeight):0;
+      entry.imageHeight=picture?entry.imageWidth*picture.naturalHeight/picture.naturalWidth:0;
+      entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*33+(picture?entry.imageHeight+10:0);
+      height+=entry.names.length*25+entry.bubbleHeight+(entry.time?24:0)+22;
+    }
+    height+=16;
+    const scale=Math.min(1,16000/height,Math.sqrt(8000000/(width*height)));
+    if(scale<0.5)throw Error('选中的聊天记录过长，请分批截图。');
+    canvas.width=Math.ceil(width*scale);
+    canvas.height=Math.ceil(height*scale);
+    ctx.scale(scale,scale);
+    const box=(x,y,w,h,r,color)=>{
+      ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x+r,y);
+      ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);
+      ctx.closePath();ctx.fill();
+    };
+    const write=(lines,x,y,size,step,color,align='left',weight='')=>{
+      ctx.fillStyle=color;ctx.font=weight+size+'px '+font;ctx.textAlign=align;ctx.textBaseline='top';
+      lines.forEach((line,i)=>ctx.fillText(line,x,y+i*step));
+    };
+    const avatar=(person,name,x,y,size)=>{
+      const image=pictures.get(safePicture(person?.avatar||''));
+      ctx.save();
+      ctx.beginPath();ctx.arc(x+size/2,y+size/2,size/2,0,Math.PI*2);ctx.clip();
+      ctx.fillStyle=colors.control;ctx.fillRect(x,y,size,size);
+      if(image){
+        const side=Math.min(image.naturalWidth,image.naturalHeight);
+        ctx.drawImage(image,(image.naturalWidth-side)/2,(image.naturalHeight-side)/2,side,side,x,y,size,size);
+      }else write([Array.from(name)[0]||'·'],x+size/2,y+size*.26,size*.42,size,colors.gold,'center','700 ');
+      ctx.restore();
+      const frame=person?.frame,overlay=pictures.get(safePicture(frame?.src||''));
+      if(frame?.ring){
+        ctx.strokeStyle=colors.gold;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+size/2,y+size/2,size/2,0,Math.PI*2);ctx.stroke();
+      }
+      if(overlay){
+        const side=size*(frame.scale||1);
+        ctx.drawImage(overlay,x+(size-side)/2+size*(frame.x||0)/100,y+(size-side)/2+size*(frame.y||0)/100,side,side);
+      }
+    };
+    ctx.fillStyle=colors.bg;ctx.fillRect(0,0,width,height);
+    ctx.fillStyle=colors.panel;ctx.fillRect(0,0,width,headerHeight);
+    avatar(c,title,28,(headerHeight-58)/2,58);
+    write(titleLines,106,(headerHeight-titleLines.length*38)/2,30,38,colors.ink,'left','700 ');
+    ctx.fillStyle=colors.line;ctx.fillRect(0,headerHeight-1,width,1);
+    let y=headerHeight+20;
+    for(const entry of entries){
+      const x=entry.system?100:entry.mine?124:76, bubbleWidth=440;
+      if(entry.person)avatar(entry.person,entry.name,entry.mine?578:22,y,40);
+      write(entry.names,entry.system?320:entry.mine?564:76,y,18,25,colors.muted,entry.system?'center':entry.mine?'right':'left');
+      y+=entry.names.length*25;
+      box(x,y,bubbleWidth,entry.bubbleHeight,14,entry.system?colors.field:entry.mine?colors.selected:colors.control);
+      let inside=y+12;
+      const ink=entry.mine?colors['selected-ink']:colors.ink;
+      write(entry.quotes,x+12,inside,17,24,ink);
+      inside+=entry.quotes.length*24;
+      write(entry.lines,x+12,inside,22,33,ink);
+      inside+=entry.lines.length*33;
+      if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),x+12,inside+4,entry.imageWidth,entry.imageHeight);
+      y+=entry.bubbleHeight;
+      if(entry.time){write([entry.time],entry.mine?564:x,y+4,15,20,colors.muted,entry.mine?'right':'left');y+=24;}
+      y+=22;
+    }
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(!blob)throw Error('截图生成失败，请减少选中的消息后重试。');
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;
+    link.download='眠龙记账-聊天截图-'+dateString()+'.png';
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),15000);
+    toast([...pictures.values()].includes(null)?'截图已生成，部分图片未能载入。':'聊天截图已生成');
+  }finally{
+    button.disabled=false;
+    button.textContent=oldLabel;
+  }
 }
 function deleteSelectedMessages(){
   const scope=messageScope();
@@ -3559,6 +3718,7 @@ document.addEventListener('click',e=>{
       break;
     }
     case 'exportMessages':exportSelectedMessages();break;
+    case 'screenshotMessages':screenshotSelectedMessages(b).catch(error=>toast(error.message));break;
     case 'deleteMessages':deleteSelectedMessages();break;
     case 'cancelMessageMenu':closeMessageTools(messageScope());break;
     case 'clearQuote':{const scope=messageScope();if(scope){chatQuotes.delete(quoteKey(scope.c.id,scope.mode));renderMessageTools(scope);}break;}
