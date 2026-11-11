@@ -325,7 +325,7 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .story-toggle .mode-toggle{flex-direction:row-reverse;justify-content:space-between;gap:12px;min-height:44px;margin:0}
 .story-toggle .mode-toggle input{right:0}
 .story-toggle>small{display:block;margin-top:2px}
-</style></head>
+</style><link rel="stylesheet" href="./mist-theme.css"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div></aside>
 <main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
@@ -1040,11 +1040,28 @@ function openGroupGames(id){
   if(!g||groupJobs.has(id)||g.pending.length)return;
   dialog('<h2>群聊小游戏</h2><p class="muted">选择一位角色参加这一局，结果和点评会发到群里。</p><form id="groupGameForm" data-id="'+esc(id)+'"><label>参与角色<select name="member">'+g.members.map(contact).filter(Boolean).map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><div class="row"><button name="kind" value="dice">掷骰子</button><button name="kind" value="rps">猜拳</button></div><label>自定义 N 选一<textarea name="options" maxlength="2000" placeholder="每行一个选项，至少两项"></textarea></label><div class="row"><button name="kind" value="options">抽一个</button><button type="button" data-group-open="'+esc(id)+'">返回群聊</button></div></form>');
 }
+function chatMessageLayout(avatar,name,time){
+  if(state.skin==='mist')return {
+    before:'<div class="mist-chat-meta">'+avatar+((name||time)?'<div>'+name+time+'</div>':'')+'</div>',
+    name:'',time:''
+  };
+  return {before:avatar,name,time};
+}
 function groupBubble(m,g,index,selected){
   if(m.tea)return teaCard(m.tea,index,selected,g.id,'group');
   const mine=!m.roleId,role=mine?'user':'assistant';
   const person=appearance(m.roleId||'user')||{name:m.speaker,avatar:'',frame:{src:'',ring:false}};
-  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>'<div class="message-row '+role+'"><span class="avatar-button">'+avatarMarkup(person)+'</span><article class="bubble '+role+(selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+(mine?'':'<small>'+esc(m.speaker)+'</small>')+(i===0?quoteMarkup(m.quote):'')+(m.storyForward?forwardedStoryCard(m):'<p>'+esc(part)+'</p>')+(i===parts.length-1?imageInMessage(m)+(g.showTime!==false?chatTimestamp(m):''):'')+'</article></div>').join('');
+  const avatar='<span class="avatar-button">'+avatarMarkup(person)+'</span>';
+  const name=mine?'':'<small>'+esc(m.speaker)+'</small>';
+  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>{
+    const last=i===parts.length-1;
+    const layout=chatMessageLayout(avatar,name,last&&g.showTime!==false?chatTimestamp(m):'');
+    return '<div class="message-row '+role+'">'+layout.before+'<article class="bubble '+role+
+      (selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
+      (selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+
+      layout.name+(i===0?quoteMarkup(m.quote):'')+(m.storyForward?forwardedStoryCard(m):'<p>'+esc(part)+'</p>')+
+      (last?imageInMessage(m):'')+layout.time+'</article></div>';
+  }).join('');
 }
 function openGroup(id){
   const g=groupById(id);if(!g)return;
@@ -1208,7 +1225,17 @@ function chat(){
       if(x.role==='system')return '<article class="imported-system'+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'"><small>系统提示</small><div>'+esc(x.content)+'</div>'+(prefs.showTime?chatTimestamp(x):'')+'</article>';
       const card=displayedChatCard(x);
       const parts=card?[x.content]:chatBubbleParts(x,prefs);
-      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
+      const avatar=avatarButton(mine?'user':c.id,person);
+      const label=!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'';
+      return parts.map((part,j)=>{
+        const last=j===parts.length-1;
+        const layout=chatMessageLayout(avatar,label,last&&prefs.showTime?chatTimestamp(x):'');
+        return '<div class="message-row '+x.role+'">'+layout.before+'<article class="bubble '+x.role+
+          (selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
+          (selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+
+          layout.name+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+'</p>')+
+          (last?image:'')+layout.time+'</article></div>';
+      }).join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&!lock&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
     (lock?teaLockNotice(lock):'<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form>')+'</section>';
@@ -3451,7 +3478,7 @@ function calculatorAction(key){
 'use strict';
 const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
-const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
+const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
 const initial = () => ({teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
@@ -3558,7 +3585,7 @@ function breakdown(bills){
 }
 const recordButtons='<button class="primary" data-action="new">＋ 记一笔</button><button data-action="parse">✦ 识别账单</button>';
 function heroCrest(skin){
-  if(skin==='day'||skin==='night'){
+  if(['day','night','mist'].includes(skin)){
     return '<svg class="crest crest-star" aria-hidden="true" viewBox="0 0 300 270"><path d="M150 38Q158 119 242 135Q158 151 150 232Q142 151 58 135Q142 119 150 38Z" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="2"/><path d="M150 72Q156 124 208 135Q156 146 150 198Q144 146 92 135Q144 124 150 72Z" fill="currentColor"/></svg>';
   }
   const animals={
@@ -3572,7 +3599,7 @@ function heroCrest(skin){
 }
 function home(){
   const all=total(state.bills),m=summary('month',dateString());
-  return '<section class="hero">'+heroCrest(state.skin)+'<div class="eyebrow">EST. HOGWARTS　✦　'+(['day','night'].includes(state.skin)?'PRIVATE LEDGER':state.skin.toUpperCase())+'</div><h1>'+esc(state.heroTitle)+'</h1><p>'+esc(state.heroSubtitle)+'</p><div class="row">'+recordButtons+'<button data-action="hero">编辑首页文字</button>'+'</div></section>'+
+  return '<section class="hero">'+heroCrest(state.skin)+'<div class="eyebrow">EST. HOGWARTS　✦　'+(['day','night'].includes(state.skin)?'PRIVATE LEDGER':state.skin==='mist'?skins.mist:state.skin.toUpperCase())+'</div><h1>'+esc(state.heroTitle)+'</h1><p>'+esc(state.heroSubtitle)+'</p><div class="row">'+recordButtons+'<button data-action="hero">编辑首页文字</button>'+'</div></section>'+
     metrics([['当前结余',state.opening+all.income-all.expense],['本月收入',m.income,'in'],['本月支出',m.expense,'out']])+
     '<div class="columns"><section class="panel"><div class="row between"><h2>近期账目</h2><button data-page="ledger">查看明细 ↗</button></div>'+table(state.bills,6)+'</section><section class="panel"><h2>本月支出分布</h2>'+breakdown(m.bills)+'</section></div>'+
     '<section class="panel quick"><div class="eyebrow">MAGICAL CORRESPONDENCE</div><h2>魔法通信</h2><p class="muted">把今日、本周或本月账目整理成信，发给你设定的角色。</p><button data-page="chat">进入魔法通信 →</button></section>';
