@@ -429,8 +429,9 @@ function storyRead(x){
   $('storyFont').onchange=event=>commit({...state,storyFont:Number(event.target.value)});
 }
 function storyProgress(){
-  storyDialog('日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>');
+  storyDialog('日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>');
   $('storyStatus').textContent=storyJob.status;
+  $('stopStory').disabled=storyJob.controller.signal.aborted;
   $('storyLive').textContent=storyJob.preview;
   updateStoryCount(storyJob.preview);
 }
@@ -456,7 +457,8 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
     parent?'沿用前文角色。':includeUser?'User 加入剧情，资料：'+JSON.stringify({姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user}):'User 不加入剧情。',
     '登场角色资料：'+JSON.stringify(roles)
   ].join('\n');
-  storyJob={status:'正在准备番外…',preview:''};
+  const controller=new AbortController();
+  storyJob={status:'正在准备番外…',preview:'',controller};
   storyProgress();
   let live='',saved='',timer;
   const firstTitle=!title&&!parent;
@@ -491,7 +493,8 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
       '请一次输出完整正文，目标约 '+target+' 字。自然分段，写到结局。',
       firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
     ].filter(Boolean).join('\n\n');
-    const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta);
+    const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta,controller.signal);
+    if(controller.signal.aborted)throw controller.signal.reason;
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
     if(!save(dialogueReply(response),partial))throw Error('模型返回了空正文。');
@@ -502,9 +505,15 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,in
     toast((partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
   }catch(error){
     checkpoint();
+    if(controller.signal.aborted){
+      if($('storyStatus')){
+        if(saved)storyRead(article);else $('storyStatus').textContent='已停止生成。';
+      }
+      toast(saved?'已停止生成，正文已保存为未完稿。':'已停止生成，尚未收到正文。');return;
+    }
     if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(saved?'。已保存未完稿。':'');
     if(saved)toast('生成中断，已保存未完稿。');else throw error;
-  }finally{clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;}
+  }finally{if($('stopStory'))$('stopStory').hidden=true;clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;}
 }
 function formatStoryBody(body){
   return body.replace(/\r\n?/g,'\n').split('\n').map(line=>line.replace(/^[ \t\u3000]+|[ \t\u3000]+$/g,'')).filter(Boolean).join('\n\n');
@@ -519,6 +528,14 @@ function storyEdit(x){
 async function storyAction(d){
   const x=state.stories.find(y=>y.id===d.storyId);
   switch(d.storyAction){
+    case 'stop':
+      if(storyJob&&!storyJob.controller.signal.aborted){
+        storyJob.status='正在停止生成…';
+        if($('storyStatus'))$('storyStatus').textContent=storyJob.status;
+        if($('stopStory'))$('stopStory').disabled=true;
+        storyJob.controller.abort();
+      }
+      break;
     case 'generator':storyGenerator();break;
     case 'saveStyle':{
       const form=$('storyGenerate'),name=form.elements.styleName.value.trim(),content=form.elements.styleContent.value.trim();
@@ -3012,10 +3029,12 @@ function apiEndpoint(base,route){
   u.pathname=u.pathname.replace(/\/+$/,'').replace(/\/(?:chat\/completions|models)$/,'')+'/'+route;
   return u.href;
 }
-async function request(p,route,body,onDelta){
+async function request(p,route,body,onDelta,cancelSignal){
   const headers={};if(p.key)headers.Authorization='Bearer '+p.key;
   if(body)headers['Content-Type']='application/json';
-  let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(onDelta?240000:90000)});}
+  const timeout=AbortSignal.timeout(onDelta?240000:90000);
+  const signal=cancelSignal?AbortSignal.any([timeout,cancelSignal]):timeout;
+  let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal});}
   catch(e){if(e instanceof TypeError)throw Error('连接失败。请检查 API 地址、中转站的跨域设置与网络。');throw e;}
   if(!response.ok)throw Error('API 返回 HTTP '+response.status+'。请核对地址、模型、密钥和配额。');
   if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return readChatStream(response,onDelta);
