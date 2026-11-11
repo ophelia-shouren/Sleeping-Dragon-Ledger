@@ -681,12 +681,14 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
   let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
   const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
+    worldContext('front'),
     '写一篇中文番外，遵守以下约束。'+storySafety,
     '叙事视角：'+(pov||'沿用前文'),
     '文风：'+(style||'自然流畅，续篇沿用前文文风'),
     parent?'沿用前文角色。':includeUser?'User 加入剧情，资料：'+JSON.stringify({姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user}):'User 不加入剧情。',
     '登场角色资料：'+JSON.stringify(roles),
-    readMemory?storyMemoryContext(people):''
+    readMemory?storyMemoryContext(people):'',
+    worldContext('end')
   ].filter(Boolean).join('\n');
   const controller=new AbortController();
   storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller};
@@ -1455,7 +1457,8 @@ function worldPosition(group){
   return Object.hasOwn(state.worldPlacement,group)&&state.worldPlacement[group]==='front'?'front':'end';
 }
 function worldContext(position,roleId){
-  const entries=state.worlds.filter(x=>x.enabled&&worldPosition(x.group)===position&&worldGroupApplies(x.group,roleId));
+  const entries=state.worlds.filter(x=>x.enabled&&worldPosition(x.group)===position&&
+    (roleId===undefined?worldScope(x.group).mode==='all':worldGroupApplies(x.group,roleId)));
   return entries.length?'世界书\n'+entries.map(x=>'【'+[x.group,x.title].filter(Boolean).join(' / ')+'】\n'+x.content).join('\n\n'):'';
 }
 function showModelError(message){
@@ -2148,7 +2151,8 @@ async function writeTea(form){
     const roles=cast.map(c=>({姓名:displayName(c),人设:c.description,性格:c.personality,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
     const context=group?groupTranscript(group.messages.filter(m=>cast.every(c=>(!m.audience||m.audience.includes(c.id))&&(!Array.isArray(m.quote?.audience)||m.quote.audience.includes(c.id)))).slice(-10)).slice(-6000):
       JSON.stringify(recentDialogue((x.mode==='ai'?cast[0]:localConfig(cast[0])[x.mode]).messages)).slice(-6000);
-    const world=cast.length===1?[worldContext('front',cast[0].id),worldContext('end',cast[0].id)].filter(Boolean).join('\n'):'';
+    const roleId=cast.length===1?cast[0].id:undefined;
+    const world=x.bonus||roleId!==undefined?[worldContext('front',roleId),worldContext('end',roleId)].filter(Boolean).join('\n'):'';
     const system='你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。'+(x.bonus&&!x.includeUser?'':'第一人称默认从用户角色的视角叙述。')+'不得输出 NSFW 内容。\n'+chatTimeContext();
     const castRule=x.bonus?(x.includeUser?'User 参与剧情。':'User 不作为人物登场，其输入仅作创作指令。第一人称从所选角色的视角叙述。'):'';
     const response=await request(p,'chat/completions',{model:p.model,stream:true,messages:[
