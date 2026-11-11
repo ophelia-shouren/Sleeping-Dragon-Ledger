@@ -1,21 +1,13 @@
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap");
 
-@font-face {
-  font-family:"WenYue Classical Ming";
-  src:local("文悦古典明朝体"),local("文悦古典明朝体 W5"),
-      local("文悦古典明朝体 (非商业使用) W5"),
-      local("WenYue-GuDianMingChaoTi-W5"),local("WenYue-GuDianMingChaoTi-NC-W5");
-  font-style:normal;
-  font-weight:400;
-  font-display:swap;
-}
+@import url("https://fontsapi.zeoseven.com/256/main/result.css");
 
 .swatch.mist {
   --swatch: linear-gradient(135deg, #eaf0fa 12%, #aebed7 50%, #3c4c73 51%, #65759b);
 }
 :root[data-skin="mist"] {
   color-scheme: dark;
-  --mist-font:"WenYue Classical Ming","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif;
+  --mist-font:"Huiwen-mincho","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif;
   --mist-char-paper:#263550c9;
   --mist-char-edge:#a2b4d078;
   --ink:#f0f3ff; --muted:#e1e8f7; --gold:#edf2ff; --line:var(--mist-char-edge);
