@@ -1381,7 +1381,9 @@ function validMemories(contact){
   return Number.isSafeInteger(contact.memoryCursor)&&contact.memoryCursor>=0&&contact.memoryCursor<=contact.messages.length&&
     contact.memoryCursor%memoryBatchSize===0&&Array.isArray(list)&&new Set(list.map(x=>x?.id)).size===list.length&&
     list.every(x=>x&&typeof x.id==='string'&&typeof x.content==='string'&&x.content.trim()&&
-      Number.isSafeInteger(x.from)&&Number.isSafeInteger(x.to)&&x.from>=1&&x.to>=x.from&&x.to<=contact.memoryCursor&&
+      (x.kind==='journal'
+        ? x.from===0&&x.to===0
+        : Number.isSafeInteger(x.from)&&Number.isSafeInteger(x.to)&&x.from>=1&&x.to>=x.from&&x.to<=contact.memoryCursor)&&
       Number.isFinite(x.created)&&!Number.isNaN(new Date(x.created).getTime())&&typeof x.merged==='boolean');
 }
 function recentDialogue(history){
@@ -1393,6 +1395,7 @@ function memoryContext(c){
     c.memories.map(x=>'【'+memoryRange(x)+'】\n'+x.content).join('\n\n'):'';
 }
 function memoryRange(x){
+  if(x.kind==='journal')return '日记与心声';
   return '第 '+x.from+'–'+x.to+' 条'+(x.merged?' · 合并精简':'');
 }
 function memoryButton(c){
@@ -1415,13 +1418,13 @@ function openMemories(id,preserve=false){
   const scroll=old?$('dialog').scrollTop:0;
   const count=c.messages.length-c.memoryCursor;
   const status=memoryJobs.has(id)?'正在总结聊天…':memoryErrors.get(id)||(count>=memoryBatchSize?'有聊天等待总结。':'下一份自动记忆：'+count+' / '+memoryBatchSize+' 条');
-  const rows=c.memories.map(x=>'<div class="memory-row"><input type="checkbox" name="memory" value="'+esc(x.id)+'" aria-label="选择'+esc(memoryRange(x))+'" '+(selected.has(x.id)?'checked':'')+'>'+
-    '<details data-memory-id="'+esc(x.id)+'" '+(expanded.has(x.id)?'open':'')+'><summary>'+esc(memoryRange(x))+' <small>'+new Date(x.created).toLocaleDateString('zh-CN')+'</small></summary><p>'+esc(x.content)+'</p></details>'+
+  const rows=c.memories.map(x=>'<div class="memory-row"><input type="checkbox" name="memory" value="'+esc(x.id)+'" aria-label="选择'+esc(memoryRange(x))+'" '+(x.kind==='journal'?'disabled':selected.has(x.id)?'checked':'')+'>'+
+    '<details data-memory-id="'+esc(x.id)+'" '+(expanded.has(x.id)?'open':'')+'><summary>'+esc(memoryRange(x))+' <small>'+new Date(x.created).toLocaleDateString('zh-CN')+'</small></summary><p style="white-space:pre-wrap">'+esc(x.content)+'</p></details>'+
     '<button type="button" data-delete-memory="'+esc(x.id)+'">删除</button></div>').join('');
   dialog('<h2>'+esc(displayName(c))+'的记忆档案</h2><p class="muted">每累计 100 条消息自动总结。已保存的记忆会随每次发信提供给角色。</p>'+
     '<form id="memoryForm" data-id="'+esc(id)+'"><p class="notice" role="status">'+esc(status)+'</p>'+
     (rows||'<p class="empty">还没有保存的记忆。</p>')+
-    '<div class="row actions"><button class="primary" '+(c.memories.length<2||mergeJobs.has(id)?'disabled':'')+'>'+(mergeJobs.has(id)?'正在精简…':'精简所选记忆')+'</button>'+
+    '<div class="row actions"><button class="primary" '+(c.memories.filter(x=>x.kind!=='journal').length<2||mergeJobs.has(id)?'disabled':'')+'>'+(mergeJobs.has(id)?'正在精简…':'精简所选记忆')+'</button>'+
     (count>=memoryBatchSize&&!memoryJobs.has(id)?'<button type="button" data-retry-memory="'+esc(id)+'">重试自动总结</button>':'')+
     '<button type="button" data-action="close">关闭</button></div><p class="muted">精简成功后，新记忆会替换所选记忆。删除记忆会保留原聊天记录。</p></form>');
   $('dialog').scrollTop=scroll;
@@ -1467,7 +1470,7 @@ async function mergeMemories(form){
   if(!c||mergeJobs.has(id))return;
   if(localConfig(c).mode!=='ai'){toast('请切回 AI 模式后再精简记忆。');return;}
   const ids=new Set(new FormData(form).getAll('memory'));
-  const selection=c.memories.filter(x=>ids.has(x.id)).sort((a,b)=>a.from-b.from);
+  const selection=c.memories.filter(x=>x.kind!=='journal'&&ids.has(x.id)).sort((a,b)=>a.from-b.from);
   if(selection.length<2){toast('请至少选择两份记忆。');return;}
   mergeJobs.add(id);syncMemoryView(id);
   try{
@@ -2552,6 +2555,22 @@ function validate(data){
   result.contacts=result.contacts.map(c=>({...memoryDefaults(),...c,relationship:string(c.relationship)?c.relationship:''}));
   if(typeof result.streamReplies!=='boolean'||!result.contacts.every(c=>validateChatModes(localConfig(c))))throw Error('聊天模式存档无效');
   if(!result.contacts.every(validMemories))throw Error('记忆档案存档无效');
+  result.contacts=result.contacts.map(c=>{
+    const {importedJournals,...contact}=c;
+    if(importedJournals===undefined)return c;
+    if(!Array.isArray(importedJournals)||!importedJournals.every(j=>j&&
+      string(j.id)&&j.id&&string(j.content)&&j.content.trim()&&
+      Number.isFinite(j.created)&&!Number.isNaN(new Date(j.created).getTime())))
+      throw Error('日记与心声存档无效');
+    const memories=new Map(contact.memories.map(memory=>[memory.id,memory]));
+    for(const journal of importedJournals){
+      if(!memories.has(journal.id))memories.set(journal.id,{
+        id:journal.id,kind:'journal',content:journal.content,created:journal.created,
+        from:0,to:0,merged:false
+      });
+    }
+    return {...contact,memories:[...memories.values()]};
+  });
   if(!result.worldPlacement||Array.isArray(result.worldPlacement)||typeof result.worldPlacement!=='object'||
     !Object.values(result.worldPlacement).every(x=>x==='front'||x==='end'))throw Error('世界书位置存档无效');
   if(!result.worldScopes||Array.isArray(result.worldScopes)||typeof result.worldScopes!=='object'||
