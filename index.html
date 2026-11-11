@@ -232,7 +232,6 @@ body.full-chat{overflow:hidden}
 .story-studio .story-paper{border-radius:14px;border-color:var(--line);background:var(--field);padding:clamp(16px,4vw,48px)}
 .story-studio .story-reader{margin-bottom:18px}
 .story-studio .story-reader-actions{margin-top:14px}
-.story-studio #storyCategory{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end}
 .story-studio #storyEdit textarea{line-height:1.85}
 #dialog.story-studio:has(.story-scrubber){padding-right:max(38px,var(--studio-pad),env(safe-area-inset-right))}
 #dialog.story-studio:has(.story-generation)>.story-shell{width:min(100%,1040px);margin-inline:auto;padding-bottom:0}
@@ -259,8 +258,16 @@ body.full-chat{overflow:hidden}
 .story-studio .story-entry button span{overflow-wrap:anywhere}
 .story-compact-header .story-heading{display:flex;align-items:center;gap:10px}
 .story-header-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;color:var(--gold);border-radius:10px}
-.story-bulk-category{display:flex;flex:1 1 100%;align-items:end;gap:10px;flex-wrap:wrap}
-.story-bulk-category label{flex:1 1 160px;min-width:0;max-width:420px}
+.story-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px}
+.story-bulk-category{flex:1 1 100%;min-width:0}
+.story-category-row label{min-width:0}
+.story-category-row input{display:block;margin:4px 0 0}
+.story-category-row input,.story-category-row button{min-height:44px}
+.story-category-row button{white-space:nowrap}
+@media(max-width:440px){
+  .story-category-row{grid-template-columns:minmax(0,1fr)}
+  .story-category-row button{justify-self:start}
+}
 #storyExport .story-books{margin-top:12px}
 aside .brand{margin-bottom:0}
 #siteMenuToggle{border:0;padding:0;background:transparent;color:var(--gold);font:inherit;border-radius:9px}
@@ -498,6 +505,10 @@ function storyCategories(extra=[]){
   const names=new Set([...state.storyCategories,...state.stories.map(x=>storyCategoryKey(x.category)),...extra].filter(Boolean));
   return ['',...[...names].sort((a,b)=>a.localeCompare(b,'zh-CN'))];
 }
+function storyCategoryInput(label,name,list,value='',choices=storyCategories()){
+  return '<label>'+label+'<input type="text" name="'+name+'" maxlength="80" value="'+esc(value)+'" list="'+list+'" placeholder="输入新分类或已有分类"></label>'+
+    '<datalist id="'+list+'">'+choices.map(key=>'<option value="'+esc(key||'未分类')+'"></option>').join('')+'</datalist>';
+}
 function storyLibrary(category=null){
   const categories=storyCategories();
   if(category!==null&&!categories.includes(category))category=null;
@@ -518,7 +529,8 @@ function storyLibrary(category=null){
   const visible=state.stories.filter(x=>storyCategoryKey(x.category)===category);
   storyDialog(category||'未分类','<div class="story-shelf-summary"><span>'+visible.length+' 篇文章</span></div>'+
     '<form id="storyExport" class="fields" data-category="'+esc(category)+'"><div class="story-panel story-shelf-tools">'+selectionTools()+
-    '<div class="story-bulk-category"><label>目标分类<select name="destination"><option value="" disabled selected>请选择分类</option>'+categories.filter(key=>key!==category).map(key=>'<option value="'+esc(key||'未分类')+'">'+esc(key||'未分类')+'</option>').join('')+'</select></label><button type="submit" value="categorize" data-needs-selection>批量分类</button></div>'+
+    '<div class="story-bulk-category story-category-row">'+storyCategoryInput('目标分类','destination','storyBulkCategoryOptions','',categories.filter(key=>key!==category))+
+    '<button type="submit" value="categorize" data-needs-selection>批量分类</button></div>'+
     '<label>导出格式<select name="format"><option value="json">JSON</option><option value="txt">TXT</option><option value="docx">Word（.docx）</option><option value="epub">EPUB</option></select></label><div class="row"><button type="submit" class="primary" data-needs-selection>导出所选文章</button><button type="submit" class="archive-danger" value="delete" data-needs-selection>删除所选</button></div></div>'+
     '<div class="story-books">'+(visible.map(x=>{
       const cast=Array.isArray(x.castNames)&&x.castNames.length?x.castNames:x.cast.map(id=>{const c=contact(id);return c?displayName(c):'已移除角色';});
@@ -578,7 +590,7 @@ function storyRead(x){
   const parent=state.stories.find(y=>y.id===x.parent);
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
-    '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(storyCategoryKey(x.category))+'" list="storyCategoryOptions" placeholder="输入新分类或已有分类名称"></label><datalist id="storyCategoryOptions">'+storyCategories().map(name=>'<option value="'+esc(name||'未分类')+'"></option>').join('')+'</datalist><button>保存分类</button></form>'+
+    '<form id="storyCategory" data-id="'+esc(x.id)+'" class="story-category-row">'+storyCategoryInput('文章分类','category','storyCategoryOptions',storyCategoryKey(x.category))+'<button>保存分类</button></form>'+
     '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader',()=>storyLibrary(storyCategoryKey(x.category)));
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
@@ -811,11 +823,13 @@ async function submitStoryForm(form,submitter){
       const picked=state.stories.filter(article=>selected.has(article.id)&&storyCategoryKey(article.category)===category);
       if(submitter?.value==='categorize'){
         if(!picked.length)throw Error('请先勾选要分类的文章。');
-        const destination=storyCategoryKey(value('destination'));
-        if(!value('destination')||destination===category||!storyCategories().includes(destination))throw Error('请选择目标分类。');
+        const name=value('destination');
+        if(!name||name.length>80)throw Error('请输入目标分类（最多 80 字）。');
+        const destination=storyCategoryKey(name);
+        if(destination===category)throw Error('文章已在该分类中。');
         const ids=new Set(picked.map(article=>article.id));
         const stories=state.stories.map(article=>ids.has(article.id)?{...article,category:destination}:article);
-        if(commit({...state,stories,storyCategories:storyCategories().slice(1)})){
+        if(commit({...state,stories,storyCategories:storyCategories([destination]).slice(1)})){
           storyLibrary(category);toast('已将 '+picked.length+' 篇文章移至「'+(destination||'未分类')+'」。');
         }
         break;
