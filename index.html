@@ -3078,8 +3078,8 @@ async function screenshotSelectedMessages(button){
     const person=system?null:mine?user:group?(contact(message.roleId)||{name:message.speaker}):c;
     const name=message.tea?teaTitle(message.tea):system?'系统提示':group&&!mine?message.speaker||displayName(person):displayName(person);
     const card=displayedChatCard(message);
-    const text=message.tea?message.tea.pov+' · '+message.tea.turns.length+' 段':card?chatCardText(card):message.content;
-    return {system,mine,person,name,text,quote:quoteText(message.quote),image:safePicture(message.image||''),
+    const text=message.tea?message.tea.pov+' · '+message.tea.turns.length+' 段':card?'':message.content;
+    return {system,mine,person,name,text,card,quote:quoteText(message.quote),image:safePicture(message.image||''),
       time:(group?group.showTime!==false:prefs.showTime)?chatTime(message.sentAt):''};
   });
   button.disabled=true;
@@ -3107,6 +3107,8 @@ async function screenshotSelectedMessages(button){
       ctx.font=weight+size+'px '+font;
       return screenshotLines(ctx,text,max);
     };
+    // Match the card's 1:2 columns, spacing and theme colors in the PNG.
+    const cardGap=10, labelWidth=Math.floor((textWidth-cardGap)/3), valueWidth=textWidth-cardGap-labelWidth;
     const titleLines=wrapped(title,30,492,'700 ');
     const headerHeight=Math.max(104,36+titleLines.length*38);
     let height=headerHeight+20;
@@ -3116,9 +3118,19 @@ async function screenshotSelectedMessages(button){
       const picture=pictures.get(entry.image);
       const text=[entry.text,entry.image&&!picture?'[图片未能载入]':''].filter(Boolean).join('\n');
       entry.lines=text?wrapped(text,22):[];
+      if(entry.card){
+        const title=wrapped(entry.card.title,23,textWidth,'700 ');
+        const body=entry.card.body?wrapped(entry.card.body,22):[];
+        const rows=entry.card.rows.map(row=>{
+          const label=wrapped(row.label,22,labelWidth),value=wrapped(row.value,22,valueWidth);
+          return {label,value,height:Math.max(label.length,value.length)*33+12};
+        });
+        entry.cardLayout={title,body,rows,height:title.length*34+
+          (body.length?8+body.length*33:0)+(rows.length?8:0)+rows.reduce((sum,row)=>sum+row.height,0)};
+      }
       entry.imageWidth=picture?Math.min(textWidth,picture.naturalWidth,360*picture.naturalWidth/picture.naturalHeight):0;
       entry.imageHeight=picture?entry.imageWidth*picture.naturalHeight/picture.naturalWidth:0;
-      entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*33+(picture?entry.imageHeight+10:0);
+      entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*33+(entry.cardLayout?.height||0)+(picture?entry.imageHeight+10:0);
       height+=entry.names.length*25+entry.bubbleHeight+(entry.time?24:0)+22;
     }
     height+=16;
@@ -3172,6 +3184,24 @@ async function screenshotSelectedMessages(button){
       const ink=entry.mine?colors['selected-ink']:colors.ink;
       write(entry.quotes,x+12,inside,17,24,ink);
       inside+=entry.quotes.length*24;
+      const card=entry.cardLayout;
+      if(card){
+        const left=x+12;
+        write(card.title,left,inside,23,34,colors.gold,'left','700 ');
+        inside+=card.title.length*34;
+        if(card.body.length){
+          inside+=8;
+          write(card.body,left,inside,22,33,ink);
+          inside+=card.body.length*33;
+        }
+        if(card.rows.length)inside+=8;
+        for(const row of card.rows){
+          ctx.fillStyle=colors.line;ctx.fillRect(left,inside,textWidth,1);
+          write(row.label,left,inside+6,22,33,colors.muted);
+          write(row.value,left+labelWidth+cardGap,inside+6,22,33,ink);
+          inside+=row.height;
+        }
+      }
       write(entry.lines,x+12,inside,22,33,ink);
       inside+=entry.lines.length*33;
       if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),x+12,inside+4,entry.imageWidth,entry.imageHeight);
