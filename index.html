@@ -419,11 +419,11 @@ function storyDialog(title,body,view='',back=null){
     '" aria-label="'+(shelf?'写番外':'余晖藏书阁')+'" title="'+(shelf?'写番外':'余晖藏书阁')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">'+
     (shelf?'<path d="m4 16-1 5 5-1L21 7l-4-4L4 16Zm11-11 4 4M4 16l4 4"/>':'<path d="M3 4h4v16H3zM8 4h4v16H8zM13 5l4-1 4 15-4 1zM3 8h4m1 8h4"/>')+'</svg></button>':'';
   const navigation=compact?'':storyButton('library','余晖藏书阁');
-  const exitLabel=folder?'返回分类':reading?'返回余晖藏书阁':'关闭';
-  const exitAction=folder||reading?'data-story-action="library"':'data-action="close"';
+  const exitLabel=folder?'返回分类':reading?'返回文章所属分类':'关闭';
+  const exitAction=reading?'data-action="storyBack"':folder?'data-story-action="library"':'data-action="close"';
   dialog('<header class="story-header'+(compact?' story-compact-header':'')+'"><div class="story-heading"><h2>'+esc(title)+'</h2>'+shortcut+'</div><div class="story-header-actions" role="navigation" aria-label="番外导航">'+navigation+
     '<button type="button" class="story-header-exit" '+exitAction+' aria-label="'+exitLabel+'" title="'+exitLabel+'"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">'+
-    (folder?'<path d="M20 12H4m7-7-7 7 7 7"/>':'<path d="m6 6 12 12M18 6 6 18"/>')+'</svg></button></div></header><div class="story-shell">'+body+'</div>',true);
+    (folder||reading?'<path d="M20 12H4m7-7-7 7 7 7"/>':'<path d="m6 6 12 12M18 6 6 18"/>')+'</svg></button></div></header><div class="story-shell">'+body+'</div>',true);
   $('dialog').classList.add('story-studio');
   $('dialog').orbBack=back||(folder?()=>storyLibrary():null);
 }
@@ -3427,6 +3427,7 @@ document.addEventListener('click',e=>{
     case 'chatExport':chatHistoryDialog(false);break;
     case 'chatDirectory':openChatDirectory();break;
     case 'homeOrb':openHomeOrb();break;
+    case 'storyBack':$('dialog').orbBack?.();break;
     case 'orbCancel':$('orbQuickDialog').close();break;
     case 'orbBack':{
       $('orbQuickDialog').close();
