@@ -471,6 +471,9 @@ function storyDialog(title,body,view='',back=null){
 function storyChecks(items,name,legend,selected=''){
   return '<fieldset class="story-choices"><legend>'+esc(legend)+'</legend>'+items.map(([value,label])=>'<label><input type="checkbox" name="'+name+'" value="'+esc(value)+'" '+(value===selected?'checked':'')+'>'+esc(label)+'</label>').join('')+'</fieldset>';
 }
+function storyMemoryField(){
+  return '<div class="story-choices"><label><input type="checkbox" name="readMemory">读取角色记忆</label><small class="muted">带入每位登场角色最近 10 条 AI 私聊和记忆同心圆内容</small></div>';
+}
 function storyStreamField(){
   return '<div class="story-choices"><label><input type="checkbox" name="stream" '+(state.streamReplies?'checked':'')+'>流式显示</label></div>';
 }
@@ -498,7 +501,7 @@ function bindStoryStyleChip(chip){
 function storyGenerator(){
   if(storyJob){storyProgress();return;}
   storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
-    '<section class="story-panel story-cast"><h3>角色与文风</h3><div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div>'+
+    '<section class="story-panel story-cast"><h3>角色与文风</h3><div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div>'+storyMemoryField()+
     storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
     '<fieldset id="storyStyleChoices" class="story-choices"><legend>文风 · 可多选</legend>'+storyStyles.map(style=>storyStyleChip(style,style)).join('')+state.customStoryStyles.map(x=>storyStyleChip(x.id,x.name,true)).join('')+'</fieldset>'+
     '<details class="story-style-editor"><summary>＋ 添加自定义文风</summary><p class="muted">长按自定义文风可删除。</p><label>文风名称<input name="styleName" maxlength="60"></label><label>文风内容<textarea name="styleContent" rows="4" maxlength="4000"></textarea></label>'+storyButton('saveStyle','保存文风')+'</details></section>'+
@@ -654,7 +657,14 @@ function storeStory(x){
   const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
   if(!commit({...state,stories,storyCategories:storyCategories([storyCategoryKey(x.category)]).slice(1)}))throw Error('文章保存失败，请检查本机存储空间。');
 }
-async function generateStory({parent,cast,title,guide,stream,target,pov,style,styleNames,includeUser}){
+function storyMemoryContext(people){
+  return people.map(c=>{
+    const recent=recentDialogue(c.messages).slice(-10);
+    const parts=[memoryContext(c),recent.length?'【近期私聊】\n'+JSON.stringify(recent):''].filter(Boolean);
+    return parts.length?'【'+displayName(c)+'的创作背景】\n'+parts.join('\n\n'):'';
+  }).filter(Boolean).join('\n\n');
+}
+async function generateStory({parent,cast,title,guide,stream,target,pov,style,styleNames,includeUser,readMemory=false}){
   if(storyJob)throw Error('已有一篇番外正在生成。');
   const people=cast.map(contact).filter(Boolean);
   if(!parent&&!people.length)throw Error('请至少选择一位登场角色。');
@@ -667,8 +677,9 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     '叙事视角：'+(pov||'沿用前文'),
     '文风：'+(style||'自然流畅，续篇沿用前文文风'),
     parent?'沿用前文角色。':includeUser?'User 加入剧情，资料：'+JSON.stringify({姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user}):'User 不加入剧情。',
-    '登场角色资料：'+JSON.stringify(roles)
-  ].join('\n');
+    '登场角色资料：'+JSON.stringify(roles),
+    readMemory?storyMemoryContext(people):''
+  ].filter(Boolean).join('\n');
   const controller=new AbortController();
   storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller};
   storyProgress();
@@ -810,7 +821,7 @@ async function storyAction(d){
       if(x)await generateStory({parent:x,cast:x.cast,guide:storySequelRequest,stream:state.streamReplies,target:22000});
       break;
     case 'custom':
-      if(x)storyDialog('自定义续写','<form id="storyContinue" data-id="'+esc(x.id)+'" class="fields"><label>续写指令<textarea name="guide" rows="5" required></textarea></label>'+storyStreamField()+'<button class="primary">开始续写</button></form>');
+      if(x)storyDialog('自定义续写','<form id="storyContinue" data-id="'+esc(x.id)+'" class="fields"><label>续写指令<textarea name="guide" rows="5" required></textarea></label>'+storyMemoryField()+storyStreamField()+'<button class="primary">开始续写</button></form>');
       break;
     case 'forward':
       if(x)storyDialog('转发番外','<form id="storyForward" data-id="'+esc(x.id)+'" class="fields"><label>接收方<select name="recipient" required><option value="">请选择角色或群聊</option><optgroup label="AI 角色">'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc('contact:'+c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</optgroup><optgroup label="群聊">'+state.groups.map(g=>'<option value="'+esc('group:'+g.id)+'">'+esc(g.name)+'</option>').join('')+'</optgroup></select></label><label>附言（可留空）<input name="note"></label><button>下一步</button></form>');
@@ -823,11 +834,11 @@ async function submitStoryForm(form,submitter){
   switch(form.id){
     case 'storyGenerate':{
       const styles=data.getAll('style').map(id=>state.customStoryStyles.find(x=>x.id===id)||{name:id});
-      await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),style:styles.map(x=>x.content?x.name+'：'+x.content:x.name).join('\n'),styleNames:styles.map(x=>x.name),stream:data.has('stream'),target:Number(value('length'))||30000,pov:value('pov'),includeUser:data.has('includeUser')});
+      await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),style:styles.map(x=>x.content?x.name+'：'+x.content:x.name).join('\n'),styleNames:styles.map(x=>x.name),stream:data.has('stream'),target:Number(value('length'))||30000,pov:value('pov'),includeUser:data.has('includeUser'),readMemory:data.has('readMemory')});
       break;
     }
     case 'storyContinue':
-      if(x)await generateStory({parent:x,cast:x.cast,guide:value('guide'),stream:data.has('stream'),target:22000});
+      if(x)await generateStory({parent:x,cast:x.cast,guide:value('guide'),stream:data.has('stream'),target:22000,readMemory:data.has('readMemory')});
       break;
     case 'storyEdit':{
       const title=value('title'),body=String(data.get('body')??'');
