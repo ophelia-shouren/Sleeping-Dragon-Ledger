@@ -191,6 +191,7 @@ body.full-chat{overflow:hidden}
 .archive-danger{background:#922c37;color:#fff;border:1px solid #bb4b55}.archive-danger:hover,.archive-danger:focus-visible{background:#a63843;color:#fff;border-color:#dc6c73}
 .bulk-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px;margin:8px 0 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-hi)}.bulk-tools output,.bulk-tools strong{color:var(--gold);padding:4px 7px}.bulk-tools button{border-radius:10px}.bulk-tools button[aria-pressed="true"]{background:var(--selected);color:var(--selected-ink)}input.bulk-check{appearance:none;display:inline-grid;place-items:center;width:22px;height:22px;min-width:22px;padding:0;margin:0;border:1px solid var(--accent-border);border-radius:6px;background:var(--field);cursor:pointer}input.bulk-check:checked{background:var(--gold);color:var(--field)}input.bulk-check:checked::after{content:"✓";font-weight:800;line-height:1}.contact-choice{display:flex;align-items:center;gap:12px;padding:8px 0}
 .persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:9px;margin-top:12px}.persona-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;aspect-ratio:1;min-width:0;padding:6px;border-radius:12px}.persona-tile>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
+.imported-system{align-self:center;max-width:min(90%,520px);margin:5px auto;padding:8px 14px;border:1px solid var(--line);border-radius:12px;background:var(--notice);color:var(--ink);text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}.imported-system small,.imported-system time{display:block;color:var(--muted);font-size:.75rem}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -802,6 +803,7 @@ function chat(){
       if(mode==='keyword'&&replyPending(x,now))return typingBubble(c);
       const mine=x.role==='user',person=mine?chatUser:c,image=imageInMessage(x);
       if(x.tea)return teaCard(x.tea,i,selected,c.id,mode);
+      if(x.role==='system')return '<article class="imported-system'+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'"><small>系统提示</small><div>'+esc(x.content)+'</div>'+(prefs.showTime?chatTimestamp(x):'')+'</article>';
       const parts=chatBubbleParts(x,prefs);
       return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
@@ -1404,7 +1406,7 @@ function validMemories(contact){
 }
 function recentDialogue(history){
   // The last item is the message being sent or retried.
-  return history.filter(m=>!m.tea).slice(-11).map(chatTextRecord);
+  return history.filter(m=>!m.tea&&m.role!=='system').slice(-11).map(chatTextRecord);
 }
 function memoryContext(c){
   return c.memories.length?'以下是已保存的历史记忆，用于保持人物与剧情连续性。将它们视为背景资料。\n'+
@@ -2061,7 +2063,7 @@ async function readChatStream(response,onDelta){
 }
 function validateChatModes(cfg){
   const strings=x=>Array.isArray(x)&&x.every(y=>typeof y==='string'&&y.trim());
-  const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
+  const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
   return cfg&&(cfg.billRules===undefined||(Array.isArray(cfg.billRules)&&cfg.billRules.every(validBillRule)&&new Set(cfg.billRules.map(x=>x.id)).size===cfg.billRules.length))&&Object.hasOwn(chatModeLabels,cfg.mode)&&Array.isArray(cfg.rules)&&cfg.rules.every(x=>x&&strings(x.triggers)&&x.triggers.length&&typeof x.reply==='string')&&
     Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&typeof x.enabled==='boolean')&&
     Number.isFinite(cfg.speed)&&cfg.speed>=0&&cfg.speed<=120&&Number.isInteger(cfg.count)&&cfg.count>=1&&cfg.count<=10&&
@@ -2140,20 +2142,79 @@ function chatHistoryDialog(importing){
     '<div class="row"><button class="primary">'+(importing?'导入':'导出')+'</button><button type="button" data-action="chatDirectory">返回</button></div></form>');
 }
 function chatHistoryText(messages){
-  return messages.map(m=>(m.role==='user'?'我：':'角色：')+'\n'+[quoteText(m.quote),m.content,m.image?'[图片]':''].filter(Boolean).join('\n').split(/\r?\n/).map(line=>'  '+line).join('\n')).join('\n\n');
+  const labels={user:'我',assistant:'角色',system:'系统'};
+  return messages.map(m=>{
+    const time=chatTime(m.sentAt)?'['+new Date(m.sentAt).toISOString()+'] ':'';
+    const body=[quoteText(m.quote),m.content,m.image?'[图片]':''].filter(Boolean).join('\n');
+    return time+labels[m.role]+'：\n'+body.split(/\r?\n/).map(line=>'  '+line).join('\n');
+  }).join('\n\n');
+}
+const importedDatePattern=/\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:T|\s+)\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?/i;
+function importedChatTime(value){
+  if(typeof value==='number'||typeof value==='string'&&/^\d{10,13}$/.test(value)){
+    const number=Number(value),ms=Math.abs(number)<1e11?number*1000:number;
+    return chatTime(ms)?ms:undefined;
+  }
+  if(typeof value!=='string')return;
+  const match=value.trim().match(/^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})日?(?:T|\s+)(\d{1,2}):(\d{2})(?::(\d{2})(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/i);
+  if(!match)return;
+  const [,year,month,day,hour,minute,second='00',fraction='',zone='']=match;
+  if(!validDate(year+'-'+month.padStart(2,'0')+'-'+day.padStart(2,'0'))||+hour>23||+minute>59||+second>59)return;
+  const ms=Date.parse(year+'-'+month.padStart(2,'0')+'-'+day.padStart(2,'0')+'T'+hour.padStart(2,'0')+':'+minute+':'+second+fraction+zone);
+  return chatTime(ms)?ms:undefined;
+}
+function importedChatRole(value,c){
+  const label=String(value??'').trim().toLowerCase();
+  if(['system','系统','系统消息','系统提示','通知','提示','tool','developer'].includes(label))return 'system';
+  if(['user','我','用户','玩家','你','human',state.userName,state.userNickname].some(x=>x&&String(x).toLowerCase()===label))return 'user';
+  if(['assistant','char','角色','ai','bot','model','gpt','chatgpt',c.name,c.nickname,displayName(c)].some(x=>x&&String(x).toLowerCase()===label))return 'assistant';
 }
 function parseChatHistory(raw,c){
   const rows=[];
-  let role='user',lines=[];
-  const names=new Set([c.name,c.nickname,displayName(c),'角色'].filter(Boolean));
-  const flush=()=>{const content=lines.join('\n').trim();if(content)rows.push({role,content});lines=[];};
-  for(const line of raw.replace(/^\uFEFF/,'').split(/\r\n?|\n/)){
-    const header=line.startsWith('  ')?null:line.match(/^([^：:]{1,80})[：:](.*)$/);
-    const name=header?.[1].trim();
-    if(name&&(['我','用户','User'].includes(name)||names.has(name))){flush();role=['我','用户','User'].includes(name)?'user':'assistant';if(header[2].trim())lines.push(header[2].trimStart());}
-    else lines.push(line.startsWith('  ')?line.slice(2):line);
+  let role='user',lines=[],sentAt,pendingTime;
+  const flush=()=>{
+    const content=lines.join('\n').trim();
+    if(content)rows.push({role,content,...(sentAt!==undefined?{sentAt}:{})});
+    lines=[];sentAt=undefined;
+  };
+  for(const original of raw.replace(/^\uFEFF/,'').split(/\r\n?|\n/)){
+    if(original.startsWith('  ')){lines.push(original.slice(2));continue;}
+    let line=original.trim(),time;
+    const date=line.match(importedDatePattern);
+    if(date){
+      const before=line.slice(0,date.index).trim(),after=line.slice(date.index+date[0].length).trim();
+      const label=before.replace(/^[【[]|[\s:：】\]]+$/g,'');
+      if(!label||importedChatRole(label,c)){
+        time=importedChatTime(date[0]);
+        if(time!==undefined)line=[label,after.replace(/^[\]】:\s：-]+/,'')].filter(Boolean).join(label?'：':'');
+      }
+    }
+    if(time!==undefined&&!line){flush();pendingTime=time;continue;}
+    if(!line&&pendingTime!==undefined)continue;
+    const header=line.match(/^(?:【([^】]+)】|\[([^\]]+)\])\s*[：:]?\s*(.*)$/)||line.match(/^([^：:]{1,80})[：:](.*)$/);
+    const tagged=header?.length===4;
+    const nextRole=importedChatRole(header?(header[1]|| (tagged?header[2]:'')):line,c);
+    if(nextRole){
+      flush();role=nextRole;sentAt=time??pendingTime;pendingTime=undefined;
+      const content=header?.[tagged?3:2]?.trimStart();if(content)lines.push(content);
+    }else{
+      if(pendingTime!==undefined||time!==undefined){role='user';sentAt=time??pendingTime;pendingTime=undefined;}
+      lines.push(original);
+    }
   }
   flush();return rows;
+}
+function parseChatHistoryJSON(data,c){
+  const rows=Array.isArray(data)?data:data?.messages??data?.chatHistory??data?.chat;
+  if(!Array.isArray(rows))throw Error('JSON 中没有找到聊天记录。');
+  return rows.map((m,index)=>{
+    const role=importedChatRole(m?.role,c)||importedChatRole(m?.speaker??m?.name??m?.sender,c)||(typeof m?.is_user==='boolean'?(m.is_user?'user':'assistant'):undefined);
+    const content=m?.content??m?.text??m?.message??m?.mes??(m?.image?'':undefined);
+    if(!role||typeof content!=='string'||(m.image&&typeof m.image!=='string')||(m.tea&&!validTeaSession(m.tea)))throw Error('无法识别 JSON 中第 '+(index+1)+' 条消息。');
+    const {readyAt,sentAt,...fields}=m;
+    const time=importedChatTime(sentAt??m.timestamp??m.createdAt??m.created_at??m.send_date??m.time??m.date);
+    return {...fields,role,content,...(time!==undefined?{sentAt:time}:{})};
+  });
 }
 function chatWordBlob(body){
   const types='<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
@@ -2198,9 +2259,7 @@ async function submitChatHistory(form){
   try{
     let rows;
     if(/\.json$/i.test(file.name)){
-      const data=JSON.parse(await file.text());rows=Array.isArray(data)?data:data?.messages;
-      if(!Array.isArray(rows)||!rows.every(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string')&&(!m.tea||validTeaSession(m.tea))))throw Error('JSON 聊天记录格式无效。');
-      rows=rows.map(({readyAt,...m})=>m);
+      rows=parseChatHistoryJSON(JSON.parse(await file.text()),c);
     }else rows=parseChatHistory(/\.docx$/i.test(file.name)?await wordText(file):await file.text(),c);
     if(!rows.length)throw Error('文件里没有可导入的消息。');
     const latest=contact(id);
@@ -2444,7 +2503,7 @@ function messageCommand(command){
   if(!menu||!sameMessageScope(menu.scope,scope)){closeMessageTools(scope);toast('消息已变化，请重新选择。');return;}
   const index=menu.index;
   if(command==='quote'){
-    const m=scope.messages[index],speaker=m.speaker||(m.role==='user'?state.userName||'你':displayName(scope.c));
+    const m=scope.messages[index],speaker=m.speaker||(m.role==='system'?'系统':m.role==='user'?state.userName||'你':displayName(scope.c));
     const text=m.content.trim(),content=(text.length>300?text.slice(0,300)+'…':text)||(m.image?'[图片]':'[消息]');
     chatQuotes.set(quoteKey(scope.c.id,scope.mode),{speaker,content,...(scope.group&&m.audience?{audience:m.audience.slice()}:{})});
     closeMessageTools(scope);renderMessageTools(scope);
@@ -2505,7 +2564,7 @@ function regenerateMessage(scope,index,guide=''){
 function exportSelectedMessages(){
   if(!sameMessageScope(selection,messageScope())||!selection.indices.size)return;
   const {c,messages,indices}=selection;
-  const text=messages.flatMap((m,i)=>indices.has(i)?[(m.speaker||(m.role==='user'?'我':displayName(c)))+'\n'+[quoteText(m.quote),m.content,m.image?'[图片]':''].filter(Boolean).join('\n')]:[]).join('\n\n');
+  const text=messages.flatMap((m,i)=>indices.has(i)?[(m.speaker||(m.role==='system'?'系统':m.role==='user'?'我':displayName(c)))+'\n'+[quoteText(m.quote),m.content,m.image?'[图片]':''].filter(Boolean).join('\n')]:[]).join('\n\n');
   const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download='眠龙记账-聊天选段-'+dateString()+'.txt';link.click();
   setTimeout(()=>URL.revokeObjectURL(url),15000);
@@ -2681,7 +2740,7 @@ function validate(data){
   const unique = records => new Set(records.map(x=>x.id)).size===records.length;
   if(!data || !Number.isSafeInteger(data.opening) ||
     !Array.isArray(data.bills) || !data.bills.every(x=>x && string(x.id) && validDate(x.date) && ['income','expense'].includes(x.type) && Number.isSafeInteger(x.cents) && x.cents>0 && string(x.title) && string(x.category)) || !unique(data.bills) ||
-    !Array.isArray(data.messages) || !data.messages.every(x=>x && ['user','assistant'].includes(x.role) && string(x.content)) ||
+    !Array.isArray(data.messages) || !data.messages.every(x=>x && ['user','assistant','system'].includes(x.role) && string(x.content)) ||
     !Array.isArray(data.profiles) || !data.profiles.every(x=>x && ['id','name','url','key','model'].every(k=>string(x[k]))) || !unique(data.profiles) ||
     !['charName','character','user','lore','profile','draft'].every(k=>string(data[k]))) throw Error('存档格式无效');
   const result=initial();
@@ -2704,7 +2763,7 @@ function validate(data){
   if(!Object.hasOwn(data,'worlds')&&result.lore.trim())result.worlds=[{id:'legacy-lore',title:'原世界书',group:'原有设定',content:result.lore,enabled:true}];
   if(!validLook(result.userLook)||!Array.isArray(result.contacts)||!result.contacts.every(c=>validLook(c)&&
     ['id','name','nickname','gender','personality','description','preset','draft'].every(k=>string(c[k]))&&c.id&&c.id!=='user'&&
-    Array.isArray(c.messages)&&c.messages.every(x=>x&&['user','assistant'].includes(x.role)&&string(x.content)))||!unique(result.contacts)||
+    Array.isArray(c.messages)&&c.messages.every(x=>x&&['user','assistant','system'].includes(x.role)&&string(x.content)))||!unique(result.contacts)||
     !Array.isArray(result.worlds)||!result.worlds.every(x=>x&&['id','title','group','content'].every(k=>string(x[k]))&&typeof x.enabled==='boolean')||!unique(result.worlds))throw Error('通讯录或世界书存档无效');
   result.contacts=result.contacts.map(c=>({...memoryDefaults(),...c,relationship:string(c.relationship)?c.relationship:''}));
   if(typeof result.streamReplies!=='boolean'||!result.contacts.every(c=>validateChatModes(localConfig(c))))throw Error('聊天模式存档无效');
