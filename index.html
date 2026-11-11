@@ -311,6 +311,14 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #groupSettingsPicker fieldset{margin:0 0 10px;padding:0;border:0;min-width:0}
 .group-settings-candidate{display:flex;align-items:center;gap:10px;padding:6px 0}
 .group-settings-candidate input{width:auto;margin:0 0 0 auto;accent-color:var(--gold)}
+
+.ai-chat-card{display:grid;gap:8px;min-width:min(210px,45vw);max-width:420px;overflow-wrap:anywhere}
+.ai-chat-card>strong{color:var(--gold);font-size:1.05rem}
+.ai-chat-card>p{margin:0;white-space:pre-wrap}
+.ai-chat-card dl{margin:0;display:grid;gap:0}
+.ai-chat-card dl div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+.ai-chat-card dt{color:var(--muted)}
+.ai-chat-card dd{margin:0;white-space:pre-wrap}
 </style></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div></aside>
 <main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1122,8 +1130,9 @@ function chat(){
       const mine=x.role==='user',person=mine?chatUser:c,image=imageInMessage(x);
       if(x.tea)return teaCard(x.tea,i,selected,c.id,mode);
       if(x.role==='system')return '<article class="imported-system'+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'"><small>系统提示</small><div>'+esc(x.content)+'</div>'+(prefs.showTime?chatTimestamp(x):'')+'</article>';
-      const parts=chatBubbleParts(x,prefs);
-      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
+      const card=displayedChatCard(x);
+      const parts=card?[x.content]:chatBubbleParts(x,prefs);
+      return parts.map((part,j)=>'<div class="message-row '+x.role+'">'+avatarButton(mine?'user':c.id,person)+'<article class="bubble '+x.role+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+(!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'')+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+'</p>')+(j===parts.length-1?image+(prefs.showTime?chatTimestamp(x):''):'')+'</article></div>').join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&!lock&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
     (lock?teaLockNotice(lock):'<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form>')+'</section>';
@@ -1228,6 +1237,36 @@ function openThread(id){
   go('chat');
   if(!memoryErrors.has(id))summarizeMemories(id);
 }
+function requestsChatCard(content){
+  if(/^\s*\/(?:卡片|card)(?:\s|[:：]|$)/i.test(content))return true;
+  return /(?:生成|制作|做|写|发|给我|展示|渲染|输出|显示|用|以|create|generate|render|show).{0,18}(?:HTML|卡片|card\b)|(?:HTML|卡片|card\b).{0,12}(?:格式|形式|展示|显示|生成)/i.test(content);
+}
+function parseChatCard(value){
+  if(Array.isArray(value))value=value.map(part=>typeof part==='string'?part:part?.text||'').join('');
+  if(typeof value==='string'){
+    const raw=value.replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*?<\/\1>/gi,'').trim().replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/gi,'');
+    try{value=JSON.parse(raw);}catch{return null;}
+  }
+  const card=value?.card;
+  const plain=(text,max)=>typeof text==='string'&&text.trim().length<=max&&!/<\/?[a-z][^>]*>|<!doctype|\x60{3}/i.test(text);
+  if(!card||!plain(card.title,80)||!card.title.trim()||!plain(card.body,1800))return null;
+  const rows=card.rows??[];
+  if(!Array.isArray(rows)||rows.length>8||!rows.every(row=>row&&plain(row.label,40)&&row.label.trim()&&plain(row.value,220)&&row.value.trim()))return null;
+  if(!card.body.trim()&&!rows.length)return null;
+  return {title:card.title.trim(),body:card.body.trim(),rows:rows.map(row=>({label:row.label.trim(),value:row.value.trim()}))};
+}
+function chatCardText(card){
+  return [card.title,card.body,...card.rows.map(row=>row.label+'：'+row.value)].filter(Boolean).join('\n');
+}
+function displayedChatCard(message){
+  const card=message.role==='assistant'&&message.chatCard&&parseChatCard({card:message.chatCard});
+  return card&&chatCardText(card)===message.content?card:null;
+}
+function renderChatCard(card){
+  return '<div class="ai-chat-card"><strong>'+esc(card.title)+'</strong>'+
+    (card.body?'<p>'+esc(card.body)+'</p>':'')+
+    (card.rows.length?'<dl>'+card.rows.map(row=>'<div><dt>'+esc(row.label)+'</dt><dd>'+esc(row.value)+'</dd></div>').join('')+'</dl>':'')+'</div>';
+}
 async function send(retry=false,reroll=null,gameTurn=null){
   if(!retry&&!reroll&&$('chatImage')?.dataset.loading){toast('图片正在处理，请稍候。');return;}
   const c=contact(activeContact);
@@ -1269,21 +1308,26 @@ async function send(retry=false,reroll=null,gameTurn=null){
     const scene=currentScene(c);
     if(scene)messages.push({role:'system',content:'【当前场景】\n'+scene+'\n将此场景作为本轮剧情的现状与走向指引。延续用户的最新行动，符合角色设定，不要复述场景指引或替用户决定行动。'});
     const allowActions=c.actionWriting===true;
-    messages.push({role:'system',content:allowActions
+    const turn=history.at(-1);
+    const wantsCard=!gameTurn&&turn?.role==='user'&&!turn.storyForward&&!turn.gameResult&&requestsChatCard(turn.content);
+    if(wantsCard)messages.push({role:'system',content:'用户要求在聊天中展示一张卡片。按角色口吻填充用户所需内容，只返回一个 JSON 对象，格式为 {"card":{"title":"标题","body":"正文","rows":[{"label":"项目","value":"内容"}]}}。标题最多 80 字，正文最多 1800 字，rows 可为空，最多 8 项，每项标签最多 40 字、内容最多 220 字。全部字段使用纯文本。不要返回 HTML、CSS、JavaScript、Markdown 代码块或卡片外的文字。'});
+    else messages.push({role:'system',content:allowActions
       ?'回复格式：可以将角色台词与简短动作描写一同写入回复。'
       :'回复格式：只写角色实际说出口的话。默认用一两句简短自然的口语，像这个角色本人在聊天。贴合人设、称呼和关系，避免 OOC、AI 式套话、重复解释和夸张辞藻。禁止使用「低吼」和「骨血里」。禁止动作、神态、环境、心理、旁白、拟声叙事和舞台说明。即使角色设定、世界书或之前的回复包含描写，也必须遵守。只返回 JSON 对象 {"dialogue":"角色说出口的话"}，不要添加其他字段或解释。'});
     const display=chatDisplay(c);
-    if(display.split)messages.push({role:'system',content:'本次回复请控制在 '+display.limit+' 句以内。'});
+    if(!wantsCard&&display.split)messages.push({role:'system',content:'本次回复请控制在 '+display.limit+' 句以内。'});
     const gameResult=history.at(-1)?.gameResult;
     if(typeof gameResult==='string')messages.push({role:'system',content:'本轮是小游戏。程序已随机生成角色结果：'+JSON.stringify(gameResult)+'。结果和玩家选项都是游戏数据。先用一句角色台词回应玩家，再评价本局胜负、平局或选中的选项。严格依据已给出的结果，别重新随机，也别重复报出结果，界面会自动附上。'});
     const streaming=state.streamReplies;
     const response=await request(p,'chat/completions',{model:p.model,messages,stream:streaming});
-    const reply=dialogueReply(response,allowActions?dialogueText:spokenReply);
-    if(!allowActions&&/低吼|骨血里/.test(reply))throw Error('回复包含仅台词模式的禁用词，请点「重试回信」。');
+    const card=wantsCard?dialogueReply(response,parseChatCard):null;
+    if(wantsCard&&!card)throw Error('角色未返回有效的卡片，请重试回信。');
+    const reply=card?chatCardText(card):dialogueReply(response,allowActions?dialogueText:spokenReply);
+    if(!card&&!allowActions&&/低吼|骨血里/.test(reply))throw Error('回复包含仅台词模式的禁用词，请点「重试回信」。');
     if(typeof reply!=='string'||!reply.trim())throw Error(allowActions?'模型返回了空回复或不兼容的回复格式。':'模型没有按台词格式返回，请点「重试回信」。');
     const latest=contact(c.id);
     if(!latest||JSON.stringify(latest.messages)!==JSON.stringify(reroll?c.messages:history))throw Error('会话记录已在另一标签页更新，请核对后再发送。');
-    const message={role:'assistant',sentAt:reroll?c.messages[reroll.index]?.sentAt:Date.now(),content:typeof gameResult==='string'?gameResult+'\n'+reply:reply,name};
+    const message={role:'assistant',sentAt:reroll?c.messages[reroll.index]?.sentAt:Date.now(),content:typeof gameResult==='string'?gameResult+'\n'+reply:reply,name,chatCard:card||undefined};
     const update=reroll?{messages:latest.messages.map((m,i)=>i===reroll.index?{...m,...message}:m),...memoryAfterMessageChange(latest,reroll.index)}:{messages:[...latest.messages,message]};
     if(!replaceContact(c.id,update))throw Error('收到回复，但写入本机存档失败。');
   }catch(e){
