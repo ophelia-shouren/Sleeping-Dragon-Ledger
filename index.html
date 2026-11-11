@@ -1042,16 +1042,20 @@ function refreshGroup(id){
 function patchGroup(g,patch){
   if(!commit({...state,groups:state.groups.map(x=>x.id===g.id?{...x,...patch}:x)}))throw Error('群聊保存失败。');
 }
+function groupModelProfile(){
+  const profile=state.profiles.find(p=>p.id===state.profile);
+  if(!profile?.url||!profile.model)throw Error('请在 API 连接中设置全局默认预设。');
+  return profile;
+}
 async function groupReply(g,c,guide=''){
-  const p=profileFor(c);
-  if(!p)throw Error(displayName(c)+'缺少可用的 API 预设。');
+  const p=groupModelProfile();
   const action=g.actionWriting===true;
   const gameResult=groupMessagesFor(g,c.id).findLast(m=>!m.roleId)?.gameResult;
   const system=[
     worldContext('front',c.id),chatTimeContext(),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
     '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
     '人设：'+c.description,'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
-    g.shared?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
+    g.shared&&profileFor(c)?.id===p.id?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
     guide?'重新生成这条回复。用户给出的改写提示：'+guide:'',
     g.scene?'【当前场景】\n'+g.scene:'',
     gameResult?'本轮小游戏结果已由网页随机确定：'+JSON.stringify(gameResult)+'。根据结果点评，不要重新抽取或重复报出结果。':'',
@@ -1086,8 +1090,7 @@ function parseGroupRound(value,roles,action){
   return roles.map(c=>replies.get(c.id));
 }
 async function groupRoundReply(g,roles){
-  const p=profileFor(roles[0]);
-  if(!p)throw Error(displayName(roles[0])+'缺少可用的 API 预设。');
+  const p=groupModelProfile();
   const action=g.actionWriting===true;
   const visible=g.messages.filter(m=>!m.tea?.bonus&&roles.every(c=>!m.audience||m.audience.includes(c.id)))
     .slice(-24).map(m=>Array.isArray(m.quote?.audience)&&roles.some(c=>!m.quote.audience.includes(c.id))?{...m,quote:undefined}:m);
@@ -1140,8 +1143,8 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false){
       if(g.pending.length)return;
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
-      const first=game?members.find(c=>c.id===game.roleId):members[0];
-      if(!first||!profileFor(first))throw Error('请为本轮首位回复角色设置可用的 API 预设。');
+      groupModelProfile();
+      if(game&&!members.some(c=>c.id===game.roleId))throw Error('该角色已不在群聊中。');
       const quote=!game&&!storyForward&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
