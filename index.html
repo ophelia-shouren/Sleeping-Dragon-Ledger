@@ -261,6 +261,7 @@ body.full-chat{overflow:hidden}
 .story-header-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;color:var(--gold);border-radius:10px}
 .story-bulk-category{display:flex;flex:1 1 100%;align-items:end;gap:10px;flex-wrap:wrap}
 .story-bulk-category label{flex:1 1 160px;min-width:0;max-width:420px}
+#storyExport .story-books{margin-top:12px}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -392,7 +393,7 @@ function storySun(){
 function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
-function storyDialog(title,body,view=''){
+function storyDialog(title,body,view='',back=null){
   const folder=view==='folder',reading=view==='reader',shelf=view==='shelf',compose=view==='compose';
   const compact=folder||reading||shelf||compose;
   const shortcut=compose||shelf?'<button type="button" class="story-header-icon" data-story-action="'+(shelf?'generator':'library')+
@@ -405,6 +406,7 @@ function storyDialog(title,body,view=''){
     '<button type="button" class="story-header-exit" '+exitAction+' aria-label="'+exitLabel+'" title="'+exitLabel+'"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">'+
     (folder?'<path d="M20 12H4m7-7-7 7 7 7"/>':'<path d="m6 6 12 12M18 6 6 18"/>')+'</svg></button></div></header><div class="story-shell">'+body+'</div>',true);
   $('dialog').classList.add('story-studio');
+  $('dialog').orbBack=back||(folder?()=>storyLibrary():null);
 }
 function storyChecks(items,name,legend,selected=''){
   return '<fieldset class="story-choices"><legend>'+esc(legend)+'</legend>'+items.map(([value,label])=>'<label><input type="checkbox" name="'+name+'" value="'+esc(value)+'" '+(value===selected?'checked':'')+'>'+esc(label)+'</label>').join('')+'</fieldset>';
@@ -565,7 +567,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(storyCategoryKey(x.category))+'" list="storyCategoryOptions" placeholder="输入新分类或已有分类名称"></label><datalist id="storyCategoryOptions">'+storyCategories().map(name=>'<option value="'+esc(name||'未分类')+'"></option>').join('')+'</datalist><button>保存分类</button></form>'+
-    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader');
+    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader',()=>storyLibrary(storyCategoryKey(x.category)));
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -663,8 +665,26 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
 function formatStoryBody(body){
   return body.replace(/\r\n?/g,'\n').split('\n').map(line=>line.replace(/^[ \t\u3000]+|[ \t\u3000]+$/g,'')).filter(Boolean).join('\n\n');
 }
+function storyEditCast(x){
+  const names=x.castNames||[];
+  const paired=names.length>=x.cast.length;
+  const choices=state.contacts.map(c=>({value:'contact:'+c.id,id:c.id,name:displayName(c),checked:x.cast.includes(c.id)}));
+  for(const [index,id] of x.cast.entries()){
+    if(!contact(id))choices.push({value:'contact:'+id,id,name:(paired&&names[index])||'已移除角色',checked:true});
+  }
+  const known=new Set(choices.filter(choice=>choice.checked).map(choice=>choice.name));
+  const extraNames=paired?names.slice(x.cast.length):names.filter(name=>!known.has(name));
+  extraNames.forEach((name,index)=>choices.push({value:'saved:'+index,name,checked:true}));
+  return choices;
+}
 function storyEdit(x){
-  storyDialog('编辑文章','<form id="storyEdit" data-id="'+esc(x.id)+'" class="fields story-panel"><label>标题<input name="title" required value="'+esc(x.title)+'"></label><label>正文<textarea name="body" rows="16" required></textarea></label><div class="row"><output id="storyEditCount" aria-live="polite"></output><button type="button" data-story-action="formatEdit">一键排版</button><button class="primary">保存文章</button>'+storyButton('read','取消编辑',x.id)+'</div></form>');
+  const cast=storyEditCast(x);
+  const selectedStyles=new Set(x.styleNames||[]);
+  const styles=[...new Set([...storyStyles,...state.customStoryStyles.map(style=>style.name),...selectedStyles])];
+  storyDialog('编辑文章','<form id="storyEdit" data-id="'+esc(x.id)+'" class="fields story-panel"><label>标题<input name="title" required value="'+esc(x.title)+'"></label>'+
+    '<fieldset class="story-choices"><legend>参与角色 · 可多选</legend>'+(cast.map(choice=>'<label><input type="checkbox" name="cast" value="'+esc(choice.value)+'" '+(choice.checked?'checked':'')+'>'+esc(choice.name)+'</label>').join('')||'<span class="muted">暂无可选角色</span>')+'</fieldset>'+
+    '<fieldset class="story-choices"><legend>文风 · 可多选</legend>'+styles.map(name=>'<label><input type="checkbox" name="style" value="'+esc(name)+'" '+(selectedStyles.has(name)?'checked':'')+'>'+esc(name)+'</label>').join('')+'</fieldset>'+
+    '<label>正文<textarea name="body" rows="16" required></textarea></label><div class="row"><output id="storyEditCount" aria-live="polite"></output><button type="button" data-story-action="formatEdit">一键排版</button><button class="primary">保存文章</button>'+storyButton('read','取消编辑',x.id)+'</div></form>','',()=>storyRead(x));
   const body=$('storyEdit').elements.body;
   body.value=x.body;
   const syncProgress=bindStoryScrubber(body);
@@ -747,7 +767,11 @@ async function submitStoryForm(form,submitter){
     case 'storyEdit':{
       const title=value('title'),body=String(data.get('body')??'');
       if(!x||!title||!body.trim())throw Error('请填写文章标题和正文。');
-      const updated={...x,title,body};
+      const selectedCast=new Set(data.getAll('cast'));
+      const cast=storyEditCast(x).filter(choice=>selectedCast.has(choice.value));
+      const styleNames=data.getAll('style');
+      const updated={...x,title,body,cast:cast.flatMap(choice=>choice.id?[choice.id]:[]),
+        castNames:cast.map(choice=>choice.name),styleNames:styleNames.length||x.styleNames?styleNames:undefined};
       storeStory(updated);storyRead(updated);toast('文章已保存 · 全文 '+storyCount(body)+' 字');
       break;
     }
@@ -2563,12 +2587,12 @@ function saveDeckPreset(form){
 function openHomeOrb(){
   const c=page==='chat'?contact(activeContact):null,current=c?c.preset:state.profile;
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===current?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
-  const panel=$('orbQuickDialog'),insideStory=$('dialog').open&&$('dialog').classList.contains('story-fullscreen');
-  const html='<h2>快捷导航</h2><div class="row"><button type="button" class="primary" data-action="orbHome">回到主页</button><button type="button" data-action="'+(insideStory?'orbCancel':'close')+'">取消</button></div>'+
+  const panel=$('orbQuickDialog'),canGoBack=$('dialog').open||page!=='home';
+  const html='<h2>快捷导航</h2><div class="row"><button type="button" class="primary" data-action="orbHome">回到主页</button>'+(canGoBack?'<button type="button" data-action="orbBack">← 返回上一级</button>':'')+'<button type="button" data-action="orbCancel">取消</button></div>'+
     '<h3 class="quick-model-heading">快速更换 API 预设</h3><p class="muted">'+(c?'应用于 '+esc(displayName(c)):'应用于全局默认预设')+'</p>'+
     (options?'<form id="quickProfileForm" data-contact="'+esc(c?.id||'')+'"><label>API 预设<select name="profile"><option value="">'+(c?'跟随全局预设':'未选择预设')+'</option>'+options+'</select></label><button class="primary">应用预设</button></form>':'<p class="muted">还没有已保存的 API 预设。</p>');
-  if(insideStory){panel.innerHTML=html;panel.showModal();}
-  else dialog(html);
+  panel.innerHTML=html;
+  panel.showModal();
 }
 function saveQuickProfile(form){
   const id=form.elements.profile.value;
@@ -3163,6 +3187,7 @@ function render(){
 function dialog(html,full=false){
   const panel=$('dialog'),orb=$('homeOrb');
   panel.onscroll=null;
+  panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
   panel.classList.remove('story-studio');
@@ -3367,6 +3392,18 @@ document.addEventListener('click',e=>{
     case 'chatDirectory':openChatDirectory();break;
     case 'homeOrb':openHomeOrb();break;
     case 'orbCancel':$('orbQuickDialog').close();break;
+    case 'orbBack':{
+      $('orbQuickDialog').close();
+      const panel=$('dialog');
+      if(panel.open){
+        if(panel.orbBack)panel.orbBack();
+        else if($('lookForm')?.dataset.returnCard)openCard($('lookForm').dataset.returnCard);
+        else panel.close();
+      }else if(page==='chat'&&activeContact){
+        localRuns.clear();activeContact='';go('chat');
+      }else go('home');
+      break;
+    }
     case 'orbHome':$('orbQuickDialog').close();$('dialog').close();activeContact='';go('home');break;
     case 'localChatSettings':openLocalChatSettings();break;
     case 'localChatPreview':{
