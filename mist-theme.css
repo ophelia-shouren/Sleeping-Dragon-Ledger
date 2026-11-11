@@ -1,12 +1,21 @@
-@import url("https://fonts.googleapis.com/css2?family=Klee+One&family=LXGW+WenKai+TC&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap");
+
+@font-face {
+  font-family:"WenYue Classical Ming";
+  src:local("文悦古典明朝体"),local("文悦古典明朝体 W5"),
+      local("文悦古典明朝体 (非商业使用) W5"),
+      local("WenYue-GuDianMingChaoTi-W5"),local("WenYue-GuDianMingChaoTi-NC-W5");
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+}
 
 .swatch.mist {
   --swatch: linear-gradient(135deg, #eaf0fa 12%, #aebed7 50%, #3c4c73 51%, #65759b);
 }
 :root[data-skin="mist"] {
   color-scheme: dark;
-  --mist-font:"Klee One","LXGW WenKai TC","Kaiti SC",KaiTi,STKaiti,serif;
-  --mist-chat-font:"LXGW WenKai TC","Kaiti SC",KaiTi,serif;
+  --mist-font:"WenYue Classical Ming","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif;
   --mist-char-paper:#263550c9;
   --mist-char-edge:#a2b4d078;
   --ink:#f0f3ff; --muted:#e1e8f7; --gold:#edf2ff; --line:var(--mist-char-edge);
@@ -28,7 +37,7 @@
     linear-gradient(158deg,#586c89,#425976 53%,#263650);
 }
 [data-skin="mist"] body { background:var(--mist-backdrop) fixed; font-family:var(--mist-font); font-synthesis-weight:none; }
-[data-skin="mist"] body :is(h1,h2,h3,h4,button,input,select,textarea,option,.brand,.eyebrow,.number,.brand small,footer small,.story-reader,.story-live,.tea-copy) {
+[data-skin="mist"] body :is(h1,h2,h3,h4,button,input,select,textarea,option,.brand,.eyebrow,.number,.brand small,footer small,.story-reader,.story-live,.tea-copy,.tea-passage,.avatar) {
   font-family:var(--mist-font);
 }
 [data-skin="mist"] :is(h1,h2,h3,.brand,.number) { letter-spacing:.025em; }
@@ -84,10 +93,10 @@
 
 [data-skin="mist"] :is(.chat-thread,.group-room) {
   background:var(--mist-backdrop); color:var(--ink);
-  font:14px/1.6 var(--mist-chat-font);
+  font:14px/1.6 var(--mist-font);
 }
 [data-skin="mist"] .group-room { padding:8px; border-radius:10px; }
-[data-skin="mist"] :is(.chat-thread,.group-room) :is(h2,button,textarea) { font-family:var(--mist-chat-font); }
+[data-skin="mist"] :is(.chat-thread,.group-room) :is(h2,button,textarea) { font-family:var(--mist-font); }
 [data-skin="mist"] :is(.chat-thread,.group-room) .chat-top {
   min-height:44px; padding:5px 8px; margin-bottom:6px;
   background:#26375455; border-color:#a8bdd265; box-shadow:none;
@@ -111,7 +120,7 @@
 [data-skin="mist"] .mist-chat-meta+.bubble {
   max-width:100%; margin:0; padding:8px 10px; border-radius:4px;
   color:var(--ink); background:var(--mist-char-paper); border-color:var(--mist-char-edge);
-  font:14px/1.65 var(--mist-chat-font);
+  font:14px/1.65 var(--mist-font);
 }
 [data-skin="mist"] .mist-chat-meta+.bubble.user {
   --ink:#24314e; --muted:#384663; --gold:#263753; --field:#e1e7f2; --control:#e9edf6; --label:#24314e;
@@ -133,7 +142,7 @@
   color:var(--ink);
 }
 [data-skin="mist"] body :is(.story-paper,#dialog.story-studio .story-draft textarea) {
-  font-family:var(--mist-chat-font);
+  font-family:var(--mist-font);
 }
 
 /* Typing uses the same dark paper as a character's reply. */
