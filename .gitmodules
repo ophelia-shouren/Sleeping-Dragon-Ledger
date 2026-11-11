@@ -1,0 +1,3 @@
+[submodule "huiwen-font"]
+	path = fonts/huiwen-source
+	url = https://github.com/cntrump/imitation_typeface_fonts.git

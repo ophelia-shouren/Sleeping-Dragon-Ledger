@@ -1,13 +1,19 @@
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap");
 
-@import url("https://fontsapi.zeoseven.com/256/main/result.css");
+@font-face {
+  font-family:"Huiwen Mincho";
+  src:url("./fonts/huiwen-source/匯文明朝體v1.0.ttf") format("truetype");
+  font-style:normal;
+  font-weight:400;
+  font-display:swap;
+}
 
 .swatch.mist {
   --swatch: linear-gradient(135deg, #eaf0fa 12%, #aebed7 50%, #3c4c73 51%, #65759b);
 }
 :root[data-skin="mist"] {
   color-scheme: dark;
-  --mist-font:"Huiwen-mincho","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif;
+  --mist-font:"Huiwen Mincho","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif;
   --mist-char-paper:#263550c9;
   --mist-char-edge:#a2b4d078;
   --ink:#f0f3ff; --muted:#e1e8f7; --gold:#edf2ff; --line:var(--mist-char-edge);
