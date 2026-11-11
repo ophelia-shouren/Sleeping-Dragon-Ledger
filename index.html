@@ -1411,6 +1411,7 @@ function memoryContext(c){
     c.memories.map(x=>'【'+memoryRange(x)+'】\n'+x.content).join('\n\n'):'';
 }
 function memoryRange(x){
+  if(typeof x.title==='string'&&x.title.trim())return x.title;
   if(x.kind==='journal')return x.merged?'日记与心声 · 合并精简':'日记与心声';
   return '第 '+x.from+'–'+x.to+' 条'+(x.merged?' · 合并精简':'');
 }
@@ -1439,6 +1440,30 @@ function syncFormSelection(form,toggle=false){
   form.querySelector('[data-selection-count]').textContent='已选 '+count+' 项';
   form.querySelectorAll('[data-needs-selection]').forEach(button=>{button.disabled=!count;});
 }
+function editMemory(id,entryId=''){
+  const c=contact(id);if(!c)return;
+  const entry=c.memories.find(x=>x.id===entryId);
+  if(entryId&&!entry)return;
+  const groups=[...new Set(c.memories.map(x=>x.group).filter(x=>typeof x==='string'&&x))];
+  dialog('<h2>'+(entry?'编辑记忆':'新建记忆')+'</h2><form id="memoryEditForm" class="fields" data-id="'+esc(id)+'" data-entry="'+esc(entryId)+'">'+
+    '<label>标题<input name="title" maxlength="120" value="'+esc(entry?.title||'')+'" placeholder="可留空"></label>'+
+    '<label>分组<input name="group" maxlength="80" list="memoryGroups" value="'+esc(entry?.group||'')+'" placeholder="输入新分组或选择已有分组"></label>'+
+    '<datalist id="memoryGroups">'+groups.map(group=>'<option value="'+esc(group)+'"></option>').join('')+'</datalist>'+
+    '<label>正文<textarea name="content" rows="9" required>'+esc(entry?.content||'')+'</textarea></label>'+
+    '<div class="row"><button class="primary">保存记忆</button><button type="button" data-memory="'+esc(id)+'">返回</button></div></form>');
+}
+function saveEditedMemory(form){
+  const c=contact(form.dataset.id);if(!c)return;
+  if(mergeJobs.has(c.id))throw Error('记忆正在精简，请稍后保存。');
+  const entryId=form.dataset.entry,existing=c.memories.find(x=>x.id===entryId);
+  if(entryId&&!existing)throw Error('这条记忆已不存在。');
+  const {title,group,content}=form.elements;
+  if(!content.value.trim())throw Error('请输入记忆正文。');
+  const entry={...(existing||{id:crypto.randomUUID(),kind:'journal',from:0,to:0,created:Date.now(),merged:false}),
+    title:title.value.trim(),group:group.value.trim(),content:content.value.trim()};
+  const memories=existing?c.memories.map(x=>x.id===entryId?entry:x):[entry,...c.memories];
+  if(replaceContact(c.id,{memories})){openMemories(c.id);toast('记忆已保存。');}
+}
 function openMemories(id,preserve=false){
   const c=contact(id);if(!c)return;
   const old=preserve?$('memoryForm'):null;
@@ -1447,10 +1472,16 @@ function openMemories(id,preserve=false){
   const scroll=old?$('dialog').scrollTop:0;
   const count=c.messages.length-c.memoryCursor;
   const status=memoryJobs.has(id)?'正在总结聊天…':memoryErrors.get(id)||(count>=memoryBatchSize?'有聊天等待总结。':'下一份自动记忆：'+count+' / '+memoryBatchSize+' 条');
-  const rows=c.memories.map(x=>'<div class="memory-row"><input type="checkbox" class="bulk-check" name="memory" value="'+esc(x.id)+'" aria-label="选择'+esc(memoryRange(x))+'" '+(selected.has(x.id)?'checked':'')+'>'+
+  const groups=new Map();
+  for(const memory of c.memories){
+    const name=typeof memory.group==='string'&&memory.group.trim()?memory.group.trim():'未分组';
+    if(!groups.has(name))groups.set(name,[]);
+    groups.get(name).push(memory);
+  }
+  const rows=[...groups].map(([name,entries])=>'<section class="memory-section"><h3>'+esc(name)+'</h3>'+entries.map(x=>'<div class="memory-row"><input type="checkbox" class="bulk-check" name="memory" value="'+esc(x.id)+'" aria-label="选择'+esc(memoryRange(x))+'" '+(selected.has(x.id)?'checked':'')+'>'+
     '<details data-memory-id="'+esc(x.id)+'" '+(expanded.has(x.id)?'open':'')+'><summary>'+esc(memoryRange(x))+' <small>'+new Date(x.created).toLocaleDateString('zh-CN')+'</small></summary><p style="white-space:pre-wrap">'+esc(x.content)+'</p></details>'+
-    '<button type="button" data-delete-memory="'+esc(x.id)+'">删除</button></div>').join('');
-  dialog('<h2>'+esc(displayName(c))+'的记忆档案</h2><p class="muted">每累计 100 条消息自动总结。已保存的记忆会随每次发信提供给角色。</p>'+
+    '<div class="row"><button type="button" data-edit-memory="'+esc(x.id)+'">编辑</button><button type="button" data-delete-memory="'+esc(x.id)+'">删除</button></div></div>').join('')+'</section>').join('');
+  dialog('<div class="row between"><h2>'+esc(displayName(c))+'的记忆档案</h2><button type="button" data-new-memory="'+esc(id)+'">＋ 新建记忆</button></div><p class="muted">每累计 100 条消息自动总结。已保存的记忆会随每次发信提供给角色。</p>'+
     '<form id="memoryForm" data-id="'+esc(id)+'"><p class="notice" role="status">'+esc(status)+'</p>'+selectionTools('<button type="button" class="message-danger" data-action="deleteSelectedMemories" data-needs-selection disabled>删除所选</button>')+
     (rows||'<p class="empty">还没有保存的记忆。</p>')+
     '<div class="row actions"><button class="primary" '+(c.memories.length<2||mergeJobs.has(id)?'disabled':'')+'>'+(mergeJobs.has(id)?'正在精简…':'精简所选记忆')+'</button>'+
@@ -2100,12 +2131,92 @@ function refreshBillReplies(id){
   if(next!==state)commit(next);
 }
 
+function chatHistoryDialog(importing){
+  const c=contact(activeContact);if(!c)return;
+  const mode=localConfig(c).mode;
+  dialog('<h2>'+(importing?'导入聊天':'导出聊天')+'</h2><p class="muted">'+esc(displayName(c)+' · '+chatModeLabels[mode])+'</p><form id="chatHistoryForm" data-id="'+esc(c.id)+'" data-mode="'+esc(mode)+'">'+
+    (importing?'<label>选择文件<input type="file" name="file" accept=".txt,.docx,.json" required></label><p class="muted">导入内容会追加到当前模式。TXT 和 Word 可用「我：」「角色：」标记发言。</p>':
+    '<label>文件格式<select name="format"><option value="txt">TXT</option><option value="docx">Word (.docx)</option><option value="json">JSON（保留图片和消息信息）</option></select></label>')+
+    '<div class="row"><button class="primary">'+(importing?'导入':'导出')+'</button><button type="button" data-action="chatDirectory">返回</button></div></form>');
+}
+function chatHistoryText(messages){
+  return messages.map(m=>(m.role==='user'?'我：':'角色：')+'\n'+[quoteText(m.quote),m.content,m.image?'[图片]':''].filter(Boolean).join('\n').split(/\r?\n/).map(line=>'  '+line).join('\n')).join('\n\n');
+}
+function parseChatHistory(raw,c){
+  const rows=[];
+  let role='user',lines=[];
+  const names=new Set([c.name,c.nickname,displayName(c),'角色'].filter(Boolean));
+  const flush=()=>{const content=lines.join('\n').trim();if(content)rows.push({role,content});lines=[];};
+  for(const line of raw.replace(/^\uFEFF/,'').split(/\r\n?|\n/)){
+    const header=line.startsWith('  ')?null:line.match(/^([^：:]{1,80})[：:](.*)$/);
+    const name=header?.[1].trim();
+    if(name&&(['我','用户','User'].includes(name)||names.has(name))){flush();role=['我','用户','User'].includes(name)?'user':'assistant';if(header[2].trim())lines.push(header[2].trimStart());}
+    else lines.push(line.startsWith('  ')?line.slice(2):line);
+  }
+  flush();return rows;
+}
+function chatWordBlob(body){
+  const types='<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
+  const rels='<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  const paragraphs=body.split('\n').map(line=>'<w:p><w:r><w:t xml:space="preserve">'+esc(line.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,''))+'</w:t></w:r></w:p>').join('');
+  const xml='<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+paragraphs+'</w:body></w:document>';
+  const encoder=new TextEncoder(),parts=[],directory=[];
+  let offset=0,centralSize=0;
+  for(const [path,content] of [['[Content_Types].xml',types],['_rels/.rels',rels],['word/document.xml',xml]]){
+    const name=encoder.encode(path),data=encoder.encode(content);
+    let crc=-1;
+    for(const byte of data){crc^=byte;for(let bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+    crc=(~crc)>>>0;
+    const local=new DataView(new ArrayBuffer(30)),central=new DataView(new ArrayBuffer(46));
+    local.setUint32(0,0x04034b50,true);local.setUint16(4,20,true);local.setUint16(12,33,true);
+    local.setUint32(14,crc,true);local.setUint32(18,data.length,true);local.setUint32(22,data.length,true);local.setUint16(26,name.length,true);
+    central.setUint32(0,0x02014b50,true);central.setUint16(4,20,true);central.setUint16(6,20,true);central.setUint16(14,33,true);
+    central.setUint32(16,crc,true);central.setUint32(20,data.length,true);central.setUint32(24,data.length,true);central.setUint16(28,name.length,true);central.setUint32(42,offset,true);
+    parts.push(local.buffer,name,data);directory.push(central.buffer,name);
+    offset+=30+name.length+data.length;centralSize+=46+name.length;
+  }
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);end.setUint16(8,3,true);end.setUint16(10,3,true);end.setUint32(12,centralSize,true);end.setUint32(16,offset,true);
+  return new Blob([...parts,...directory,end.buffer],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+async function submitChatHistory(form){
+  const {id,mode}=form.dataset,c=contact(id);if(!c||localConfig(c).mode!==mode)return;
+  const file=form.elements.file?.files[0];
+  if(!file){
+    const messages=localSession(c).messages.filter(m=>!replyPending(m));
+    if(!messages.length)throw Error('当前模式还没有聊天记录。');
+    const format=form.elements.format.value,plain=()=>chatHistoryText(messages);
+    const blob=format==='docx'?chatWordBlob(plain()):format==='json'?
+      new Blob([JSON.stringify({version:1,messages},null,2)],{type:'application/json'}):new Blob(['\uFEFF',plain()],{type:'text/plain'});
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download=displayName(c).replace(/[\\/:*?"<>|]/g,'_')+'-聊天记录-'+dateString()+'.'+format;
+    link.click();setTimeout(()=>URL.revokeObjectURL(url),15000);return;
+  }
+  if(!/\.(txt|docx|json)$/i.test(file.name))throw Error('请选择 TXT、Word (.docx) 或 JSON 文件。');
+  if(form.dataset.busy)return;
+  form.dataset.busy='true';
+  try{
+    let rows;
+    if(/\.json$/i.test(file.name)){
+      const data=JSON.parse(await file.text());rows=Array.isArray(data)?data:data?.messages;
+      if(!Array.isArray(rows)||!rows.every(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string')&&(!m.tea||validTeaSession(m.tea))))throw Error('JSON 聊天记录格式无效。');
+      rows=rows.map(({readyAt,...m})=>m);
+    }else rows=parseChatHistory(/\.docx$/i.test(file.name)?await wordText(file):await file.text(),c);
+    if(!rows.length)throw Error('文件里没有可导入的消息。');
+    const latest=contact(id);
+    if(!form.isConnected||!latest||activeContact!==id||localConfig(latest).mode!==mode)return;
+    if(messageBusy(latest,mode))throw Error('聊天或记忆正在更新，请稍后导入。');
+    if(!confirm('将 '+rows.length+' 条消息追加到当前聊天？'))return;
+    if(patchSession(latest,mode,{messages:[...localSession(latest).messages,...rows]})){openChatDirectory();render();toast('已导入 '+rows.length+' 条消息。');}
+  }finally{delete form.dataset.busy;}
+}
 function openChatDirectory(){
   const c=contact(activeContact);
   if(!c)return;
   dialog('<h2>聊天目录</h2><div class="chat-directory"><h3>角色</h3><div class="row"><button type="button" data-card="'+esc(c.id)+'">人设卡</button>'+
-    (localConfig(c).mode==='ai'?memoryButton(c):'')+'</div><h3>聊天模式</h3>'+chatModeBar(c)+
+    memoryButton(c)+'</div><h3>聊天模式</h3>'+chatModeBar(c)+
     '<h3>当前模型</h3><p class="muted">'+esc(profileFor(c)?profileFor(c).name+' · '+profileFor(c).model:'尚未配置 API')+'</p>'+chatDisplaySettings(c)+
+    '<h3>聊天记录</h3><div class="row"><button type="button" data-action="chatImport">导入聊天</button><button type="button" data-action="chatExport">导出聊天</button></div>'+
     '<h3>发送账单</h3><div class="row"><button type="button" data-share="day">今日账单</button><button type="button" data-share="week">本周账单</button><button type="button" data-share="month">本月账单</button></div>'+
     '<div class="row actions"><button type="button" data-action="close">关闭</button></div></div>');
 }
@@ -2846,6 +2957,8 @@ document.addEventListener('click',e=>{
   }
   if(d.memory)openMemories(d.memory);
   if(d.retryMemory)summarizeMemories(d.retryMemory);
+  if(d.newMemory)editMemory(d.newMemory);
+  if(d.editMemory&&$('memoryForm'))editMemory($('memoryForm').dataset.id,d.editMemory);
   if(d.deleteMemory&&$('memoryForm'))deleteMemory($('memoryForm').dataset.id,d.deleteMemory);
   if(d.addCharRelation!==undefined){
     const form=$('contactForm');
@@ -2905,6 +3018,8 @@ document.addEventListener('click',e=>{
     case 'exitMessages':selection=null;renderMessageTools();break;
     case 'calculator':openCalculator(b);break;
     case 'currentScene':openCurrentScene();break;
+    case 'chatImport':chatHistoryDialog(true);break;
+    case 'chatExport':chatHistoryDialog(false);break;
     case 'chatDirectory':openChatDirectory();break;
     case 'homeOrb':openHomeOrb();break;
     case 'orbCancel':$('orbQuickDialog').close();break;
@@ -3050,6 +3165,8 @@ document.addEventListener('submit',e=>{
     if(f.id==='deckPresetForm')saveDeckPreset(f);
     if(f.id==='localChatForm')saveLocalChatForm(f);
     if(f.id==='contactSelection')removeContacts(new FormData(f).getAll('contact'));
+    if(f.id==='chatHistoryForm')submitChatHistory(f).catch(error=>toast(error.message));
+    if(f.id==='memoryEditForm')saveEditedMemory(f);
     if(f.id==='memoryForm')mergeMemories(f);
     if(f.id==='teaSettings')startTea(f);
     if(f.id==='teaWriteForm')writeTea(f);
