@@ -676,8 +676,8 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
   if(storyJob)throw Error('已有一篇番外正在生成。');
   const people=cast.map(contact).filter(Boolean);
   if(!parent&&!people.length)throw Error('请至少选择一位登场角色。');
-  const p=people.map(profileFor).find(Boolean)||state.profiles.find(x=>x.id===state.profile);
-  if(!p?.url||!p.model)throw Error('请先配置可用的聊天模型。');
+  const p=state.profiles.find(x=>x.id===state.profile);
+  if(!p?.url||!p.model)throw Error('请在 API 连接中设置可用的全局默认预设。');
   let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
   const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
