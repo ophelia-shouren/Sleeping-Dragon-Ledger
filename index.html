@@ -190,6 +190,7 @@ body.full-chat{overflow:hidden}
 .story-scrubber{position:fixed;z-index:5;right:max(5px,env(safe-area-inset-right));top:26%;height:min(48dvh,360px);display:flex;flex-direction:column;align-items:center;gap:5px;width:24px;color:var(--gold);border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:5px 0}.story-scrubber output{font-size:9px}.story-track{position:relative;flex:1;width:100%;min-height:0;touch-action:none;cursor:ns-resize}.story-track::before{content:"";position:absolute;inset:0 auto 0 50%;width:2px;background:var(--line)}.story-track span{position:absolute;left:50%;top:var(--progress,0%);transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:var(--gold);pointer-events:none}.story-scrubber{padding-bottom:10px;gap:9px}.story-shell:has(.story-reader){padding-right:20px}
 .archive-danger{background:#922c37;color:#fff;border:1px solid #bb4b55}.archive-danger:hover,.archive-danger:focus-visible{background:#a63843;color:#fff;border-color:#dc6c73}
 .bulk-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px;margin:8px 0 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-hi)}.bulk-tools output,.bulk-tools strong{color:var(--gold);padding:4px 7px}.bulk-tools button{border-radius:10px}.bulk-tools button[aria-pressed="true"]{background:var(--selected);color:var(--selected-ink)}input.bulk-check{appearance:none;display:inline-grid;place-items:center;width:22px;height:22px;min-width:22px;padding:0;margin:0;border:1px solid var(--accent-border);border-radius:6px;background:var(--field);cursor:pointer}input.bulk-check:checked{background:var(--gold);color:var(--field)}input.bulk-check:checked::after{content:"✓";font-weight:800;line-height:1}.contact-choice{display:flex;align-items:center;gap:12px;padding:8px 0}
+.persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:9px;margin-top:12px}.persona-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;aspect-ratio:1;min-width:0;padding:6px;border-radius:12px}.persona-tile>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -808,7 +809,7 @@ function chat(){
     (lock?teaLockNotice(lock):'<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form>')+'</section>';
 }
 function cards(){
-  const roles=state.contacts.map(c=>'<button class="directory-item" data-card="'+esc(c.id)+'">'+avatarMarkup(c)+'<span><strong>'+esc(displayName(c))+'</strong></span></button>').join('');
+  const roles=state.contacts.map(c=>'<button class="persona-tile" data-card="'+esc(c.id)+'">'+avatarMarkup(c)+'<span><strong>'+esc(displayName(c))+'</strong></span></button>').join('');
   const groups=new Map();
   for(const entry of state.worlds){
     const group=entry.group;
@@ -817,7 +818,7 @@ function cards(){
   }
   const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3><label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name)+entries.map(x=>'<div class="world-row"><button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button><button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
   return heading('CHARACTER ARCHIVE','人设与世界书','从目录打开卡片。开启的世界书条目会加入角色对话。')+
-    '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><div class="row"><button type="button" data-action="selectContacts">批量管理</button><button class="primary" data-action="newContact">＋ 新建角色</button></div></div><button class="directory-item" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong></span></button>'+roles+'</section>'+
+    '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><div class="row"><button type="button" data-action="selectContacts">批量管理</button><button class="primary" data-action="newContact">＋ 新建角色</button></div></div><div class="persona-grid"><button class="persona-tile" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong></span></button>'+roles+'</div></section>'+
     '<section class="panel"><div class="row between"><h2>世界书目录</h2><button data-action="newWorld">＋ 新建条目</button></div>'+(worlds||'<p class="empty">还没有世界书条目。</p>')+'</section></div>';
 }
 const charRelations=c=>(Array.isArray(c.charRelations)?c.charRelations:[]).filter(r=>r&&typeof r.roleId==='string'&&typeof r.description==='string'&&r.description.trim());
@@ -1410,7 +1411,7 @@ function memoryContext(c){
     c.memories.map(x=>'【'+memoryRange(x)+'】\n'+x.content).join('\n\n'):'';
 }
 function memoryRange(x){
-  if(x.kind==='journal')return '日记与心声';
+  if(x.kind==='journal')return x.merged?'日记与心声 · 合并精简':'日记与心声';
   return '第 '+x.from+'–'+x.to+' 条'+(x.merged?' · 合并精简':'');
 }
 function memoryButton(c){
@@ -1452,9 +1453,9 @@ function openMemories(id,preserve=false){
   dialog('<h2>'+esc(displayName(c))+'的记忆档案</h2><p class="muted">每累计 100 条消息自动总结。已保存的记忆会随每次发信提供给角色。</p>'+
     '<form id="memoryForm" data-id="'+esc(id)+'"><p class="notice" role="status">'+esc(status)+'</p>'+selectionTools('<button type="button" class="message-danger" data-action="deleteSelectedMemories" data-needs-selection disabled>删除所选</button>')+
     (rows||'<p class="empty">还没有保存的记忆。</p>')+
-    '<div class="row actions"><button class="primary" '+(c.memories.filter(x=>x.kind!=='journal').length<2||mergeJobs.has(id)?'disabled':'')+'>'+(mergeJobs.has(id)?'正在精简…':'精简所选记忆')+'</button>'+
+    '<div class="row actions"><button class="primary" '+(c.memories.length<2||mergeJobs.has(id)?'disabled':'')+'>'+(mergeJobs.has(id)?'正在精简…':'精简所选记忆')+'</button>'+
     (count>=memoryBatchSize&&!memoryJobs.has(id)?'<button type="button" data-retry-memory="'+esc(id)+'">重试自动总结</button>':'')+
-    '<button type="button" data-action="close">关闭</button></div><p class="muted">精简适用于聊天总结。日记与心声可勾选并批量删除。删除记忆会保留原聊天记录。</p></form>');
+    '<button type="button" data-action="close">关闭</button></div><p class="muted">精简会用摘要替换所选条目。同选日记与心声和聊天总结时，两类会分别精简。删除记忆会保留原聊天记录。</p></form>');
   $('dialog').scrollTop=scroll;
   syncFormSelection($('memoryForm'));
 }
@@ -1503,19 +1504,24 @@ function deleteSelectedMemories(form){
 async function mergeMemories(form){
   const id=form.dataset.id,c=contact(id);
   if(!c||mergeJobs.has(id))return;
-  if(localConfig(c).mode!=='ai'){toast('请切回 AI 模式后再精简记忆。');return;}
   const ids=new Set(new FormData(form).getAll('memory'));
-  const selection=c.memories.filter(x=>x.kind!=='journal'&&ids.has(x.id)).sort((a,b)=>a.from-b.from);
-  if(selection.length!==ids.size){toast('精简仅适用于聊天总结，请取消勾选日记与心声。');return;}
-  if(selection.length<2){toast('请至少选择两份聊天总结。');return;}
+  const selection=c.memories.filter(x=>ids.has(x.id));
+  if(selection.length<2){toast('请至少选择两份记忆。');return;}
   mergeJobs.add(id);syncMemoryView(id);
   try{
-    const content=await requestMemory(c,selection.map(x=>({范围:memoryRange(x),内容:x.content})),true);
+    const entries=[];
+    const journals=selection.filter(x=>x.kind==='journal').sort((a,b)=>a.created-b.created);
+    const summaries=selection.filter(x=>x.kind!=='journal').sort((a,b)=>a.from-b.from);
+    for(const batch of [journals,summaries]){
+      if(!batch.length)continue;
+      const journal=batch===journals;
+      const content=await requestMemory(c,batch.map(x=>({范围:memoryRange(x),日期:new Date(x.created).toLocaleDateString('zh-CN'),内容:x.content})),true);
+      entries.push({id:crypto.randomUUID(),from:journal?0:batch[0].from,to:journal?0:Math.max(...batch.map(x=>x.to)),content,created:Date.now(),merged:true,...(journal?{kind:'journal'}:{})});
+    }
     const latest=contact(id);
     if(!latest||selection.some(x=>!latest.memories.some(y=>y.id===x.id&&y.content===x.content)))
       throw Error('所选记忆已发生变化，请重新选择。');
-    const entry={id:crypto.randomUUID(),from:Math.min(...selection.map(x=>x.from)),to:Math.max(...selection.map(x=>x.to)),content,created:Date.now(),merged:true};
-    const memories=[...latest.memories.filter(x=>!ids.has(x.id)),entry].sort((a,b)=>a.from-b.from);
+    const memories=[...latest.memories.filter(x=>!ids.has(x.id)),...entries].sort((a,b)=>a.from-b.from);
     if(replaceContact(id,{memories}))toast('所选记忆已精简合并');
   }catch(e){if(!deviceLocked)showModelError('记忆精简失败。'+(e instanceof SyntaxError?'接口回复格式无效。':e.message||''));}
   finally{mergeJobs.delete(id);syncMemoryView(id);}
