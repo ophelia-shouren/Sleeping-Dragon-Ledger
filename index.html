@@ -319,6 +319,9 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .ai-chat-card dl div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:10px;padding:6px 0;border-top:1px solid var(--line)}
 .ai-chat-card dt{color:var(--muted)}
 .ai-chat-card dd{margin:0;white-space:pre-wrap}
+.scene-presets{margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px}
+.scene-presets summary{cursor:pointer;color:var(--gold)}
+.scene-presets label{margin-top:10px}
 </style></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div></aside>
 <main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -2843,12 +2846,40 @@ function currentSceneButton(c,group=false){
   const scene=group?c.scene:currentScene(c);
   return '<button type="button" class="scene-button" data-action="'+(group?'groupScene':'currentScene')+'" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6h14v13H5zM5 6l3-3h11v3M8 16l3-4 2 2 2-3 2 5"/><circle cx="9" cy="9" r="1"/></svg><span><strong>当前场景</strong><small>'+(scene?'已设定':'写下剧情走向')+'</small></span>'+(scene?'<i aria-hidden="true"></i>':'')+'</button>';
 }
+function scenePresetControls(){
+  const options=state.scenePresets.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('');
+  return '<details class="scene-presets"><summary>场景预设 · '+state.scenePresets.length+'</summary>'+
+    '<label>已保存的预设<select name="scenePreset"><option value="">请选择预设</option>'+options+'</select></label>'+
+    '<button type="button" data-action="loadScenePreset" '+(options?'':'disabled')+'>取用预设</button>'+
+    '<label>预设名称<input name="presetName" maxlength="80" placeholder="为上方场景命名"></label>'+
+    '<button type="submit" value="savePreset">保存为预设</button></details>';
+}
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Enter'||event.isComposing||!event.target.matches('.scene-presets input[name="presetName"]'))return;
+  event.preventDefault();
+  const form=event.target.form;
+  form.requestSubmit(form.querySelector('button[value="savePreset"]'));
+});
+function saveScenePreset(form){
+  const name=form.elements.presetName.value.trim(),scene=form.elements.scene.value.trim();
+  if(!name||name.length>80)throw Error('请输入预设名称（最多 80 字）。');
+  if(!scene||scene.length>form.elements.scene.maxLength)throw Error('请填写有效的场景内容。');
+  const preset={id:crypto.randomUUID(),name,scene};
+  if(!commit({...state,scenePresets:[...state.scenePresets,preset]}))return;
+  const select=form.elements.scenePreset,option=document.createElement('option');
+  option.value=preset.id;option.textContent=name;
+  select.append(option);select.value=preset.id;
+  form.querySelector('[data-action="loadScenePreset"]').disabled=false;
+  form.querySelector('summary').textContent='场景预设 · '+state.scenePresets.length;
+  form.elements.presetName.value='';
+  toast('场景预设已保存');
+}
 function openCurrentScene(){
   const c=contact(activeContact);
   if(!c||localConfig(c).mode!=='ai')return;
   dialog('<section class="scene-editor"><p class="eyebrow">SCENE NOTES</p><h2>当前场景</h2><p class="muted">设定此刻的地点、处境或接下来想走的剧情。保存后会随该角色的 AI 消息发送，留空保存即可清除。</p>'+
     '<form id="currentSceneForm" data-contact="'+esc(c.id)+'"><label>剧情指引<textarea name="scene" rows="6" maxlength="3000" placeholder="例如：雨停后，我们回到小屋。让他先说起今晚还没谈完的事。">'+esc(currentScene(c))+'</textarea></label>'+
-    '<div class="row actions"><button class="primary" type="submit">保存场景</button><button type="button" data-action="close">取消</button></div></form></section>');
+    '<div class="row actions"><button class="primary" type="submit">保存场景</button><button type="button" data-action="close">取消</button></div>'+scenePresetControls()+'</form></section>');
 }
 function saveCurrentScene(form){
   const c=contact(form.dataset.contact);
@@ -3160,7 +3191,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({teaSessions:[],groups:[],stories:[],storyCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -3181,6 +3212,7 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
+  if(!Array.isArray(result.scenePresets)||!result.scenePresets.every(p=>p&&string(p.id)&&p.id&&string(p.name)&&p.name.trim()&&string(p.scene)&&p.scene.trim()&&p.scene.length<=4000)||!unique(result.scenePresets))throw Error('场景预设存档无效');
   if(!Array.isArray(result.teaSessions)||!result.teaSessions.every(validTeaSession)||!unique(result.teaSessions))throw Error('茶叙存档无效');
   if(!Array.isArray(result.groups)||!result.groups.every(g=>g&&string(g.id)&&string(g.name)&&typeof g.shared==='boolean'&&Array.isArray(g.members)&&g.members.every(string)&&Array.isArray(g.pending)&&g.pending.every(string)&&Array.isArray(g.messages)&&g.messages.every(m=>m&&string(m.speaker)&&string(m.content)&&string(m.roleId)&&(m.audience===undefined||(Array.isArray(m.audience)&&m.audience.every(string)))))||!unique(result.groups))throw Error('群聊存档无效');
   if(!Array.isArray(result.customStoryStyles)||!result.customStoryStyles.every(x=>x&&['id','name','content'].every(k=>typeof x[k]==='string'&&x[k].trim()))||!unique(result.customStoryStyles))throw Error('文风存档无效');
@@ -3530,6 +3562,15 @@ document.addEventListener('click',e=>{
     case 'exitMessages':selection=null;renderMessageTools();break;
     case 'calculator':openCalculator(b);break;
     case 'currentScene':openCurrentScene();break;
+    case 'loadScenePreset':{
+      const form=b.form,preset=state.scenePresets.find(p=>p.id===form.elements.scenePreset.value);
+      if(!preset){toast('请先选择场景预设。');break;}
+      const field=form.elements.scene;
+      if(preset.scene.length>field.maxLength){toast('这条预设超出当前场景的字数限制。');break;}
+      field.value=preset.scene;
+      toast('已填入预设，保存场景后生效');
+      break;
+    }
     case 'chatImport':chatHistoryDialog(true);break;
     case 'chatExport':chatHistoryDialog(false);break;
     case 'chatDirectory':openChatDirectory();break;
@@ -3558,7 +3599,7 @@ document.addEventListener('click',e=>{
     case 'chatGames':{const room=b.closest('[data-group-room]');if(room)openGroupGames(room.dataset.groupRoom);else openChatGames();break;}
     case 'groupScene':{
       const g=groupById(b.closest('[data-group-room]').dataset.groupRoom);
-      dialog('<h2>当前场景</h2><form id="groupSceneForm" data-id="'+esc(g.id)+'"><label>群聊剧情走向<textarea name="scene" rows="5" maxlength="4000">'+esc(g.scene||'')+'</textarea></label><div class="row"><button class="primary">保存场景</button><button type="button" data-group-open="'+esc(g.id)+'">返回群聊</button></div></form>');
+      dialog('<h2>当前场景</h2><form id="groupSceneForm" data-id="'+esc(g.id)+'"><label>群聊剧情走向<textarea name="scene" rows="5" maxlength="4000">'+esc(g.scene||'')+'</textarea></label><div class="row"><button class="primary">保存场景</button><button type="button" data-group-open="'+esc(g.id)+'">返回群聊</button></div>'+scenePresetControls()+'</form>');
       break;
     }
     case 'rollChatDice':playChatGame('dice');break;
@@ -3727,6 +3768,9 @@ document.addEventListener('submit',e=>{
       if(message||picture)sendGroup(f.dataset.id,message,picture);
     }
     if(f.id==='contactForm'&&saveCard(f)){$('dialog').close();render();toast('人设卡已保存');}
+    if((f.id==='currentSceneForm'||f.id==='groupSceneForm')&&e.submitter?.value==='savePreset'){
+      saveScenePreset(f);return;
+    }
     if(f.id==='currentSceneForm')saveCurrentScene(f);
     if(f.id==='chatDisplayForm')saveChatDisplay(f);
     if(f.id==='quickProfileForm')saveQuickProfile(f);
