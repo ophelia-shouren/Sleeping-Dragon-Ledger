@@ -1040,6 +1040,9 @@ function openGroupGames(id){
   if(!g||groupJobs.has(id)||g.pending.length)return;
   dialog('<h2>群聊小游戏</h2><p class="muted">选择一位角色参加这一局，结果和点评会发到群里。</p><form id="groupGameForm" data-id="'+esc(id)+'"><label>参与角色<select name="member">'+g.members.map(contact).filter(Boolean).map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><div class="row"><button name="kind" value="dice">掷骰子</button><button name="kind" value="rps">猜拳</button></div><label>自定义 N 选一<textarea name="options" maxlength="2000" placeholder="每行一个选项，至少两项"></textarea></label><div class="row"><button name="kind" value="options">抽一个</button><button type="button" data-group-open="'+esc(id)+'">返回群聊</button></div></form>');
 }
+function bubbleTimestamp(message,showTime,split,last){
+  return showTime&&(last||(state.skin==='mist'&&split))?chatTimestamp(message):'';
+}
 function chatMessageLayout(avatar,name,time){
   if(state.skin==='mist')return {
     before:'<div class="mist-chat-meta">'+avatar+((name||time)?'<div>'+name+time+'</div>':'')+'</div>',
@@ -1055,7 +1058,7 @@ function groupBubble(m,g,index,selected){
   const name=mine?'':'<small>'+esc(m.speaker)+'</small>';
   return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>{
     const last=i===parts.length-1;
-    const layout=chatMessageLayout(avatar,name,last&&g.showTime!==false?chatTimestamp(m):'');
+    const layout=chatMessageLayout(avatar,name,bubbleTimestamp(m,g.showTime!==false,g.split===true,last));
     return '<div class="message-row '+role+'">'+layout.before+'<article class="bubble '+role+
       (selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
       (selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+
@@ -1229,7 +1232,7 @@ function chat(){
       const label=!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'';
       return parts.map((part,j)=>{
         const last=j===parts.length-1;
-        const layout=chatMessageLayout(avatar,label,last&&prefs.showTime?chatTimestamp(x):'');
+        const layout=chatMessageLayout(avatar,label,bubbleTimestamp(x,prefs.showTime,prefs.split,last));
         return '<div class="message-row '+x.role+'">'+layout.before+'<article class="bubble '+x.role+
           (selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
           (selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+
