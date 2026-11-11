@@ -206,7 +206,7 @@ body.full-chat{overflow:hidden}
 .story-studio .story-shell{padding-bottom:max(38px,env(safe-area-inset-bottom))}
 .story-studio .story-panel{min-width:0;padding:clamp(14px,3vw,26px);background:var(--panel);border:1px solid var(--line);border-radius:16px}
 .story-panel h3{color:var(--ink);font:700 1.35rem/1.3 var(--studio-serif);margin:0 0 4px}
-.story-studio .story-compose{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+.story-studio .story-compose{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
 .story-draft,.story-cast{display:grid;gap:15px}
 .story-form-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .story-compose-actions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
@@ -243,8 +243,8 @@ body.full-chat{overflow:hidden}
   .story-studio .story-header{align-items:flex-start;flex-direction:column;gap:10px}
   .story-header-actions{width:100%;justify-content:space-between}
   .story-header-actions .story-header-exit{min-height:40px;width:40px}
-  .story-studio .story-reader-header{flex-direction:row}
-  .story-reader-header .story-header-actions{width:auto}
+  .story-studio .story-compact-header{flex-direction:row}
+  .story-compact-header .story-header-actions{width:auto}
   .story-books{grid-template-columns:minmax(0,1fr)}
   .story-studio .story-entry{min-height:0}
 }
@@ -257,6 +257,10 @@ body.full-chat{overflow:hidden}
 .story-folder-card svg,.story-folder-card small{color:var(--gold)}
 .story-folder-card strong{font:700 1.3rem/1.4 var(--studio-serif)}
 .story-studio .story-entry button span{overflow-wrap:anywhere}
+.story-compact-header .story-heading{display:flex;align-items:center;gap:10px}
+.story-header-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;color:var(--gold);border-radius:10px}
+.story-bulk-category{display:flex;flex:1 1 100%;align-items:end;gap:10px;flex-wrap:wrap}
+.story-bulk-category label{flex:1 1 160px;min-width:0;max-width:420px}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -389,11 +393,17 @@ function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
 function storyDialog(title,body,view=''){
-  const reading=view==='reader';
-  const navigation=reading?'':view==='shelf'?storyButton('generator','写番外'):storyButton('library','余晖藏书阁');
-  const exit=reading?'data-story-action="library" aria-label="返回余晖藏书阁" title="返回余晖藏书阁"':'data-action="close" aria-label="关闭" title="关闭"';
-  dialog('<header class="story-header'+(reading?' story-reader-header':'')+'"><div class="story-heading"><h2>'+esc(title)+'</h2></div><div class="story-header-actions" role="navigation" aria-label="番外导航">'+navigation+
-    '<button type="button" class="story-header-exit" '+exit+'><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></header><div class="story-shell">'+body+'</div>',true);
+  const folder=view==='folder',reading=view==='reader',shelf=view==='shelf',compose=view==='compose';
+  const compact=folder||reading||shelf||compose;
+  const shortcut=compose||shelf?'<button type="button" class="story-header-icon" data-story-action="'+(shelf?'generator':'library')+
+    '" aria-label="'+(shelf?'写番外':'余晖藏书阁')+'" title="'+(shelf?'写番外':'余晖藏书阁')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">'+
+    (shelf?'<path d="m4 16-1 5 5-1L21 7l-4-4L4 16Zm11-11 4 4M4 16l4 4"/>':'<path d="M3 4h4v16H3zM8 4h4v16H8zM13 5l4-1 4 15-4 1zM3 8h4m1 8h4"/>')+'</svg></button>':'';
+  const navigation=compact?'':storyButton('library','余晖藏书阁');
+  const exitLabel=folder?'返回分类':reading?'返回余晖藏书阁':'关闭';
+  const exitAction=folder||reading?'data-story-action="library"':'data-action="close"';
+  dialog('<header class="story-header'+(compact?' story-compact-header':'')+'"><div class="story-heading"><h2>'+esc(title)+'</h2>'+shortcut+'</div><div class="story-header-actions" role="navigation" aria-label="番外导航">'+navigation+
+    '<button type="button" class="story-header-exit" '+exitAction+' aria-label="'+exitLabel+'" title="'+exitLabel+'"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">'+
+    (folder?'<path d="M20 12H4m7-7-7 7 7 7"/>':'<path d="m6 6 12 12M18 6 6 18"/>')+'</svg></button></div></header><div class="story-shell">'+body+'</div>',true);
   $('dialog').classList.add('story-studio');
 }
 function storyChecks(items,name,legend,selected=''){
@@ -425,16 +435,17 @@ function bindStoryStyleChip(chip){
 }
 function storyGenerator(){
   if(storyJob){storyProgress();return;}
-  storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose"><section class="story-panel story-draft"><h3>构思番外</h3>'+
+  storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
+    '<section class="story-panel story-cast"><h3>角色与文风</h3><div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div>'+
+    storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
+    '<fieldset id="storyStyleChoices" class="story-choices"><legend>文风 · 可多选</legend>'+storyStyles.map(style=>storyStyleChip(style,style)).join('')+state.customStoryStyles.map(x=>storyStyleChip(x.id,x.name,true)).join('')+'</fieldset>'+
+    '<details class="story-style-editor"><summary>＋ 添加自定义文风</summary><p class="muted">长按自定义文风可删除。</p><label>文风名称<input name="styleName" maxlength="60"></label><label>文风内容<textarea name="styleContent" rows="4" maxlength="4000"></textarea></label>'+storyButton('saveStyle','保存文风')+'</details></section>'+
+    '<section class="story-panel story-draft"><h3>构思番外</h3>'+
     '<label>标题<input name="title" maxlength="120" placeholder="留空由 AI 拟题"></label>'+
     '<label>剧情指令<textarea name="guide" rows="7"></textarea></label>'+
     '<div class="story-form-pair"><label>叙事视角<select name="pov"><option>第一人称</option><option>第二人称</option><option selected>第三人称</option></select></label>'+
     '<label>目标字数<input type="number" name="length" min="100" max="100000" placeholder="默认 20000–40000"></label></div></section>'+
-    '<section class="story-panel story-cast"><h3>角色与文风</h3>'+
-    storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
-    '<fieldset id="storyStyleChoices" class="story-choices"><legend>文风 · 可多选</legend>'+storyStyles.map(style=>storyStyleChip(style,style)).join('')+state.customStoryStyles.map(x=>storyStyleChip(x.id,x.name,true)).join('')+'</fieldset>'+
-    '<details class="story-style-editor"><summary>＋ 添加自定义文风</summary><p class="muted">长按自定义文风可删除。</p><label>文风名称<input name="styleName" maxlength="60"></label><label>文风内容<textarea name="styleContent" rows="4" maxlength="4000"></textarea></label>'+storyButton('saveStyle','保存文风')+'</details><div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div></section>'+
-    '<div class="story-panel story-compose-actions">'+storyStreamField()+'<button class="primary">开始写番外</button></div></form>');
+    '<div class="story-compose-actions">'+storyStreamField()+'<button class="primary">开始写番外</button></div></form>','compose');
   $('storyStyleChoices').querySelectorAll('[data-custom-style]').forEach(bindStoryStyleChip);
 }
 function storyEpubBlob(articles){
@@ -491,8 +502,9 @@ function storyLibrary(category=null){
     return;
   }
   const visible=state.stories.filter(x=>storyCategoryKey(x.category)===category);
-  storyDialog(category||'未分类','<div class="story-shelf-summary">'+storyButton('library','‹ 返回分类')+'<span>'+visible.length+' 篇文章</span></div>'+
+  storyDialog(category||'未分类','<div class="story-shelf-summary"><span>'+visible.length+' 篇文章</span></div>'+
     '<form id="storyExport" class="fields" data-category="'+esc(category)+'"><div class="story-panel story-shelf-tools">'+selectionTools()+
+    '<div class="story-bulk-category"><label>目标分类<select name="destination"><option value="" disabled selected>请选择分类</option>'+categories.filter(key=>key!==category).map(key=>'<option value="'+esc(key||'未分类')+'">'+esc(key||'未分类')+'</option>').join('')+'</select></label><button type="submit" value="categorize" data-needs-selection>批量分类</button></div>'+
     '<label>导出格式<select name="format"><option value="json">JSON</option><option value="txt">TXT</option><option value="docx">Word（.docx）</option><option value="epub">EPUB</option></select></label><div class="row"><button type="submit" class="primary" data-needs-selection>导出所选文章</button><button type="submit" class="archive-danger" value="delete" data-needs-selection>删除所选</button></div></div>'+
     '<div class="story-books">'+(visible.map(x=>{
       const cast=Array.isArray(x.castNames)&&x.castNames.length?x.castNames:x.cast.map(id=>{const c=contact(id);return c?displayName(c):'已移除角色';});
@@ -501,7 +513,7 @@ function storyLibrary(category=null){
       return '<div class="story-entry"><input type="checkbox" class="bulk-check" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'"><button type="button" data-story-action="read" data-story-id="'+esc(x.id)+'"><strong>'+esc(x.title)+'</strong>'+
         '<span>参与角色 · '+esc(cast.join('、')||'未记录')+'</span><span>文风 · '+esc(styleLabel)+'</span>'+
         '<small>'+storyCount(x.body)+' 字'+(x.parent?' · 续文':'')+(x.partial?' · 未完稿':'')+'</small></button></div>';
-    }).join('')||'<p class="story-panel muted">这个分类还没有文章。</p>')+'</div></form>');
+    }).join('')||'<p class="story-panel muted">这个分类还没有文章。</p>')+'</div></form>','folder');
   syncFormSelection($('storyExport'));
 }
 function forwardedStory(message){
@@ -758,7 +770,20 @@ async function submitStoryForm(form,submitter){
       break;
     }
     case 'storyExport':{
-      const picked=state.stories.filter(y=>data.getAll('picked').includes(y.id));
+      const selected=new Set(data.getAll('picked'));
+      const category=form.dataset.category;
+      const picked=state.stories.filter(article=>selected.has(article.id)&&storyCategoryKey(article.category)===category);
+      if(submitter?.value==='categorize'){
+        if(!picked.length)throw Error('请先勾选要分类的文章。');
+        const destination=storyCategoryKey(value('destination'));
+        if(!value('destination')||destination===category||!storyCategories().includes(destination))throw Error('请选择目标分类。');
+        const ids=new Set(picked.map(article=>article.id));
+        const stories=state.stories.map(article=>ids.has(article.id)?{...article,category:destination}:article);
+        if(commit({...state,stories,storyCategories:storyCategories().slice(1)})){
+          storyLibrary(category);toast('已将 '+picked.length+' 篇文章移至「'+(destination||'未分类')+'」。');
+        }
+        break;
+      }
       const deleting=submitter?.value==='delete';
       if(!picked.length)throw Error(deleting?'请先勾选要删除的文章。':'请先勾选要导出的文章。');
       if(deleting){
