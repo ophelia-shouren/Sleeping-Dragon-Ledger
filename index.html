@@ -173,7 +173,7 @@ body.full-chat{overflow:hidden}
 .full-chat #chatForm:has(.composer-menu:not([hidden])){max-height:65%}
 .story-sun{display:inline-grid;place-items:center;min-width:32px;min-height:32px;padding:4px;background:transparent;border:1px solid transparent;color:var(--muted);opacity:.68}.story-sun:hover,.story-sun:focus-visible{opacity:1;color:var(--gold);border-color:var(--line)}.story-sun svg{width:17px;height:17px}.story-choices{display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line);border-radius:10px;padding:8px;min-width:0}.story-choices label{display:flex;align-items:center;gap:5px;padding:4px 7px}.story-choices input,.story-entry input[type=checkbox]{width:auto;margin:0}.story-entry{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line)}.bubble:has(p){overflow-wrap:anywhere}.story-paper{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85;max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:12px}.story-progress{white-space:pre-wrap}
 #dialog.story-fullscreen{position:fixed;inset:0;margin:0;width:100%;height:100%;height:100dvh;max-width:none;max-height:none;border:0;border-radius:0;box-sizing:border-box;overflow:auto;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
-.story-shell{width:min(100%,840px);margin:0 auto}.story-shelf-hero{text-align:center;border:1px solid var(--line);border-radius:18px;padding:24px;background:radial-gradient(ellipse at top,var(--line),transparent 75%)}.story-shelf-hero span{color:var(--gold);font-size:34px}.story-shelf-hero p{font-size:1.35rem;margin:.3em}.story-shelf-hero button{display:block;margin:14px auto 0}.story-shell .story-entry{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--field)}.story-entry button{flex:1;text-align:left;overflow-wrap:anywhere}.story-reader-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;color:var(--gold);margin:10px 0}.story-reader-bar label{display:flex;align-items:center;gap:6px}.story-reader-bar input{width:min(30vw,150px);padding:0}.story-shell .story-reader{max-height:none;padding:clamp(14px,4vw,44px);line-height:1.95;background:var(--field)}.story-style-chip{border:1px solid var(--line);border-radius:999px;touch-action:pan-y;user-select:none}.story-style-chip:has(input:checked){border-color:var(--gold)}.story-style-editor{border:1px solid var(--line);border-radius:10px;padding:12px}.story-style-editor label{margin-block:8px}
+.story-shell{width:min(100%,840px);margin:0 auto}.story-shell .story-entry{border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--field)}.story-entry button{flex:1;text-align:left;overflow-wrap:anywhere}.story-reader-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;color:var(--gold);margin:10px 0}.story-reader-bar label{display:flex;align-items:center;gap:6px}.story-reader-bar input{width:min(30vw,150px);padding:0}.story-shell .story-reader{max-height:none;padding:clamp(14px,4vw,44px);line-height:1.95;background:var(--field)}.story-style-chip{border:1px solid var(--line);border-radius:999px;touch-action:pan-y;user-select:none}.story-style-chip:has(input:checked){border-color:var(--gold)}.story-style-editor{border:1px solid var(--line);border-radius:10px;padding:12px}.story-style-editor label{margin-block:8px}
 .story-reader-exit{display:flex;justify-content:center;padding:18px 0 56px}.story-reader-exit button{border-color:var(--gold);color:var(--gold);padding:10px 20px}
 #dialog.story-fullscreen[open]:has(.story-generation){display:flex;flex-direction:column;overflow:hidden}
 #dialog.story-fullscreen:has(.story-generation)>.story-shell{display:flex;flex:1 1 0;min-height:0;width:100%;margin:0}
@@ -193,6 +193,59 @@ body.full-chat{overflow:hidden}
 .persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:9px;margin-top:12px}.persona-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;aspect-ratio:1;min-width:0;padding:6px;border-radius:12px}.persona-tile>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
 .imported-system{align-self:center;max-width:min(90%,520px);margin:5px auto;padding:8px 14px;border:1px solid var(--line);border-radius:12px;background:var(--notice);color:var(--ink);text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}.imported-system small,.imported-system time{display:block;color:var(--muted);font-size:.75rem}
 .bonus-tea{--gold:#d5adf0;--line:#765791;--panel:#30233e;--ink:#fff1ff;--muted:#ddc8eb;color:var(--ink);background:radial-gradient(ellipse at top,#4b315e,#241a31 64%);border-radius:16px;padding:12px}.bonus-tea h2,.bonus-tea .eyebrow{color:var(--gold)}.bonus-tea-button{color:#f2dcff;background:#543764;border-color:#a780bd}.bonus-tea .tea-top{border-color:var(--line)}
+
+/* 日隙拾光与余晖藏书阁 */
+#dialog.story-studio{--studio-serif:"Noto Serif CJK SC","Songti SC","SimSun",serif;--studio-pad:clamp(14px,4vw,56px);padding-inline:max(var(--studio-pad),env(safe-area-inset-left)) max(var(--studio-pad),env(safe-area-inset-right));background:radial-gradient(ellipse at 75% 0,var(--glow),transparent 54%),var(--bg)}
+.story-studio .story-header,.story-studio .story-shell{width:min(100%,1040px);margin-inline:auto}
+.story-studio .story-header{flex:none;align-items:flex-end;gap:16px;padding:clamp(14px,4vw,40px) 0 clamp(18px,4vw,32px);margin-bottom:clamp(16px,3vw,30px);border-bottom:1px solid var(--gold)}
+.story-heading{min-width:0}
+.story-heading h2{color:var(--ink);font:700 clamp(1.8rem,5vw,3.65rem)/1.22 var(--studio-serif);margin:0;overflow-wrap:anywhere}
+.story-header-actions{display:flex;gap:8px;align-items:center;flex:none}
+.story-header-actions button{min-height:44px;white-space:nowrap}
+.story-header-actions [data-action="close"]{display:grid;place-items:center;width:44px;padding:0}
+.story-studio .story-shell{padding-bottom:max(38px,env(safe-area-inset-bottom))}
+.story-studio .story-panel{min-width:0;padding:clamp(14px,3vw,26px);background:var(--panel);border:1px solid var(--line);border-radius:16px}
+.story-panel h3{color:var(--ink);font:700 1.35rem/1.3 var(--studio-serif);margin:0 0 4px}
+.story-studio .story-compose{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+.story-draft,.story-cast{display:grid;gap:15px}
+.story-form-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.story-compose-actions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.story-compose-actions .story-choices,.story-cast div.story-choices{border:0;padding:0}
+.story-studio .primary,.story-studio .archive-danger{min-height:44px}
+.story-studio input[type="checkbox"],.story-studio input[type="range"]{accent-color:var(--gold)}
+.story-cast .story-choices legend{padding-inline:6px;color:var(--muted)}
+.story-cast fieldset.story-choices label{background:var(--field);border:1px solid var(--line);border-radius:999px;padding:6px 9px}
+.story-cast fieldset.story-choices label:has(input:checked){border-color:var(--gold);color:var(--gold)}
+.story-shelf-summary{display:flex;align-items:baseline;gap:20px;color:var(--muted);margin-bottom:14px}
+.story-shelf-summary strong{font:700 1.8rem var(--studio-serif);color:var(--gold)}
+.story-shelf-tools{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px}
+.story-shelf-tools>label{flex:1 1 180px;max-width:420px;min-width:0}
+.story-studio #storyImport{margin-top:14px}
+.story-books{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px}
+.story-studio .story-entry{position:relative;display:flex;align-items:stretch;min-width:0;min-height:142px;padding:0;overflow:hidden;border-radius:14px;background:linear-gradient(145deg,var(--panel),var(--field))}
+.story-studio .story-entry:has(input:checked){border-color:var(--gold)}
+.story-entry .bulk-check{position:absolute;z-index:1;top:12px;right:12px;margin:0}
+.story-studio .story-entry button{display:grid;align-content:start;gap:6px;padding:16px 40px 18px 17px;border:0;border-inline-start:3px solid var(--gold);border-radius:0;background:transparent;line-height:1.45}
+.story-entry button strong{color:var(--ink);font:700 1.18rem/1.45 var(--studio-serif)}
+.story-entry button small{color:var(--gold)}
+.story-entry button span{color:var(--muted);font-size:.8rem}
+.story-studio .story-paper{border-radius:14px;border-color:var(--line);background:var(--field);padding:clamp(16px,4vw,48px)}
+.story-studio .story-reader{margin-bottom:18px}
+.story-studio .story-reader-actions{margin-top:14px}
+.story-studio #storyCategory{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end}
+.story-studio #storyEdit textarea{line-height:1.85}
+#dialog.story-studio:has(.story-scrubber){padding-right:max(38px,var(--studio-pad),env(safe-area-inset-right))}
+#dialog.story-studio:has(.story-generation)>.story-shell{width:min(100%,1040px);margin-inline:auto;padding-bottom:0}
+.story-generation .story-reader-bar{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.story-generation .story-reader-bar p{margin:0}
+@media(max-width:650px){
+  .story-studio .story-compose{grid-template-columns:minmax(0,1fr)}
+  .story-studio .story-header{align-items:flex-start;flex-direction:column;gap:10px}
+  .story-header-actions{width:100%;justify-content:space-between}
+  .story-header-actions [data-action="close"]{min-height:40px;width:40px}
+  .story-books{grid-template-columns:minmax(0,1fr)}
+  .story-studio .story-entry{min-height:0}
+}
 </style></head>
 <body><aside><div class="brand"><span>♜</span><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer></aside>
 <main><header><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -323,8 +376,11 @@ function storySun(){
 function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
-function storyDialog(title,body){
-  dialog('<div class="row between"><h2>'+esc(title)+'</h2>'+storyButton('library','余晖藏书阁')+'<button type="button" data-action="close">关闭</button></div><div class="story-shell">'+body+'</div>',true);
+function storyDialog(title,body,view=''){
+  const navigation=view==='shelf'?storyButton('generator','写番外'):storyButton('library','余晖藏书阁');
+  dialog('<header class="story-header"><div class="story-heading"><h2>'+esc(title)+'</h2></div><div class="story-header-actions" role="navigation" aria-label="番外导航">'+navigation+
+    '<button type="button" data-action="close" aria-label="关闭" title="关闭"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></header><div class="story-shell">'+body+'</div>',true);
+  $('dialog').classList.add('story-studio');
 }
 function storyChecks(items,name,legend,selected=''){
   return '<fieldset class="story-choices"><legend>'+esc(legend)+'</legend>'+items.map(([value,label])=>'<label><input type="checkbox" name="'+name+'" value="'+esc(value)+'" '+(value===selected?'checked':'')+'>'+esc(label)+'</label>').join('')+'</fieldset>';
@@ -355,14 +411,16 @@ function bindStoryStyleChip(chip){
 }
 function storyGenerator(){
   if(storyJob){storyProgress();return;}
-  storyDialog('日隙拾光','<p class="muted">借一束日光，写下信件之外的故事。</p><form id="storyGenerate" class="fields">'+
+  storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose"><section class="story-panel story-draft"><h3>构思番外</h3>'+
+    '<label>标题<input name="title" maxlength="120" placeholder="留空由 AI 拟题"></label>'+
+    '<label>剧情指令<textarea name="guide" rows="7"></textarea></label>'+
+    '<div class="story-form-pair"><label>叙事视角<select name="pov"><option>第一人称</option><option>第二人称</option><option selected>第三人称</option></select></label>'+
+    '<label>目标字数<input type="number" name="length" min="100" max="100000" placeholder="默认 20000–40000"></label></div></section>'+
+    '<section class="story-panel story-cast"><h3>角色与文风</h3>'+
     storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
     '<fieldset id="storyStyleChoices" class="story-choices"><legend>文风 · 可多选</legend>'+storyStyles.map(style=>storyStyleChip(style,style)).join('')+state.customStoryStyles.map(x=>storyStyleChip(x.id,x.name,true)).join('')+'</fieldset>'+
-    '<details class="story-style-editor"><summary>＋ 添加自定义文风</summary><p class="muted">长按自定义文风可删除。</p><label>文风名称<input name="styleName" maxlength="60"></label><label>文风内容<textarea name="styleContent" rows="4" maxlength="4000"></textarea></label>'+storyButton('saveStyle','保存文风')+'</details><label>标题<input name="title" maxlength="120" placeholder="留空由 AI 拟题"></label>'+
-    '<div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div>'+
-    '<label>叙事视角<select name="pov"><option>第一人称</option><option>第二人称</option><option selected>第三人称</option></select></label>'+
-    '<label>目标字数<input type="number" name="length" min="100" max="100000" placeholder="默认 20000–40000"></label>'+
-    '<label>剧情指令<textarea name="guide" rows="4"></textarea></label>'+storyStreamField()+'<button class="primary">开始写番外</button></form>');
+    '<details class="story-style-editor"><summary>＋ 添加自定义文风</summary><p class="muted">长按自定义文风可删除。</p><label>文风名称<input name="styleName" maxlength="60"></label><label>文风内容<textarea name="styleContent" rows="4" maxlength="4000"></textarea></label>'+storyButton('saveStyle','保存文风')+'</details><div class="story-choices"><label><input type="checkbox" name="includeUser">让 User 加入剧情</label></div></section>'+
+    '<div class="story-panel story-compose-actions">'+storyStreamField()+'<button class="primary">开始写番外</button></div></form>');
   $('storyStyleChoices').querySelectorAll('[data-custom-style]').forEach(bindStoryStyleChip);
 }
 function storyEpubBlob(articles){
@@ -395,11 +453,14 @@ function storyEpubBlob(articles){
 }
 function storyLibrary(category=''){
   const categories=[...new Set(state.stories.map(x=>x.category).filter(Boolean))].sort();
-  storyDialog('余晖藏书阁','<header class="story-shelf-hero"><span aria-hidden="true">✧</span><p>故事在余晖里落款</p><small>馆藏 '+state.stories.length+' 篇</small>'+storyButton('generator','回到日隙拾光')+'</header>'+
-    '<form id="storyExport" class="fields"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+
-    selectionTools()+(state.stories.filter(x=>!category||x.category===category).map(x=>'<div class="story-entry"><input type="checkbox" class="bulk-check" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'">'+storyButton('read',x.title,x.id)+'<small class="muted">'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+(x.partial?' · 未完稿':'')+'</small></div>').join('')||'<p class="muted">这里还没有文章。</p>')+
-    '<label>导出格式<select name="format"><option value="json">JSON</option><option value="txt">TXT</option><option value="docx">Word（.docx）</option><option value="epub">EPUB</option></select></label><div class="row"><button type="submit">导出所选文章</button><button type="submit" value="delete">删除所选</button></div></form><form id="storyImport" class="fields"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>');
+  const visible=state.stories.filter(x=>!category||x.category===category);
+  storyDialog('余晖藏书阁','<div class="story-shelf-summary"><span>馆藏 <strong>'+state.stories.length+'</strong> 篇</span><span>'+categories.length+' 个分类</span></div>'+
+    '<form id="storyExport" class="fields"><div class="story-panel story-shelf-tools"><label>按分类查看<select name="filter" id="storyFilter"><option value="">全部分类</option>'+categories.map(x=>'<option '+(x===category?'selected ':'')+'value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'</select></label>'+selectionTools()+'</div>'+
+    '<div class="story-panel story-shelf-tools"><label>导出格式<select name="format"><option value="json">JSON</option><option value="txt">TXT</option><option value="docx">Word（.docx）</option><option value="epub">EPUB</option></select></label><div class="row"><button type="submit" class="primary" data-needs-selection>导出所选文章</button><button type="submit" class="archive-danger" value="delete" data-needs-selection>删除所选</button></div></div>'+
+    '<div class="story-books">'+(visible.map(x=>'<div class="story-entry"><input type="checkbox" class="bulk-check" name="picked" aria-label="选择 '+esc(x.title)+'" value="'+esc(x.id)+'"><button type="button" data-story-action="read" data-story-id="'+esc(x.id)+'"><small>'+esc(x.category||'未分类')+(x.parent?' · 续文':'')+(x.partial?' · 未完稿':'')+'</small><strong>'+esc(x.title)+'</strong><span>全文 '+storyCount(x.body)+' 字</span></button></div>').join('')||'<p class="story-panel muted">这里还没有文章。</p>')+'</div></form>'+
+    '<form id="storyImport" class="fields story-panel story-shelf-tools"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>','shelf');
   $('storyFilter').onchange=e=>storyLibrary(e.target.value);
+  syncFormSelection($('storyExport'));
 }
 function forwardedStory(message){
   const match=message.content.match(/^(?:([^\n]*)\n\n)?《([^\n]+?)》\n\n([\s\S]*)$/);
@@ -450,7 +511,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="fields"><label>文章分类<input name="category" maxlength="80" value="'+esc(x.category)+'" placeholder="输入新分类或已有分类名称"></label><button>保存分类</button></form>'+
-    '<div class="row">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
+    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('library','退出阅读 · 返回藏书阁')+'</footer>');
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -549,7 +610,7 @@ function formatStoryBody(body){
   return body.replace(/\r\n?/g,'\n').split('\n').map(line=>line.replace(/^[ \t\u3000]+|[ \t\u3000]+$/g,'')).filter(Boolean).join('\n\n');
 }
 function storyEdit(x){
-  storyDialog('编辑文章','<form id="storyEdit" data-id="'+esc(x.id)+'" class="fields"><label>标题<input name="title" required value="'+esc(x.title)+'"></label><label>正文<textarea name="body" rows="16" required></textarea></label><div class="row"><output id="storyEditCount" aria-live="polite"></output><button type="button" data-story-action="formatEdit">一键排版</button><button class="primary">保存文章</button>'+storyButton('read','取消编辑',x.id)+'</div></form>');
+  storyDialog('编辑文章','<form id="storyEdit" data-id="'+esc(x.id)+'" class="fields story-panel"><label>标题<input name="title" required value="'+esc(x.title)+'"></label><label>正文<textarea name="body" rows="16" required></textarea></label><div class="row"><output id="storyEditCount" aria-live="polite"></output><button type="button" data-story-action="formatEdit">一键排版</button><button class="primary">保存文章</button>'+storyButton('read','取消编辑',x.id)+'</div></form>');
   const body=$('storyEdit').elements.body;
   body.value=x.body;
   const syncProgress=bindStoryScrubber(body);
@@ -3018,6 +3079,7 @@ function dialog(html,full=false){
   panel.onscroll=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
+  panel.classList.remove('story-studio');
   panel.innerHTML=html;
   if(full)panel.append(orb);
   panel.scrollTop=0;
