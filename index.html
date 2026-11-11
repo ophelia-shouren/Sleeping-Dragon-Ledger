@@ -3040,12 +3040,9 @@ function apiEndpoint(base,route){
 async function request(p,route,body,onDelta,cancelSignal){
   const headers={};if(p.key)headers.Authorization='Bearer '+p.key;
   if(body)headers['Content-Type']='application/json';
-  const controller=new AbortController();
-  const cancel=()=>controller.abort(cancelSignal.reason);
-  if(cancelSignal?.aborted)cancel();
-  else cancelSignal?.addEventListener('abort',cancel,{once:true});
-  const timer=setTimeout(()=>controller.abort(),onDelta?240000:90000);
-  const signal=controller.signal;
+  const timeoutController=cancelSignal?null:new AbortController();
+  const timer=timeoutController?setTimeout(()=>timeoutController.abort(),onDelta?240000:90000):undefined;
+  const signal=cancelSignal||timeoutController.signal;
   try{
   let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal});}
   catch(e){if(e instanceof TypeError)throw Error('连接失败。请检查 API 地址、中转站的跨域设置与网络。');throw e;}
@@ -3059,7 +3056,6 @@ async function request(p,route,body,onDelta,cancelSignal){
   }
   }finally{
     clearTimeout(timer);
-    cancelSignal?.removeEventListener('abort',cancel);
   }
 }
 function profileForm(form){
