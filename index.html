@@ -281,6 +281,36 @@ aside .brand{margin-bottom:0}
   #siteMenu nav{grid-template-columns:repeat(2,minmax(0,1fr))}
   main{padding-top:14px}
 }
+
+.group-settings-page{width:min(100%,680px);margin:0 auto;padding-bottom:52px}
+.group-settings-page form{display:grid;gap:14px}
+.group-settings-header{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin:0 0 14px;padding:8px 0;background:var(--bg)}
+.group-settings-header h2{margin:0;font-size:1.25rem;color:var(--ink)}
+.group-settings-header button{justify-self:start;min-height:44px;min-width:44px}
+.group-settings-header button:last-child{justify-self:end;color:var(--gold)}
+.group-settings-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;min-width:0}
+.group-settings-block,.group-settings-edit{padding:14px}
+.group-settings-profile{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;cursor:pointer;list-style:none}
+.group-settings-profile::-webkit-details-marker{display:none}
+.group-settings-profile strong,.group-settings-profile small{display:block;overflow-wrap:anywhere}
+.group-settings-profile small,.group-settings-profile>span:last-child{color:var(--muted)}
+.group-settings-profile .group-avatar{width:48px;height:48px}
+.group-settings-edit{border-top:1px solid var(--line)}
+.group-settings-edit .row label{min-width:0;flex:1 1 180px}
+.group-settings-block h3{margin:0;font-size:1rem}
+.group-settings-section-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px}
+.group-settings-members{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px 5px}
+.group-settings-person{min-width:0;display:grid;justify-items:center;align-content:start;gap:4px;text-align:center;font-size:.78rem}
+button.group-settings-person{padding:0;background:transparent;border:0}
+.group-settings-person>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-settings-person .avatar,.group-settings-person b{width:clamp(32px,9vw,48px);height:clamp(32px,9vw,48px)}
+.group-settings-person b{display:grid;place-items:center;background:var(--control);border-radius:50%;color:var(--gold);font-size:1.35rem;font-weight:400}
+.group-settings-switch.mode-toggle{flex-direction:row-reverse;justify-content:space-between;padding:10px 0;margin:0;border-bottom:1px solid var(--line)}
+.group-settings-block p{margin:8px 0 0}
+#groupSettingsPicker{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+#groupSettingsPicker fieldset{margin:0 0 10px;padding:0;border:0;min-width:0}
+.group-settings-candidate{display:flex;align-items:center;gap:10px;padding:6px 0}
+.group-settings-candidate input{width:auto;margin:0 0 0 auto;accent-color:var(--gold)}
 </style></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div></aside>
 <main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -922,12 +952,45 @@ function groupDirectory(){
   return '<div class="row between"><h3>群聊</h3><button type="button" data-group-edit="">＋ 新建群聊</button></div>'+
     state.groups.map(g=>'<button class="directory-item" data-group-open="'+esc(g.id)+'">'+groupAvatar(g)+'<span><strong>'+esc(g.name)+'</strong><small>'+g.members.filter(id=>contact(id)).length+' 位角色 · '+(g.shared?'记忆互通':'独立记忆')+'</small></span><b>›</b></button>').join('');
 }
+function renderGroupSettingsMembers(form){
+  const members=form.memberDraft.map(contact).filter(Boolean);
+  $('groupSettingsCount').textContent=members.length+' 位角色';
+  $('groupSettingsMembers').innerHTML=members.map(c=>'<div class="group-settings-person">'+avatarMarkup(c)+'<span title="'+esc(displayName(c))+'">'+esc(displayName(c))+'</span><input type="hidden" name="member" value="'+esc(c.id)+'"></div>').join('')+
+    '<button type="button" class="group-settings-person" data-action="groupInvite"><b aria-hidden="true">＋</b><span>邀请</span></button>'+
+    '<button type="button" class="group-settings-person" data-action="groupRemove" '+(members.length?'':'disabled')+'><b aria-hidden="true">−</b><span>移除</span></button>';
+}
+function groupSettingsPicker(form,remove){
+  const picker=$('groupSettingsPicker');
+  const candidates=state.contacts.filter(c=>form.memberDraft.includes(c.id)===remove);
+  picker.dataset.mode=remove?'remove':'invite';
+  picker.innerHTML='<fieldset><legend>'+(remove?'移除角色':'邀请角色')+'</legend>'+
+    (candidates.map(c=>'<label class="group-settings-candidate">'+avatarMarkup(c)+'<span>'+esc(displayName(c))+'</span><input type="checkbox" name="memberChoice" value="'+esc(c.id)+'"></label>').join('')||'<p class="muted">暂无可邀请的角色。</p>')+'</fieldset>'+
+    '<div class="row"><button type="button" data-action="groupPickerDone" '+(candidates.length?'':'disabled')+'>确定</button><button type="button" data-action="groupPickerCancel">取消</button></div>';
+  picker.hidden=false;
+  picker.scrollIntoView({block:'nearest'});
+  picker.querySelector('input,button:not([disabled])')?.focus({preventScroll:true});
+}
 function editGroup(id){
   const g=groupById(id);
   if(groupJobs.has(id))return;
-  const members=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="member" value="'+esc(c.id)+'" '+(g?.members.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
-  dialog('<h2>'+(g?'群聊设置':'新建群聊')+'</h2><form id="groupSettings" data-id="'+esc(id)+'"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><div class="row"><span id="groupAvatarPreview">'+groupAvatar(g)+'</span><label>群聊头像<input id="groupAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" data-action="removeGroupAvatar">移除头像</button></div><h3>邀请角色</h3><p class="muted">请选择至少两位角色。</p>'+members+'<label class="world-scope-choice"><input type="checkbox" name="showTime" '+(g?.showTime!==false?'checked':'')+'>显示消息时间戳</label><label class="world-scope-choice"><input type="checkbox" name="split" '+(g?.split===true?'checked':'')+'>角色分句显示</label><label class="world-scope-choice"><input type="checkbox" name="shared" '+(g?.shared?'checked':'')+'>与日常聊天互通记忆</label><p class="muted">开启后，每个角色可参考自己的近期 AI 私聊与已保存记忆，私聊也可参考该角色参与过的近期群聊。角色可能在群里提到私聊内容。</p><div class="row"><button class="primary">保存群聊</button><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+'>返回</button></div></form>');
-  $('groupSettings').avatarDraft=g?.avatar||'';
+  const toggle=(name,label,checked)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="'+name+'" '+(checked?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
+  dialog('<div class="group-settings-page"><header class="group-settings-header"><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+' aria-label="返回">‹</button><h2>'+(g?'群聊设置':'新建群聊')+'</h2><button type="submit" form="groupSettings">保存</button></header>'+
+    '<form id="groupSettings" data-id="'+esc(id)+'"><details class="group-settings-card" '+(g?'':'open')+'><summary class="group-settings-profile"><span id="groupAvatarPreview">'+groupAvatar(g)+'</span><span><strong id="groupSettingsName">'+esc(g?.name||'设置群聊名称')+'</strong><small>编辑群聊名称与头像</small></span><span aria-hidden="true">›</span></summary>'+
+    '<div class="group-settings-edit"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><div class="row"><label>更换群聊头像<input id="groupAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" data-action="removeGroupAvatar">移除头像</button></div></div></details>'+
+    '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>群成员</h3><span id="groupSettingsCount" class="muted" aria-live="polite"></span></div><div id="groupSettingsMembers" class="group-settings-members"></div><div id="groupSettingsPicker" hidden></div></section>'+
+    '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+toggle('showTime','显示消息时间戳',g?.showTime!==false)+toggle('split','角色分句显示',g?.split===true)+'</section>'+
+    '<section class="group-settings-card group-settings-block"><h3>聊天记忆</h3>'+toggle('shared','与日常聊天互通记忆',g?.shared)+'<p class="muted">开启后，角色可以参考近期私聊、群聊与已保存的记忆，也可能在群里提到私聊内容。</p></section></form></div>',true);
+  const form=$('groupSettings');
+  form.avatarDraft=g?.avatar||'';
+  form.memberDraft=[...(g?.members||[])];
+  form.elements.name.oninput=()=>{
+    const name=form.elements.name.value.trim();
+    $('groupSettingsName').textContent=name||'设置群聊名称';
+    if(!form.avatarDraft)$('groupAvatarPreview').innerHTML=groupAvatar({name});
+  };
+  form.elements.name.oninvalid=()=>{form.elements.name.closest('details').open=true;};
+  $('dialog').orbBack=g?()=>openGroup(id):null;
+  renderGroupSettingsMembers(form);
 }
 function saveGroupSettings(form){
   if($('groupAvatarFile').dataset.loading)throw Error('头像正在处理，请稍候。');
@@ -3457,6 +3520,18 @@ document.addEventListener('click',e=>{
     case 'rollChatDice':playChatGame('dice');break;
     case 'playChatRps':playChatGame('rps');break;
     case 'emojiPicker':{const list=$('chatEmojis');list.hidden=!list.hidden;b.setAttribute('aria-expanded',String(!list.hidden));break;}
+    case 'groupInvite':case 'groupRemove':
+      groupSettingsPicker($('groupSettings'),d.action==='groupRemove');break;
+    case 'groupPickerCancel':
+      $('groupSettingsPicker').hidden=true;break;
+    case 'groupPickerDone':{
+      const form=$('groupSettings'),picker=$('groupSettingsPicker');
+      const choices=[...picker.querySelectorAll('input:checked')].map(input=>input.value);
+      form.memberDraft=picker.dataset.mode==='remove'?form.memberDraft.filter(id=>!choices.includes(id)):[...new Set([...form.memberDraft,...choices])];
+      picker.hidden=true;
+      renderGroupSettingsMembers(form);
+      break;
+    }
     case 'removeGroupAvatar':{
       const form=$('groupSettings'),input=$('groupAvatarFile');input.value='';form.avatarDraft='';$('groupAvatarPreview').innerHTML=groupAvatar({name:form.elements.name.value});break;
     }
