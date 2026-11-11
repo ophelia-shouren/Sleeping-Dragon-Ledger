@@ -538,18 +538,7 @@ async function storyAction(d){
     case 'copy':{
       if(!x)break;
       const content=x.title+'\n\n'+x.body;
-      const field=document.createElement('textarea');
-      field.value=content;field.readOnly=true;
-      field.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
-      const focused=document.activeElement;
-      $('dialog').append(field);
-      field.select();
-      let copied=false;
-      try{copied=document.execCommand('copy');}catch{}
-      field.remove();focused?.focus({preventScroll:true});
-      if(!copied){
-        try{await navigator.clipboard.writeText(content);copied=true;}catch{}
-      }
+      const copied=await copyText(content);
       if(!copied)throw Error('复制失败，请在正文中长按选取文字。');
       toast('已复制全文。');
       break;
@@ -2528,6 +2517,7 @@ function openMessageMenu(index){
   const ai=scope.mode==='ai'||!!scope.group,generated=!m.tea&&(scope.group?!!m.roleId:m.role==='assistant');
   const canReroll=generated&&(scope.mode==='cards'||(ai&&scope.messages.slice(0,index).some(x=>scope.group?!x.roleId:x.role==='user')));
   const actions=[
+    ...(m.content.trim()?[['copy','⧉','复制','复制这条消息的文字']]:[]),
     ['quote','❝','引用回复','附在下一条消息里'],
     ['select','☷','多选消息','批量导出为 TXT 或删除'],
     ...(canReroll?[['reroll','↻','重新生成','只替换这条回复']]:[]),
@@ -2537,10 +2527,32 @@ function openMessageMenu(index){
   dialog('<h2>消息操作</h2><div class="message-menu" id="messageMenu">'+actions.map(([key,icon,title,detail])=>'<button type="button" data-message-command="'+key+'"><span class="message-menu-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+detail+'</small></span></button>').join('')+'</div><div class="row actions"><button type="button" data-action="cancelMessageMenu">取消</button></div>');
   $('messageMenu').scope=scope;$('messageMenu').index=index;
 }
-function messageCommand(command){
+async function copyText(content){
+  const field=document.createElement('textarea');
+  field.value=content;field.readOnly=true;
+  field.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0';
+  const focused=document.activeElement;
+  $('dialog').append(field);
+  field.select();
+  let copied=false;
+  try{copied=document.execCommand('copy');}catch{}
+  field.remove();focused?.focus({preventScroll:true});
+  if(!copied){
+    try{await navigator.clipboard.writeText(content);copied=true;}catch{}
+  }
+  return copied;
+}
+async function messageCommand(command){
   const menu=$('messageMenu'),scope=messageScope();
   if(!menu||!sameMessageScope(menu.scope,scope)){closeMessageTools(scope);toast('消息已变化，请重新选择。');return;}
   const index=menu.index;
+  if(command==='copy'){
+    const content=scope.messages[index]?.content;
+    if(!content?.trim())return;
+    const copied=await copyText(content);
+    if(copied&&$('messageMenu')===menu)closeMessageTools(scope);
+    toast(copied?'已复制消息。':'复制失败，请重试。');return;
+  }
   if(command==='quote'){
     const m=scope.messages[index],speaker=m.speaker||(m.role==='system'?'系统':m.role==='user'?state.userName||'你':displayName(scope.c));
     const text=m.content.trim(),content=(text.length>300?text.slice(0,300)+'…':text)||(m.image?'[图片]':'[消息]');
