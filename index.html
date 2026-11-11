@@ -1061,10 +1061,62 @@ async function groupReply(g,c,guide=''){
   const transcript=latest?.storyForward?
     [groupTranscript(visible.filter(m=>m!==latest)).slice(-12000),groupTranscript([latest])].filter(Boolean).join('\n\n'):
     groupTranscript(visible).slice(-12000);
-  const response=await requestChatReply(p,{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content:transcript}]});
+  const image=latest?.caption?'':safePicture(latest?.image||'');
+  const content=image?[{type:'text',text:transcript},{type:'image_url',image_url:{url:image}}]:transcript;
+  const response=await requestChatReply(p,{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content}]});
   const reply=dialogueReply(response,action?dialogueText:spokenReply);
   if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
   return gameResult?gameResult+'\n'+reply:reply;
+}
+function parseGroupRound(value,roles,action){
+  if(Array.isArray(value))value=value.map(part=>typeof part==='string'?part:part?.text||'').join('');
+  if(typeof value==='string'){
+    const raw=value.replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*?<\/\1>/gi,'').trim()
+      .replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/gi,'');
+    try{value=JSON.parse(raw);}catch{return null;}
+  }
+  if(!Array.isArray(value?.replies)||value.replies.length!==roles.length)return null;
+  const expected=new Set(roles.map(c=>c.id)), replies=new Map();
+  for(const item of value.replies){
+    if(!expected.has(item?.roleId)||replies.has(item.roleId)||typeof item.dialogue!=='string')return null;
+    const text=item.dialogue.trim();
+    if(!text||(!action&&/低吼|骨血里/.test(text)))return null;
+    replies.set(item.roleId,text);
+  }
+  return roles.map(c=>replies.get(c.id));
+}
+async function groupRoundReply(g,roles){
+  const p=profileFor(roles[0]);
+  if(!p)throw Error(displayName(roles[0])+'缺少可用的 API 预设。');
+  const action=g.actionWriting===true;
+  const visible=g.messages.filter(m=>!m.tea?.bonus&&roles.every(c=>!m.audience||m.audience.includes(c.id)))
+    .slice(-24).map(m=>Array.isArray(m.quote?.audience)&&roles.some(c=>!m.quote.audience.includes(c.id))?{...m,quote:undefined}:m);
+  const latest=visible.findLast(m=>!m.roleId),gameResult=latest?.gameResult;
+  const people=roles.map(c=>({
+    roleId:c.id,姓名:displayName(c),性别:c.gender,性格:c.personality,人设:c.description,与用户的关系:c.relationship,
+    角色关系:charRelationContext(c),世界书:[worldContext('front',c.id),worldContext('end',c.id)].filter(Boolean),
+    ...(g.shared&&profileFor(c)?.id===p.id?{个人记忆:memoryContext(c),近期私聊:recentDialogue(c.messages).slice(-8)}:{})
+  }));
+  const system=[
+    chatTimeContext(),
+    '你负责生成一轮群聊。按给定角色顺序，每位角色各回复一次。后面的角色可以接前面角色的话。不要代替用户发言。每位角色只能使用自己的设定、世界书、个人记忆和私聊，以及共同可见的群聊内容。',
+    '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
+    '本轮发言角色（按顺序）：'+JSON.stringify(people),
+    g.scene?'【当前场景】\n'+g.scene:'',
+    gameResult?'本轮小游戏结果由网页确定：'+JSON.stringify(gameResult)+'。据此点评，别重新抽取或重复报出结果。':'',
+    action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作、旁白及「低吼」「骨血里」。',
+    '只返回 JSON 对象 {"replies":[{"roleId":"使用给定的角色 ID","dialogue":"发言内容"}]}。每个指定 ID 只出现一次。'
+  ].filter(Boolean).join('\n\n');
+  const transcript=latest?.storyForward?
+    [groupTranscript(visible.filter(m=>m!==latest)).slice(-12000),groupTranscript([latest])].filter(Boolean).join('\n\n'):
+    groupTranscript(visible).slice(-12000);
+  const image=latest?.caption?'':safePicture(latest?.image||'');
+  const content=image?[{type:'text',text:transcript},{type:'image_url',image_url:{url:image}}]:transcript;
+  const response=await requestChatReply(p,{model:p.model,stream:state.streamReplies,messages:[{role:'system',content:system},{role:'user',content}]});
+  const replies=dialogueReply(response,value=>parseGroupRound(value,roles,action));
+  if(!replies)throw Error('模型没有完整返回本轮角色发言，请点击「继续回复」重试。');
+  return roles.map((c,i)=>({speaker:displayName(c),roleId:c.id,content:gameResult?gameResult+'\n'+replies[i]:replies[i],
+    sentAt:Date.now(),audience:g.members.slice()}));
 }
 async function rerollGroup(id,index,guide){
   const g=groupById(id),m=g?.messages[index],c=m&&contact(m.roleId);
@@ -1088,24 +1140,22 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false){
       if(g.pending.length)return;
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
-      if(members.some(c=>!profileFor(c)))throw Error('请为群成员设置可用的 API 预设。');
+      const first=game?members.find(c=>c.id===game.roleId):members[0];
+      if(!first||!profileFor(first))throw Error('请为本轮首位回复角色设置可用的 API 预设。');
       const quote=!game&&!storyForward&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
-      const caption=image?await describeChatImage(image):'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
-      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image,caption}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
+      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
     }
     if(!game&&!storyForward&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);chatQuotes.delete(quoteKey(id,'group'));}
     refreshNeeded=true;
     refreshGroup(id);
-    while((g=groupById(id))?.pending.length){
-      const [roleId,...pending]=g.pending,c=contact(roleId);
-      if(!c){patchGroup(g,{pending});continue;}
-      const content=await groupReply(g,c);
-      if(groupById(id)!==g)throw Error('群聊已更新，请核对后重试。');
-      patchGroup(g,{pending,messages:[...g.messages,{speaker:displayName(c),roleId,content,sentAt:Date.now(),audience:g.members.slice()}]});
-      refreshGroup(id);
-    }
+    g=groupById(id);
+    if(!g?.pending.length)return;
+    const roles=[...new Set(g.pending)].map(contact).filter(Boolean);
+    const replies=roles.length?await groupRoundReply(g,roles):[];
+    if(groupById(id)!==g)throw Error('群聊已更新，请核对后重试。');
+    patchGroup(g,{pending:[],messages:[...g.messages,...replies]});
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);if(refreshNeeded)refreshGroup(id);}
 }
