@@ -1442,7 +1442,7 @@ function openGroup(id){
   const lock=teaLock(g.members),busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
   dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button type="button" class="star-button" data-group-edit="'+esc(id)+'" aria-label="打开群聊设置" title="群聊设置" '+(busy?'disabled':'')+'>★</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
     (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
-    (speaker?typingBubble(speaker,true,true):'')+'</div>'+ (lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
+    (speaker?typingBubble(speaker,true,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
 }
@@ -1624,7 +1624,7 @@ function chat(){
       }).join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(history.current?'<div class="chat-history-page"><button type="button" data-action="newerChatPage">查看较新的消息</button><button type="button" data-action="latestChatPage">回到最新</button></div>':typing?typingBubble(c):'')+'</div>'+
     (ai&&!busy&&!lock&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
-    (lock?teaLockNotice(lock):'<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form>')+'</section>';
+    (mysteryChatBlocked([c.id])?'<p class="notice" role="status">绑定世界书已关闭。重新启用后可继续聊天。</p>':lock?teaLockNotice(lock):'<form id="chatForm"><label>写信<textarea data-draft="'+esc(c.id)+'" name="message" placeholder="写给你的角色…">'+esc(session.draft)+'</textarea></label>'+quoteDraft(c.id,mode)+chatAttachments(c,busy)+'</form>')+'</section>';
 }
 function cards(){
   const roles=state.contacts.map(c=>'<button class="persona-tile" data-card="'+esc(c.id)+'">'+avatarMarkup(c)+'<span><strong>'+esc(displayName(c))+'</strong></span></button>').join('');
@@ -1634,7 +1634,7 @@ function cards(){
     if(!groups.has(group))groups.set(group,[]);
     groups.get(group).push(entry);
   }
-  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3><label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name)+entries.map(x=>'<div class="world-row"><button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button><button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
+  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3>'+(mysteryWorldGroup(name)?'<p class="muted">绑定世界书 · 关闭后暂停绑定角色聊天</p>':'<label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name))+entries.map(x=>'<div class="world-row"><button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>'+(isMysteryBound(x.id)?'查看条目':'编辑条目')+'</small></span><b>›</b></button><button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
   return heading('CHARACTER ARCHIVE','人设与世界书','从目录打开卡片。开启的世界书条目会加入角色对话。')+
     '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><div class="row"><button type="button" data-action="selectContacts">批量管理</button><button class="primary" data-action="newContact">＋ 新建角色</button></div></div><div class="persona-grid"><button class="persona-tile" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong></span></button>'+roles+'</div></section>'+
     '<section class="panel"><div class="row between"><h2>世界书目录</h2><button data-action="newWorld">＋ 新建条目</button></div>'+(worlds||'<p class="empty">还没有世界书条目。</p>')+'</section></div>';
@@ -1648,25 +1648,33 @@ function charRelationRow(id,relation={}){
   const options=state.contacts.filter(other=>other.id!==id).map(other=>'<option value="'+esc(other.id)+'" '+(other.id===relation.roleId?'selected':'')+'>'+esc(displayName(other))+'</option>').join('');
   return '<div class="panel" data-char-relation><div class="fields"><label>对方角色<select name="relationRole"><option value="">选择角色</option>'+options+'</select></label><label>关系描述<input name="relationDescription" placeholder="例如：并肩作战多年的搭档" value="'+esc(relation.description||'')+'"></label></div><button type="button" data-remove-char-relation>移除此条</button></div>';
 }
+const isMysteryBound=id=>typeof id==='string'&&/^mystery:[a-z0-9-]+:(?:role|world)-\d+$/.test(id);
+const mysteryWorldGroup=group=>state.worlds.some(w=>w.group===group&&isMysteryBound(w.id));
 function openCard(id){
   const isUser=id==='user';
   const c=isUser?{name:state.userName,gender:state.userGender,personality:state.userPersonality,description:state.user}:contact(id)||contactDefaults('');
   const fields=[['姓名','name'],['性别','gender'],['性格','personality'],['人设','description']];
   if(!isUser){fields.splice(1,0,['昵称','nickname']);fields.push(['Char 与 User 的关系','relationship']);}
-  const labels=fields.map(([label,k])=>'<label>'+label+(['description','personality'].includes(k)?'<textarea name="'+k+'">'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
+  const locked=isMysteryBound(id);
+  const labels=fields.map(([label,k])=>'<label>'+label+(['description','personality'].includes(k)?'<textarea name="'+k+'" '+(locked?'readonly':'')+'>'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(locked&&k!=='relationship'?'readonly ':'')+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===c.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
+  if(locked){
+    dialog('<h2>人设卡</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label><div class="row"><button class="primary">保存</button><button type="button" data-look="'+esc(id)+'">头像与头像框</button><button type="button" data-action="close">关闭</button></div></form>');
+    return;
+  }
   dialog('<h2>'+(isUser?'User 人设卡':id?'编辑角色':'新建角色')+'</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+
     (isUser?'':'<section class="panel"><h3>Char 与 Char 的关系</h3><p class="muted">选填。可添加多条，每条选择一位通讯录角色并填写关系。</p><div data-char-relations>'+charRelations(c).filter(r=>contact(r.roleId)&&r.roleId!==id).map(r=>charRelationRow(id,r)).join('')+'</div><button type="button" data-add-char-relation '+(state.contacts.some(other=>other.id!==id)?'':'disabled')+'>＋ 添加角色关系</button></section><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label>')+
     '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对四栏内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+(!isUser&&id?'<button type="button" data-delete-contact="'+esc(id)+'">删除角色</button>':'')+'</div></form>');
 }
 function selectContacts(){
   dialog('<h2>批量管理人设卡</h2><form id="contactSelection">'+selectionTools('<button class="message-danger" data-needs-selection disabled>删除所选</button>')+
-    state.contacts.map(c=>'<label class="contact-choice"><input type="checkbox" class="bulk-check" name="contact" value="'+esc(c.id)+'">'+avatarMarkup(c)+'<strong>'+esc(displayName(c))+'</strong></label>').join('')+
+    state.contacts.filter(c=>!isMysteryBound(c.id)).map(c=>'<label class="contact-choice"><input type="checkbox" class="bulk-check" name="contact" value="'+esc(c.id)+'">'+avatarMarkup(c)+'<strong>'+esc(displayName(c))+'</strong></label>').join('')+
     '<button type="button" data-action="close">关闭</button></form>');
   syncFormSelection($('contactSelection'));
 }
 function removeContacts(ids){
-  const picked=state.contacts.filter(c=>ids.includes(c.id));
+  const picked=state.contacts.filter(c=>ids.includes(c.id)&&!isMysteryBound(c.id));
+  if(ids.some(isMysteryBound)){toast('绑定角色请通过神秘小入口删除。');return;}
   if(!picked.length)return;
   if(teaLock(ids)||picked.some(c=>threads.has(c.id)||memoryJobs.has(c.id)||mergeJobs.has(c.id))||
      state.groups.some(g=>g.members.some(id=>ids.includes(id))&&groupJobs.has(g.id))){
@@ -1692,6 +1700,10 @@ function saveCard(form){
   const name=v('name'),gender=v('gender'),personality=v('personality'),description=v('description');
   if(id==='user')return commit({...state,userName:name,userGender:gender,userPersonality:personality,user:description});
   const nickname=v('nickname'),preset=v('preset');
+  if(isMysteryBound(id)){
+    if(!contact(id)||preset&&!state.profiles.some(p=>p.id===preset))throw Error('模型预设无效。');
+    return replaceContact(id,{relationship:v('relationship').slice(0,80),preset});
+  }
   if(!name&&!nickname)throw Error('请填写姓名或昵称。');
   const descriptions=data.getAll('relationDescription');
   const charRelations=data.getAll('relationRole').flatMap((roleId,index)=>{
@@ -1704,12 +1716,17 @@ function saveCard(form){
 }
 function openWorld(id){
   const x=state.worlds.find(y=>y.id===id)||{title:'',group:'',content:'',enabled:true};
-  const groups=[...new Set(state.worlds.map(y=>y.group).filter(Boolean))];
+  if(isMysteryBound(id)){
+    dialog('<h2>'+esc(x.title)+'</h2><label>世界书内容<textarea rows="16" readonly>'+esc(x.content)+'</textarea></label><button type="button" data-action="close">关闭</button>');
+    return;
+  }
+  const groups=[...new Set(state.worlds.map(y=>y.group).filter(group=>group&&!mysteryWorldGroup(group)))];
   dialog('<h2>'+(id?'编辑世界书条目':'新建世界书条目')+'</h2><form id="worldForm" data-id="'+esc(id)+'"><label>条目名称<input name="title" required maxlength="80" value="'+esc(x.title)+'"></label><label>分组<input name="group" list="worldGroups" maxlength="60" value="'+esc(x.group)+'" placeholder="选择已有分组或输入新分组"></label><datalist id="worldGroups">'+groups.map(g=>'<option value="'+esc(g)+'"></option>').join('')+'</datalist><label>内容<textarea name="content" required>'+esc(x.content)+'</textarea></label><div class="row"><button class="primary">保存条目</button><button type="button" data-action="close">取消</button>'+(id?'<button type="button" data-remove-world="'+esc(id)+'">删除条目</button>':'')+'</div></form>');
 }
 function saveWorld(form){
   const id=form.dataset.id,d=new FormData(form);
   const title=d.get('title').trim(),group=d.get('group').trim(),content=d.get('content').trim();
+  if(isMysteryBound(id)||mysteryWorldGroup(group))throw Error('绑定世界书内容为只读。');
   if(!title||!content)throw Error('请填写条目名称与内容。');
   const entry={id:id||crypto.randomUUID(),title,group,content,enabled:true};
   return commit({...state,worlds:id?state.worlds.map(x=>x.id===id?{...entry,enabled:x.enabled}:x):[...state.worlds,entry]});
@@ -1928,6 +1945,7 @@ function worldScopeButton(group){
   return '<button type="button" class="world-scope-button" data-world-scope="'+esc(group)+'">使用范围 · '+worldScopeLabels[mode]+count+'</button>';
 }
 function openWorldScope(group){
+  if(mysteryWorldGroup(group))return;
   const scope=worldScope(group);
   const modes=Object.entries(worldScopeLabels).map(([value,label])=>'<label class="world-scope-choice"><input type="radio" name="scopeMode" value="'+value+'" '+(scope.mode===value?'checked':'')+'>'+label+'</label>').join('');
   const roles=state.contacts.map(c=>'<label class="world-scope-choice"><input type="checkbox" name="scopeRole" value="'+esc(c.id)+'" '+(scope.roles.includes(c.id)?'checked':'')+'>'+esc(displayName(c))+'</label>').join('');
@@ -1935,6 +1953,7 @@ function openWorldScope(group){
     '<fieldset class="world-scope-roles"><legend>选择角色 · 可多选</legend>'+(roles||'<p class="muted">还没有可选角色。</p>')+'</fieldset><div class="row actions"><button class="primary">保存范围</button><button type="button" data-action="close">取消</button></div></form>');
 }
 function saveWorldScope(form){
+  if(mysteryWorldGroup(form.dataset.group))return;
   const data=new FormData(form),mode=data.get('scopeMode');
   if(!Object.hasOwn(worldScopeLabels,mode))return;
   const roles=data.getAll('scopeRole').filter(id=>contact(id));
@@ -2503,7 +2522,11 @@ const teaSession=(id,mode,bonus)=>state.teaSessions.find(x=>x.owner===id&&x.mode
 const teaTitle=x=>x.bonus?'番外茶叙':'茶叙';
 const teaById=id=>state.teaSessions.find(x=>x.id===id);
 const teaLock=(roles,sessions=state.teaSessions)=>sessions.find(x=>!x.bonus&&x.cast.some(id=>roles.includes(id)));
+function mysteryChatBlocked(roles){
+  return roles.some(id=>isMysteryBound(id)&&!state.worlds.some(w=>w.enabled&&w.id.startsWith(id.slice(0,id.lastIndexOf(':')+1)+'world-')));
+}
 function teaSendBlocked(roles){
+  if(mysteryChatBlocked(roles)){toast('绑定世界书已关闭，请重新启用后再聊天。');return true;}
   if(!teaLock(roles))return false;
   toast('参与角色正在茶叙，结束茶叙后才能发送消息。');return true;
 }
@@ -2534,6 +2557,7 @@ function startTea(form){
   const saved=teaSession(owner,mode,bonus);if(saved){renderTea(saved.id);return;}
   const cast=mode==='group'?data.getAll('cast').filter(id=>groupById(owner)?.members.includes(id)&&contact(id)):[owner];
   if(!cast.length)throw Error('请至少选择一位参与角色。');
+  if(mysteryChatBlocked(cast))throw Error('绑定世界书已关闭，请重新启用后继续。');
   if(!bonus&&teaLock(cast))throw Error('有角色已在茶叙中，请先结束原茶叙。');
   if(!bonus&&(cast.some(id=>threads.has(id)||localRuns.has(id))||state.groups.some(g=>groupJobs.has(g.id)&&g.members.some(id=>cast.includes(id)))))throw Error('有角色正在回信，请稍后入席。');
   if(!cast.map(contact).filter(Boolean).some(profileFor))throw Error('请先为参与角色设置可用的模型预设。');
@@ -2584,6 +2608,7 @@ function updateTea(x){
 async function writeTea(form){
   const id=form.dataset.id,x=teaById(id);
   if(!x||teaBusy.has(id))return;
+  if(mysteryChatBlocked(x.cast)){toast('绑定世界书已关闭，请重新启用后继续。');return;}
   const group=x.mode==='group'?groupById(x.owner):null;
   const cast=x.cast.filter(role=>x.mode!=='group'||group?.members.includes(role)).map(contact).filter(Boolean);
   const p=cast.map(profileFor).find(Boolean);
@@ -2908,7 +2933,7 @@ function resetIdleTimer(){
   idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
 }
 function queueLocalCards(c){
-  if(teaLock([c.id]))return;
+  if(mysteryChatBlocked([c.id])||teaLock([c.id]))return;
   const cfg=localConfig(c),run=Symbol(),id=c.id;
   if(!cfg.decks.some(d=>d.enabled&&d.items.length)){repaintChat();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
@@ -3641,6 +3666,7 @@ function submitMessageEdit(form){
   if(updateMessageList(scope,messages,index)){closeMessageTools(scope);renderMessageTools();toast('回复已修改');}
 }
 function regenerateMessage(scope,index,guide=''){
+  if(!scope.group&&mysteryChatBlocked([scope.c.id])){toast('绑定世界书已关闭，请重新启用后再聊天。');return;}
   if(!sameMessageScope(scope,messageScope())||messageBusy(scope.c,scope.mode)){toast('消息正在更新，请稍后重试。');return;}
   if(scope.group){rerollGroup(scope.c.id,index,guide);return;}
   if(scope.mode==='ai'){send(false,{index,guide});return;}
@@ -4073,7 +4099,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -4094,6 +4120,7 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
+  if(!Array.isArray(result.mysteryActive)||!result.mysteryActive.every(id=>typeof id==='string'&&/^[a-z0-9-]+$/.test(id)))throw Error('神秘小入口存档无效。');
   if(!Array.isArray(result.scenePresets)||!result.scenePresets.every(p=>p&&string(p.id)&&p.id&&string(p.name)&&p.name.trim()&&string(p.scene)&&p.scene.trim()&&p.scene.length<=4000)||!unique(result.scenePresets))throw Error('场景预设存档无效');
   if(!Array.isArray(result.teaSessions)||!result.teaSessions.every(validTeaSession)||!unique(result.teaSessions))throw Error('茶叙存档无效');
   if(!Array.isArray(result.groups)||!result.groups.every(g=>g&&string(g.id)&&string(g.name)&&typeof g.shared==='boolean'&&Array.isArray(g.members)&&g.members.every(string)&&Array.isArray(g.pending)&&g.pending.every(string)&&Array.isArray(g.messages)&&g.messages.every(m=>m&&string(m.speaker)&&string(m.content)&&string(m.roleId)&&(m.audience===undefined||(Array.isArray(m.audience)&&m.audience.every(string)))))||!unique(result.groups))throw Error('群聊存档无效');
@@ -4224,7 +4251,93 @@ function backup(){return heading('VAULT ARCHIVE','存档管理','账单、聊天
   '<section class="panel"><h2>设备锁</h2><p class="muted">'+(deviceConfig?'已开启 · '+(deviceConfig.delay?deviceConfig.delay+' 分钟后锁定':'立即锁定'):'尚未开启')+'</p><button data-action="deviceSettings">设备锁设置</button></section>'+
   '<section class="panel"><h2>备份与恢复</h2><div class="row"><button class="primary" data-action="export">下载备份</button><button data-action="exportKeys">下载含 API Key 的完整备份</button></div><p class="notice">普通备份会移除 Key。完整备份以明文包含 Key，请妥善保管。清除站点数据或更换浏览器前可以先下载备份。</p><label>导入备份（将替换当前存档）<input id="archiveImport" type="file" accept=".json,application/json"></label><div class="muted" id="archiveVersion" style="margin-top:8px;text-align:right;overflow-wrap:anywhere"></div></section>'+
   '<section class="panel"><h2>期初余额</h2><form id="openingForm"><label>余额（元）<input name="opening" type="number" step="0.01" required value="'+state.opening/100+'"></label><button>保存期初余额</button></form></section>'+
+  '<section class="panel"><h2>神秘小入口</h2><form id="mysteryEntryForm"><label>解锁字符<input type="password" name="code" required autocomplete="off" spellcheck="false" autocapitalize="none"></label><button type="submit" class="primary">确认</button><p id="mysteryEntryStatus" class="muted" role="status"></p></form></section>'+
   '<section class="panel"><h2>格式化存档</h2><p class="muted">清空当前设备的应用存档。此操作无法撤销。</p><button type="button" class="archive-danger" data-action="formatArchive">一键格式化</button></section>';}
+// Encrypted definitions are supplied per binding. Plaintext characters and payloads are not shipped.
+const mysteryBundles=[{"id":"th-20261112","salt":"v0HekN+AAK9zo86e7F/BfQ==","iv":"Ve4m+X6VaCs3ae4I","ciphertext":"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"}];
+async function readMysteryBundle(code){
+  const material=await crypto.subtle.importKey('raw',encoder.encode(code),'PBKDF2',false,['deriveKey']);
+  for(const bundle of mysteryBundles){
+    const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:from64(bundle.salt),iterations:210000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['decrypt']);
+    let clear;
+    try{clear=await crypto.subtle.decrypt({name:'AES-GCM',iv:from64(bundle.iv)},key,from64(bundle.ciphertext));}
+    catch(error){if(error.name==='OperationError')continue;throw error;}
+    return {...JSON.parse(new TextDecoder().decode(clear)),id:bundle.id};
+  }
+  return null;
+}
+function removeMysteryBundle(prefix){
+  const owned=id=>typeof id==='string'&&id.startsWith(prefix);
+  const ids=state.contacts.filter(card=>owned(card.id)).map(card=>card.id);
+  const related=tea=>tea&&(owned(tea.owner)||tea.cast?.some(owned));
+  const groups=state.groups.filter(g=>g.members.some(owned)||g.messages.some(m=>owned(m.roleId)||related(m.tea)));
+  if(ids.some(id=>threads.has(id)||memoryJobs.has(id)||mergeJobs.has(id))||
+     groups.some(g=>groupJobs.has(g.id))||state.teaSessions.some(t=>related(t)&&teaBusy.has(t.id))){
+    throw Error('相关角色正在处理消息或记忆，请结束后再试。');
+  }
+  const keepMessage=m=>!owned(m.roleId)&&!related(m.tea)&&!(m.audience?.length&&m.audience.every(owned));
+  const contacts=state.contacts.filter(c=>!owned(c.id)).map(c=>{
+    const first=c.messages.findIndex(m=>!keepMessage(m));
+    const memory=first<0?{}:memoryAfterMessageChange(c,first);
+    if(memory.memories)memory.memories=c.memories.filter(m=>m.kind==='journal'||memory.memories.includes(m));
+    return {...c,...memory,charRelations:charRelations(c).filter(r=>!owned(r.roleId)),messages:c.messages.filter(keepMessage),
+      ...(c.chatModes?{chatModes:{...c.chatModes,
+        keyword:{...c.chatModes.keyword,messages:c.chatModes.keyword.messages.filter(keepMessage)},
+        cards:{...c.chatModes.cards,messages:c.chatModes.cards.messages.filter(keepMessage)}}}:{})};
+  });
+  const removedWorldGroups=new Set(state.worlds.filter(w=>owned(w.id)).map(w=>w.group));
+  const worldScopes=Object.fromEntries(Object.entries(state.worldScopes).filter(([name])=>!removedWorldGroups.has(name)).map(([name,scope])=>[name,{...scope,roles:scope.roles.filter(id=>!owned(id))}]));
+  const next={...state,contacts,worldScopes,worlds:state.worlds.filter(w=>!owned(w.id)),
+    teaSessions:state.teaSessions.filter(t=>!related(t)),
+    groups:state.groups.map(g=>({...g,members:g.members.filter(id=>!owned(id)),pending:g.pending.filter(id=>!owned(id)),
+      messages:g.messages.filter(keepMessage).map(m=>m.audience?{...m,audience:m.audience.filter(id=>!owned(id))}:m)})),
+    mysteryActive:state.mysteryActive.filter(id=>('mystery:'+id+':')!==prefix)};
+  if(!commit(next))return false;
+  for(const id of ids){
+    localRuns.delete(id);replyErrors.delete(id);memoryErrors.delete(id);
+    for(const mode of Object.keys(chatModeLabels)){
+      chatImages.delete(imageKey(id,mode));chatQuotes.delete(quoteKey(id,mode));
+    }
+  }
+  if(owned(activeContact))activeContact='';
+  return true;
+}
+async function submitMysteryEntry(form){
+  if(deviceLocked||form.dataset.busy)return;
+  const status=$('mysteryEntryStatus');
+  if(!mysteryBundles.length){status.textContent='此入口尚未配置。';return;}
+  form.dataset.busy='true';
+  try{
+    const bundle=await readMysteryBundle(form.elements.code.value);
+    if(!form.isConnected||deviceLocked)return;
+    form.elements.code.value='';
+    if(!bundle){status.textContent='字符未匹配。';return;}
+    const prefix='mystery:'+bundle.id+':';
+    const active=state.mysteryActive.includes(bundle.id);
+    if(active){
+      if(removeMysteryBundle(prefix))status.textContent='已删除绑定内容及关联聊天和记忆。';
+      return;
+    }
+    const contacts=bundle.contacts.map((card,index)=>{
+      const id=prefix+'role-'+index;
+      return {...contactDefaults(id,card.name),nickname:card.nickname||'',gender:card.gender||'',personality:card.personality||'',description:card.description||'',relationship:card.relationship||''};
+    });
+    const existingGroups=new Set(state.worlds.map(w=>w.group));
+    const boundGroups=new Map();
+    const worlds=bundle.worlds.map((entry,index)=>{
+      if(!boundGroups.has(entry.group)){
+        let name=entry.group, suffix=2;
+        while(existingGroups.has(name))name=entry.group+' · '+suffix++;
+        existingGroups.add(name);boundGroups.set(entry.group,name);
+      }
+      return {...entry,group:boundGroups.get(entry.group),enabled:entry.enabled!==false,id:prefix+'world-'+index};
+    });
+    const worldScopes={...state.worldScopes,...Object.fromEntries(worlds.map(w=>[w.group,{mode:'selected',roles:contacts.map(c=>c.id)}]))};
+    const next=validate({...state,contacts:[...state.contacts,...contacts],worlds:[...state.worlds,...worlds],worldScopes,mysteryActive:[...state.mysteryActive,bundle.id]});
+    if(commit(next))status.textContent='已解锁世界书与人设卡。';
+  }catch(error){status.textContent=error.message;}
+  finally{delete form.dataset.busy;}
+}
 function confirmArchiveFormat(){
   if(deviceLocked||page!=='backup')return;
   dialog('<h2>确认格式化存档？</h2><p>这会清除当前设备的账单、余额、私聊、群聊、人设、世界书、茶叙、番外及 API 配置。设备锁单独管理。</p><p class="notice">格式化后无法撤销。已有备份可重新导入。</p><form id="archiveFormatForm"><div class="row"><button type="button" autofocus data-action="close">取消</button><button type="submit" class="archive-danger">确认格式化</button></div></form>');
@@ -4485,7 +4598,7 @@ document.addEventListener('click',e=>{
   if(d.world)openWorld(d.world);
   if(b.hasAttribute('data-world-scope'))openWorldScope(d.worldScope);
   if(d.toggleWorld&&commit({...state,worlds:state.worlds.map(x=>x.id===d.toggleWorld?{...x,enabled:!x.enabled}:x)}))render();
-  if(d.removeWorld&&confirm('删除这个世界书条目？')&&commit({...state,worlds:state.worlds.filter(x=>x.id!==d.removeWorld)})){$('dialog').close();render();}
+  if(d.removeWorld&&!isMysteryBound(d.removeWorld)&&confirm('删除这个世界书条目？')&&commit({...state,worlds:state.worlds.filter(x=>x.id!==d.removeWorld)})){$('dialog').close();render();}
   if(d.clearLook){
     const form=$('lookForm'),target=d.clearLook;
     form.look[target]='';form.elements[target+'Url'].value='';form.elements[target+'File'].value='';refreshLook(form);
@@ -4678,7 +4791,7 @@ document.addEventListener('change',async e=>{
       }finally{delete t.dataset.loading;}
     }
     if(t.id==='localChatImport')await importLocalChat(t);
-    if(t.hasAttribute('data-world-position'))commit({...state,worldPlacement:{...state.worldPlacement,[t.dataset.worldPosition]:t.value}});
+    if(t.hasAttribute('data-world-position')&&!mysteryWorldGroup(t.dataset.worldPosition))commit({...state,worldPlacement:{...state.worldPlacement,[t.dataset.worldPosition]:t.value}});
     if(t.id==='anchor'&&validDate(t.value)){anchor=t.value;render();}
     if(t.id==='profileSelect'&&commit({...state,profile:t.value}))render();
     if(t.id==='archiveImport'&&t.files[0]){
@@ -4795,6 +4908,7 @@ document.addEventListener('submit',e=>{
       if(commit({...state,bills:[...state.bills,...bills]})){$('dialog').close();render();toast('已保存 '+bills.length+' 笔账目');}
     }
     if(f.id==='archiveFormatForm')formatArchive();
+    if(f.id==='mysteryEntryForm')submitMysteryEntry(f);
     if(f.id==='openingForm'){
       const opening=Math.round(Number(f.elements.opening.value)*100);
       if(!Number.isSafeInteger(opening))throw Error('期初余额超出有效范围。');
