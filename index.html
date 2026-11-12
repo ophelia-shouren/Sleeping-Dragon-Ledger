@@ -3131,9 +3131,14 @@ function initHomeOrb(){
   orb.addEventListener('pointerup',()=>{drag=null;});
   orb.addEventListener('pointercancel',()=>{drag=null;moved=false;});
   orb.addEventListener('click',e=>{if(moved&&e.detail!==0){e.stopPropagation();moved=false;}});
-  window.addEventListener('resize',resize);
-  window.visualViewport?.addEventListener('resize',resize);
-  window.visualViewport?.addEventListener('scroll',resize);
+  let viewportFrame=null;
+  const scheduleResize=()=>{
+    if(viewportFrame!==null)return;
+    viewportFrame=requestAnimationFrame(()=>{viewportFrame=null;resize();});
+  };
+  window.addEventListener('resize',scheduleResize);
+  window.visualViewport?.addEventListener('resize',scheduleResize);
+  window.visualViewport?.addEventListener('scroll',scheduleResize);
   resize();
 }
 
@@ -3279,7 +3284,7 @@ function messageSelection(c,mode,messages){
 function messageActionBar(selected){
   if(!selected)return '';
   const n=selected.indices.size,disabled=n?'':' disabled';
-  const all=n===selected.messages.filter(m=>!replyPending(m)).length;
+  const all=n===selected.selectableCount;
   return '<div class="message-selection bulk-tools"><button type="button" data-action="toggleMessageSelection" aria-pressed="'+all+'">'+(all?'取消全选':'全选')+'</button><strong aria-live="polite">已选 '+n+' 条</strong><div class="row"><button type="button" data-action="exportMessages"'+disabled+'>导出 TXT</button><button type="button" data-action="screenshotMessages"'+disabled+'>截图</button><button type="button" class="message-danger" data-action="deleteMessages"'+disabled+'>删除所选</button><button type="button" data-action="exitMessages">完成</button></div></div>';
 }
 function openMessageMenu(index){
@@ -3332,7 +3337,9 @@ async function messageCommand(command){
     document.querySelector((scope.group?'#groupChatForm':'#chatForm')+' textarea[name=message]')?.focus();return;
   }
   if(command==='select'){
-    selection={...scope,indices:new Set([index])};closeMessageTools(scope);renderMessageTools();return;
+    selection={...scope,indices:new Set([index]),selectableCount:scope.messages.reduce((count,m)=>count+!replyPending(m),0)};
+    if(!scope.group)closeMessageTools(scope);
+    renderMessageTools(scope);return;
   }
   if(command==='reroll'){closeMessageTools(scope);regenerateMessage(scope,index);return;}
   if(command!=='edit'&&command!=='guide')return;
@@ -3642,13 +3649,34 @@ function renderMessageTools(scope=messageScope()){
   render();
   if(top!==undefined&&$('messages'))$('messages').scrollTop=top;
 }
+function updateMessageSelection(scope,index){
+  const list=$(scope.group?'groupMessages':'messages');
+  const bar=list?.previousElementSibling;
+  if(!bar?.classList.contains('message-selection'))return;
+  const selector=index===undefined?'[data-message-index]':'[data-message-index="'+index+'"]';
+  for(const node of list.querySelectorAll(selector)){
+    if(node.getAttribute('role')!=='checkbox')continue;
+    const picked=selection.indices.has(Number(node.dataset.messageIndex));
+    node.classList.toggle('message-picked',picked);
+    node.setAttribute('aria-checked',String(picked));
+  }
+  const count=selection.indices.size;
+  const all=count===selection.selectableCount;
+  const toggle=bar.querySelector('[data-action="toggleMessageSelection"]');
+  toggle.textContent=all?'取消全选':'全选';
+  toggle.setAttribute('aria-pressed',String(all));
+  bar.querySelector('strong').textContent='已选 '+count+' 条';
+  for(const button of bar.querySelectorAll('button:not([data-action="toggleMessageSelection"]):not([data-action="exitMessages"])')){
+    button.disabled=!count;
+  }
+}
 function activateMessage(index){
   const scope=messageScope(),m=scope?.messages[index];
   if(!m||replyPending(m))return;
   if(sameMessageScope(selection,scope)){
     const indices=selection.indices;
     if(indices.has(index))indices.delete(index);else indices.add(index);
-    renderMessageTools();
+    updateMessageSelection(scope,index);
   }else openMessageMenu(index);
 }
 function initMessageTools(){
@@ -3849,10 +3877,16 @@ function validate(data){
   Object.assign(result,{messages:[],draft:'',charName:'',character:'',charGender:'',charPersonality:'',lore:''});
   return result;
 }
-let archiveResetting=false;
+let archiveResetting=false, draftSaveTimer;
+function flushChatDraft(){
+  if(draftSaveTimer===undefined)return;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer=undefined;
+  if(!archiveResetting)commit(state);
+}
 function commit(next){
   if(archiveResetting)return false;
-  try{if(next.bills!==state.bills)next=withBillReplies(next);localStorage.setItem(key,JSON.stringify(next));state=next;storageError='';return true;}
+  try{if(next.bills!==state.bills)next=withBillReplies(next);localStorage.setItem(key,JSON.stringify(next));state=next;storageError='';clearTimeout(draftSaveTimer);draftSaveTimer=undefined;return true;}
   catch{toast('存档写入失败，请检查浏览器存储空间或权限。');return false;}
 }
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').style.display='block';toastTimer=setTimeout(()=>$('toast').style.display='none',4600);}
@@ -3934,6 +3968,7 @@ function confirmArchiveFormat(){
 function formatArchive(){
   if(deviceLocked||page!=='backup'||archiveResetting)return;
   archiveResetting=true;
+  clearTimeout(draftSaveTimer);draftSaveTimer=undefined;
   try{localStorage.removeItem(key);}
   catch{archiveResetting=false;toast('清除存档失败，请检查存储权限。');return;}
   location.reload();
@@ -4259,7 +4294,7 @@ document.addEventListener('click',e=>{
       if(!sameMessageScope(selection,scope))break;
       const indices=scope.messages.flatMap((m,i)=>replyPending(m)?[]:[i]);
       selection.indices=new Set(selection.indices.size===indices.length?[]:indices);
-      renderMessageTools();break;
+      updateMessageSelection(scope);break;
     }
     case 'close':if($('lookForm')?.dataset.returnCard)openCard($('lookForm').dataset.returnCard);else $('dialog').close();break;
     case 'siteMenu':setSiteMenu($('siteMenu').hidden);break;
@@ -4274,12 +4309,22 @@ document.addEventListener('click',e=>{
     case 'deleteProfile':if(confirm('确定删除当前 API 预设？')&&commit({...state,profiles:state.profiles.filter(x=>x.id!==state.profile),contacts:state.contacts.map(c=>c.preset===state.profile?{...c,preset:''}:c),profile:''}))render();break;
   }
 });
+window.addEventListener('pagehide',flushChatDraft);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushChatDraft();});
 document.addEventListener('input',e=>{
   if(e.target.matches('#groupChatForm textarea[name=message]'))groupDrafts.set(e.target.form.dataset.id,e.target.value);
   const t=e.target;
   if(t.dataset.draft){
     const c=contact(t.dataset.draft);
-    if(c){patchSession(c,localConfig(c).mode,{draft:t.value});resetIdleTimer();}
+    if(c){
+      const session=localSession(c);
+      if(session.draft!==t.value){
+        session.draft=t.value;
+        clearTimeout(draftSaveTimer);
+        draftSaveTimer=setTimeout(flushChatDraft,900);
+      }
+      resetIdleTimer();
+    }
   }
   if(t.form?.id==='lookForm'){
     if(t.name==='avatarUrl'||t.name==='frameUrl')updateLookUrl(t.form,t.name.replace('Url',''),t.value);
