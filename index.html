@@ -560,6 +560,31 @@ const storyStyles=['治愈日常','温柔抒情','轻喜剧','慢热浪漫','哥
 const storySequelRequest='<Request：以上为故事前文，请以此为序章生成一篇20000字以上的后续发展，请有头有尾并进行扩展续写，不得ooc，禁止照搬原文。内容不能含性暗示，不得输出nsfw剧情。>';
 const storySafety='保持角色设定一致。内容不能含性暗示，不得输出 NSFW 剧情。';
 let storyJob=null;
+const htmlCardRule='按用户的最新指令生成一个完整、自包含的可互动 HTML 文档。只输出 HTML，可放在一个 html 代码块内。CSS 和 JavaScript 写在文档内，使用原生浏览器能力，素材可用内联 SVG 或 data URI；禁止外部网络资源。按用户指定尺寸设计，窄屏仍可查看。尊重提供的角色设定、关系和用户面具。不要复述指令或附小说正文。';
+function wantsHtmlCard(input){
+  return /\bhtml\b/i.test(input)&&(/^\s*[$＄]|^\s*html\s*(?:卡片|互动)/i.test(input)||/(?:生成|制作|创建|写|输出|做|produce|generate|create)/i.test(input));
+}
+function parseHtmlCard(raw){
+  const source=raw.trim().replace(/^\x60\x60\x60(?:html)?[ \t]*\r?\n|\r?\n\x60\x60\x60$/gi,'').trim();
+  if(!/^(?:<!doctype html\s*>\s*)?<html(?:\s[^>]*)?>[\s\S]*<\/html>$/i.test(source)||
+     !/<body(?:\s[^>]*)?>[\s\S]*<\/body>/i.test(source))throw Error('模型没有返回完整的 HTML 卡片，请重试。');
+  return source;
+}
+function storyHtmlPreview(source,title){
+  const doc=new DOMParser().parseFromString(source,'text/html');
+  for(const node of doc.querySelectorAll('base, meta[http-equiv]'))node.remove();
+  const policy=doc.createElement('meta');
+  policy.httpEquiv='Content-Security-Policy';
+  policy.content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'";
+  doc.head.prepend(policy);
+  if(!doc.querySelector('meta[name=viewport]')){
+    const viewport=doc.createElement('meta');
+    viewport.name='viewport';viewport.content='width=device-width, initial-scale=1';
+    policy.after(viewport);
+  }
+  return '<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="'+esc(title)+'" style="display:block;width:100%;height:clamp(520px,75dvh,900px);border:1px solid var(--line);border-radius:12px;background:var(--panel)" srcdoc="'+esc('<!doctype html>'+doc.documentElement.outerHTML)+'"></iframe>';
+}
+function storyUserMask(){return {姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user};}
 function validStory(x){
   return x&&['id','title','body','category'].every(key=>typeof x[key]==='string')&&x.id&&Array.isArray(x.cast)&&x.cast.every(id=>typeof id==='string')&&typeof x.parent==='string'&&
     ['castNames','styleNames'].every(key=>x[key]===undefined||(Array.isArray(x[key])&&x[key].every(name=>typeof name==='string')));
@@ -756,9 +781,10 @@ function bindStoryScrubber(editor){
 function storyRead(x){
   const parent=state.stories.find(y=>y.id===x.parent);
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
-    '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
+    (x.htmlCard?storyHtmlPreview(x.body,x.title):'<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>')+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="story-category-row">'+storyCategoryInput('文章分类','category','storyCategoryOptions',storyCategoryKey(x.category))+'<button>保存分类</button></form>'+
     '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader',()=>storyLibrary(storyCategoryKey(x.category)));
+  if(x.htmlCard)return;
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -789,18 +815,19 @@ function storyMemoryContext(people){
 }
 async function generateStory({parent,cast,title,guide,stream,target,pov,style,styleNames,includeUser,readMemory=false}){
   if(storyJob)throw Error('已有一篇番外正在生成。');
+  const html=wantsHtmlCard(guide);
   const people=cast.map(contact).filter(Boolean);
   if(!parent&&!people.length)throw Error('请至少选择一位登场角色。');
   const p=state.profiles.find(x=>x.id===state.profile);
   if(!p?.url||!p.model)throw Error('请在 API 连接中设置可用的全局默认预设。');
-  let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
+  let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',...(html?{htmlCard:true}:{}),category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
   const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
     worldContext('front'),
-    '写一篇中文番外，遵守以下约束。'+storySafety,
+    (html?htmlCardRule:'写一篇中文番外，遵守以下约束。')+storySafety,
     '叙事视角：'+(pov||'沿用前文'),
     '文风：'+(style||'自然流畅，续篇沿用前文文风'),
-    parent?'沿用前文角色。':includeUser?'User 加入剧情，资料：'+JSON.stringify({姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user}):'User 不加入剧情。',
+    html?'用户面具：'+JSON.stringify(storyUserMask())+'。用户是否作为人物登场：'+(includeUser?'是':'由本次指令和前文决定。'):parent?'沿用前文角色。':includeUser?'User 加入剧情，资料：'+JSON.stringify({姓名:state.userName,性格:state.userPersonality,性别:state.userGender,设定:state.user}):'User 不加入剧情。',
     '登场角色资料：'+JSON.stringify(roles),
     readMemory?storyMemoryContext(people):'',
     worldContext('end')
@@ -809,9 +836,10 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
   storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller};
   storyProgress();
   let live='',saved='',timer;
-  const firstTitle=!title&&!parent;
+  const firstTitle=!html&&!title&&!parent;
   function save(raw,partial){
-    let body=raw.trim(),name=article.title;
+    if(html&&partial)return false;
+    let body=html?parseHtmlCard(raw):raw.trim(),name=article.title;
     if(firstTitle){
       const match=body.match(/^标题[：:][ \t]*([^\n]+)\n+/);
       if(match){name=match[1].trim().slice(0,120);body=body.slice(match[0].length).trim();}
@@ -828,23 +856,24 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
   document.addEventListener('visibilitychange',visibility);
   try{
     const job=storyJob;
-    job.status='正在生成全文 · '+p.model;
+    job.status=(html?'正在生成 HTML 卡片 · ':'正在生成全文 · ')+p.model;
     if($('storyStatus'))$('storyStatus').textContent=job.status;
     const onDelta=delta=>{
       live+=delta;job.preview=live;
       if(!saved)checkpoint();else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;checkpoint();},1000);
-      const box=$('storyLive');if(box)box.append(document.createTextNode(delta));
+      const box=$('storyLive');if(box&&!html)box.append(document.createTextNode(delta));
       updateStoryCount(job.preview);
     };
-    const previous=parent?.body||'';
+    const previous=parent&&!parent.htmlCard?parent.body:'';
     const prompt=[previous?'【前文】\n'+previous:'',guide,
-      '请一次输出完整正文，目标约 '+target+' 字。自然分段，写到结局。',
-      firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
+      html?'请输出完整 HTML 文档。':'请一次输出完整正文，目标约 '+target+' 字。自然分段，写到结局。',
+      html?'':firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
     ].filter(Boolean).join('\n\n');
     const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta,controller.signal);
     if(controller.signal.aborted)throw controller.signal.reason;
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
+    if(html&&partial)throw Error('HTML 卡片生成中断，请重试。');
     if(!save(dialogueReply(response),partial))throw Error('模型返回了空正文。');
     job.preview=article.body;
     if($('storyLive'))$('storyLive').textContent=job.preview;
@@ -2290,7 +2319,7 @@ function startTea(form){
   if(commit({...state,teaSessions:[...state.teaSessions,x]})){render();renderTea(x.id);}
 }
 function teaNarrative(x){
-  return x.turns.map(t=>'<div class="tea-cue">'+esc(t.input)+'</div>'+(t.output?'<div class="tea-passage">'+esc(t.output)+'</div>':'')).join('');
+  return x.turns.map(t=>'<div class="tea-cue">'+esc(t.input)+'</div>'+(t.output?'<div class="tea-passage">'+(t.htmlCard?storyHtmlPreview(t.output,'番外 HTML 卡片'):esc(t.output))+'</div>':'')).join('');
 }
 const teaPartial=new Map();
 function teaEmblem(){
@@ -2345,16 +2374,19 @@ async function writeTea(form){
       JSON.stringify(recentDialogue((x.mode==='ai'?cast[0]:localConfig(cast[0])[x.mode]).messages)).slice(-6000);
     const roleId=cast.length===1?cast[0].id:undefined;
     const world=x.bonus||roleId!==undefined?[worldContext('front',roleId),worldContext('end',roleId)].filter(Boolean).join('\n'):'';
-    const system='你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。'+(x.bonus&&!x.includeUser?'':'第一人称默认从用户角色的视角叙述。')+'不得输出 NSFW 内容。\n'+chatTimeContext();
+    const html=x.bonus&&wantsHtmlCard(current.turns.at(-1).input);
+    const system=html?htmlCardRule+'\n'+storySafety:'你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。'+(x.bonus&&!x.includeUser?'':'第一人称默认从用户角色的视角叙述。')+'不得输出 NSFW 内容。\n'+chatTimeContext();
     const castRule=x.bonus?(x.includeUser?'User 参与剧情。':'User 不作为人物登场，其输入仅作创作指令。第一人称从所选角色的视角叙述。'):'';
     const response=await request(p,'chat/completions',{model:p.model,stream:true,messages:[
       {role:'system',content:[system,castRule].filter(Boolean).join('\n')},
-      {role:'user',content:JSON.stringify({参与角色:roles,用户:x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1)).slice(-32000),最新输入:current.turns.at(-1).input})}
-    ]},delta=>showTeaDelta(id,delta));
-    const output=dialogueReply(response).trim();
+      {role:'user',content:JSON.stringify({参与角色:roles,用户:html?storyUserMask():x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1).filter(turn=>!turn.htmlCard)).slice(-32000),最新输入:current.turns.at(-1).input})}
+    ]},delta=>{if(!html)showTeaDelta(id,delta);});
+    const raw=dialogueReply(response).trim();
+    if(html&&(response.streamInterrupted||['length','content_filter'].includes(response.choices?.[0]?.finish_reason)))throw Error('HTML 卡片生成中断，可重试。');
+    const output=html?parseHtmlCard(raw):raw;
     if(!output)throw Error('模型没有返回正文，可重试。');
     if(teaById(id)!==current)throw Error('茶叙存档已变化，请重新打开。');
-    if(updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output}]}))teaPartial.delete(id);
+    if(updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output,...(html?{htmlCard:true}:{})}]}))teaPartial.delete(id);
   }catch(error){toast(error.message);}
   finally{teaBusy.delete(id);if($('dialog').open&&$('dialog').querySelector('[data-tea-room]')?.dataset.teaRoom===id)renderTea(id);}
 }
