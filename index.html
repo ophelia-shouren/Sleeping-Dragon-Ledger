@@ -3339,6 +3339,12 @@ async function screenshotSelectedMessages(button){
       }
       entry.imageWidth=picture?Math.min(textWidth,picture.naturalWidth,360*picture.naturalWidth/picture.naturalHeight):0;
       entry.imageHeight=picture?entry.imageWidth*picture.naturalHeight/picture.naturalWidth:0;
+      const lineWidth=(lines,size)=>{
+        ctx.font=size+'px '+font;
+        return lines.reduce((max,line)=>Math.max(max,ctx.measureText(line).width),0);
+      };
+      entry.bubbleWidth=entry.system||entry.cardLayout?bubbleWidth:Math.min(bubbleWidth,Math.max(44,24+Math.ceil(Math.max(
+        lineWidth(entry.lines,messageSize),lineWidth(entry.quotes,17),entry.imageWidth))));
       entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*messageStep+(entry.cardLayout?.height||0)+(picture?entry.imageHeight+10:0);
       entry.metaHeight=mist&&entry.person?Math.max(avatarSize,entry.names.length*25+(entry.time?20:0))+verticalGap:entry.names.length*25;
       entry.footerHeight=entry.time&&!(mist&&entry.person)?24:0;
@@ -3388,6 +3394,7 @@ async function screenshotSelectedMessages(button){
     let y=headerHeight+20;
     for(const entry of entries){
       const sideInset=inset+(mist?0:avatarSize+gap);
+      const bubbleWidth=entry.bubbleWidth;
       const x=entry.system?(width-bubbleWidth)/2:entry.mine?width-sideInset-bubbleWidth:sideInset;
       if(entry.person)avatar(entry.person,entry.name,entry.mine?width-inset-avatarSize:inset,y,avatarSize);
       const nameX=entry.system?width/2:mist?(entry.mine?width-inset-avatarSize-gap:inset+avatarSize+gap):(entry.mine?x+bubbleWidth:x);
@@ -3399,7 +3406,9 @@ async function screenshotSelectedMessages(button){
       box(x,y,bubbleWidth,entry.bubbleHeight,mist?7:14,fill);
       let inside=y+12;
       const ink=entry.mine?(mist?'#24314e':colors['selected-ink']):colors.ink;
-      write(entry.quotes,x+12,inside,17,24,ink);
+      const contentX=entry.mine?x+bubbleWidth-12:x+12;
+      const contentAlign=entry.mine?'right':'left';
+      write(entry.quotes,contentX,inside,17,24,ink,contentAlign);
       inside+=entry.quotes.length*24;
       const card=entry.cardLayout;
       if(card){
@@ -3419,9 +3428,9 @@ async function screenshotSelectedMessages(button){
           inside+=row.height;
         }
       }
-      write(entry.lines,x+12,inside,messageSize,messageStep,ink);
+      write(entry.lines,contentX,inside,messageSize,messageStep,ink,contentAlign);
       inside+=entry.lines.length*messageStep;
-      if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),x+12,inside+4,entry.imageWidth,entry.imageHeight);
+      if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),entry.mine?contentX-entry.imageWidth:contentX,inside+4,entry.imageWidth,entry.imageHeight);
       y+=entry.bubbleHeight;
       if(entry.footerHeight){write([entry.time],entry.mine?x+bubbleWidth:x,y+4,15,20,colors.muted,align);y+=entry.footerHeight;}
       y+=22;
