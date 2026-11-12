@@ -654,7 +654,7 @@ function storyRead(x){
   $('storyFont').onchange=event=>commit({...state,storyFont:Number(event.target.value)});
 }
 function storyProgress(){
-  storyDialog('日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>');
+  storyDialog('日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>','compose');
   $('storyStatus').textContent=storyJob.status;
   $('stopStory').disabled=storyJob.controller.signal.aborted;
   $('storyLive').textContent=storyJob.preview;
