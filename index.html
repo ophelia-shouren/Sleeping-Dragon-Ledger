@@ -594,6 +594,10 @@ function parseHtmlCard(raw){
   }
   throw Error('模型没有返回完整的 HTML 文档。请重试，或减少单次生成的内容。');
 }
+function completeHtmlStream(text){
+  if(!/<\/body\s*>\s*<\/html\s*>\s*(?:\x60{3,}\s*)?$/i.test(text.slice(-512)))return false;
+  try{parseHtmlCard(text);return true;}catch{return false;}
+}
 function htmlCardResponse(response){
   const reason=response?.choices?.[0]?.finish_reason;
   if(reason==='content_filter')throw Error('模型服务中止了这次 HTML 生成。');
@@ -601,6 +605,7 @@ function htmlCardResponse(response){
   try{return parseHtmlCard(raw);}
   catch(error){
     if(reason==='length')throw Error('HTML 超过了模型单次输出上限。请减少单次生成的内容，或换用输出上限更高的模型。');
+    if(response?.htmlIdle)throw Error('模型已 60 秒未返回新数据，HTML 尚未收完整。请重试。');
     if(response?.streamInterrupted)throw Error('模型连接中途断开，HTML 尚未收完整。请重试。');
     throw error;
   }
@@ -831,7 +836,7 @@ function storyProgress(){
   storyDialog('日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>','compose');
   $('storyStatus').textContent=storyJob.status;
   $('stopStory').disabled=storyJob.controller.signal.aborted;
-  $('storyLive').textContent=storyJob.preview;
+  $('storyLive').textContent=storyJob.html?'':storyJob.preview;
   updateStoryCount(storyJob.preview);
 }
 function updateStoryCount(body){
@@ -868,7 +873,7 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     worldContext('end')
   ].filter(Boolean).join('\n');
   const controller=new AbortController();
-  storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller};
+  storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller,html};
   storyProgress();
   let live='',saved='',timer;
   const firstTitle=!html&&!title&&!parent;
@@ -895,7 +900,9 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     if($('storyStatus'))$('storyStatus').textContent=job.status;
     const onDelta=delta=>{
       live+=delta;job.preview=live;
-      if(!saved)checkpoint();else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;checkpoint();},1000);
+      if(!html){
+        if(!saved)checkpoint();else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;checkpoint();},1000);
+      }
       const box=$('storyLive');if(box&&!html)box.append(document.createTextNode(delta));
       updateStoryCount(job.preview);
     };
@@ -904,7 +911,7 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
       html?'请输出完整 HTML 文档。':'请一次输出完整正文，目标约 '+target+' 字。自然分段，写到结局。',
       html?'':firstTitle?'首行输出「标题：你的标题」，换行后直接写正文。':'直接输出新正文。不要重述前文。'
     ].filter(Boolean).join('\n\n');
-    const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta,controller.signal);
+    const response=await request(p,'chat/completions',{model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]},onDelta,controller.signal,{htmlStream:html});
     if(controller.signal.aborted)throw controller.signal.reason;
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
@@ -2414,7 +2421,7 @@ async function writeTea(form){
     const response=await request(p,'chat/completions',{model:p.model,stream:true,messages:[
       {role:'system',content:[system,castRule].filter(Boolean).join('\n')},
       {role:'user',content:JSON.stringify({参与角色:roles,用户:html?storyUserMask():x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1).filter(turn=>!turn.htmlCard)).slice(-32000),最新输入:current.turns.at(-1).input})}
-    ]},delta=>{if(!html)showTeaDelta(id,delta);});
+    ]},delta=>{if(!html)showTeaDelta(id,delta);},undefined,{htmlStream:html});
     const output=html?htmlCardResponse(response):dialogueReply(response).trim();
     if(!output)throw Error('模型没有返回正文，可重试。');
     if(teaById(id)!==current)throw Error('茶叙存档已变化，请重新打开。');
@@ -2768,9 +2775,10 @@ async function describeChatImage(image){
   if(!caption)throw Error('图片 API 没有返回可用的描述。');
   return caption;
 }
-async function readChatStream(response,onDelta){
+async function readChatStream(response,onDelta,htmlStream=false){
   const reader=response.body.getReader(),decoder=new TextDecoder();
-  let buffer='',message='',done=false,finishReason=null;
+  let buffer='',message='',done=false,finishReason=null,htmlIdle=false;
+  let lastHtmlDelta=Date.now();
   function line(value){
     if(!value.startsWith('data:'))return;
     const data=value.slice(5).trim();
@@ -2781,18 +2789,31 @@ async function readChatStream(response,onDelta){
     const choice=event.choices?.[0],part=choice?.delta?.content??choice?.text;
     if(choice?.finish_reason)finishReason=choice.finish_reason;
     const delta=typeof part==='string'?part:Array.isArray(part)?part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join(''):'';
-    if(delta){message+=delta;onDelta?.(delta);}
+    if(delta){message+=delta;if(htmlStream)lastHtmlDelta=Date.now();onDelta?.(delta);}
   }
   try{
     while(!done){
-      const chunk=await reader.read();
+      let idleTimer;
+      let chunk;
+      try{
+        chunk=htmlStream?await Promise.race([reader.read(),new Promise(resolve=>{
+          idleTimer=setTimeout(()=>resolve(null),Math.max(0,60000-(Date.now()-lastHtmlDelta)));
+        })]):await reader.read();
+      }finally{clearTimeout(idleTimer);}
+      if(!chunk){htmlIdle=true;break;}
       if(chunk.done){buffer+=decoder.decode();if(buffer)line(buffer);break;}
       buffer+=decoder.decode(chunk.value,{stream:true});
       let newline;
       while(!done&&(newline=buffer.indexOf('\n'))!==-1){line(buffer.slice(0,newline));buffer=buffer.slice(newline+1);}
+      if(htmlStream&&finishReason!=='content_filter'&&completeHtmlStream(message))done=true;
+      if(htmlStream&&!done&&Date.now()-lastHtmlDelta>=60000){htmlIdle=true;break;}
     }
-  }finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
-  return {choices:[{message:{content:message},finish_reason:finishReason}],streamInterrupted:!done&&!finishReason};
+  }finally{
+    const cancelled=reader.cancel().catch(()=>{});
+    if(!htmlStream)await cancelled;
+    reader.releaseLock();
+  }
+  return {choices:[{message:{content:message},finish_reason:finishReason}],streamInterrupted:!done&&!finishReason,htmlIdle};
 }
 function validateChatModes(cfg){
   const strings=x=>Array.isArray(x)&&x.every(y=>typeof y==='string'&&y.trim());
@@ -4168,7 +4189,7 @@ function apiEndpoint(base,route){
 function requestChatReply(profile,body){
   return request(profile,'chat/completions',body,undefined,undefined,{timeout:false});
 }
-async function request(p,route,body,onDelta,cancelSignal,{timeout=true}={}){
+async function request(p,route,body,onDelta,cancelSignal,{timeout=true,htmlStream=false}={}){
   const headers={};if(p.key)headers.Authorization='Bearer '+p.key;
   if(body)headers['Content-Type']='application/json';
   const timeoutController=timeout&&!cancelSignal?new AbortController():null;
@@ -4178,7 +4199,7 @@ async function request(p,route,body,onDelta,cancelSignal,{timeout=true}={}){
   let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal});}
   catch(e){if(e instanceof TypeError)throw Error('连接失败。请检查 API 地址、中转站的跨域设置与网络。');throw e;}
   if(!response.ok)throw Error('API 返回 HTTP '+response.status+'。请核对地址、模型、密钥和配额。');
-  if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return await readChatStream(response,onDelta);
+  if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return await readChatStream(response,onDelta,htmlStream);
   if(route!=='chat/completions')return await response.json();
   const bodyText=await response.text();
   try{return JSON.parse(bodyText);}catch(e){
