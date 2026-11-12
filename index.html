@@ -151,6 +151,15 @@ const ledgerAndroid = (() => {
 .avatar-button:hover,.avatar-button:focus-visible{border-color:var(--gold)}
 .contact-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
 .contact-list>.row{margin-bottom:10px}
+.contact-list>.contact-list-top{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;gap:8px;min-width:0}
+.contact-list-top .contact-list-user{display:flex;flex:1 1 0;min-width:0;flex-wrap:nowrap;gap:8px}
+.contact-list-user>.avatar-button{flex:none}
+.contact-list-user .contact-list-name{min-width:0}
+.contact-list-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.contact-list-top .contact-list-actions{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:4px;white-space:nowrap}
+@media(max-width:480px){
+  .contact-list-actions [data-action="newContact"]{padding-inline:8px}
+}
 .contact-link,.directory-item{min-width:0;width:100%;text-align:left;border-color:transparent;background:transparent}
 .contact-link strong,.contact-link span,.directory-item strong,.directory-item small{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .contact-link span,.directory-item small{font-size:13px;color:var(--muted)}
@@ -364,7 +373,11 @@ body.full-chat{overflow:hidden}
 .story-folder-card svg,.story-folder-card small{color:var(--gold)}
 .story-folder-card strong{font:700 1.3rem/1.4 var(--studio-serif)}
 .story-studio .story-entry button span{overflow-wrap:anywhere}
+.story-studio .story-compact-header{align-items:center}
 .story-compact-header .story-heading{display:flex;align-items:center;gap:10px}
+.story-compact-header .story-heading h2{line-height:1.12}
+.story-compact-header .story-header-icon svg,.story-compact-header .story-header-exit svg{display:block}
+.moon-workshop-nav{margin-block-end:16px}
 .story-header-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;color:var(--gold);border-radius:10px}
 .story-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px}
 .story-bulk-category{flex:1 1 100%;min-width:0}
@@ -704,7 +717,7 @@ function storyGenerator(){
 }
 function moonWorkshop(view='generate'){
   if(view==='generate'&&storyJob?.html){storyProgress();return;}
-  const nav='<div class="row">'+storyButton('moon','按人设生成 HTML 代码')+storyButton('moonReceive','接收 HTML 代码')+'</div>';
+  const nav='<div class="row moon-workshop-nav">'+storyButton('moon','按人设生成 HTML 代码')+storyButton('moonReceive','接收 HTML 代码')+'</div>';
   const fields=view==='generate'
     ?'<form id="storyMoonGenerate" class="story-panel story-draft"><label>标题<input name="title" maxlength="120"></label>'+
       storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
@@ -1489,7 +1502,7 @@ function chat(){
       return '<div class="contact-row">'+avatarButton(x.id,x)+'<button class="contact-link" data-chat="'+esc(x.id)+'"><strong>'+esc(displayName(x))+'</strong><span>'+esc(last?(last.role==='user'?'你：':'')+(last.content||'[图片]'):'还没有对话')+'</span></button><span class="muted">›</span></div>';
     }).join('');
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
-      '<section class="panel contact-list"><div class="row between"><div class="row">'+avatarButton('user',user)+'<div><strong>'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
+      '<section class="panel contact-list"><div class="row contact-list-top"><div class="row contact-list-user">'+avatarButton('user',user)+'<div class="contact-list-name"><strong title="'+esc(user.name)+'">'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row contact-list-actions">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
       groupDirectory()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
