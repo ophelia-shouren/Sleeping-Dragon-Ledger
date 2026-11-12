@@ -1695,7 +1695,7 @@ async function psdComposite(file){
 const deviceKey='sleeping-dragon-device-lock-v1';
 const lockDelays=[0,5,10,30,60];
 const encoder=new TextEncoder();
-let deviceConfig=null,deviceLocked=false,hiddenAt=null,lockTimer,authenticating=false;
+let deviceConfig=null,deviceLocked=false,hiddenAt=null,lockTimer,authenticating=false,registeringPlatform=false;
 let pinFailures=0,pinRetryAt=0;
 const bytes64=bytes=>btoa(String.fromCharCode(...new Uint8Array(bytes)));
 const from64=text=>Uint8Array.from(atob(text),c=>c.charCodeAt(0));
@@ -1734,7 +1734,7 @@ function engageDeviceLock(){
   document.querySelector('main').inert=true;
   document.querySelector('aside').inert=true;
   const modal=$('deviceLock');
-  modal.innerHTML='<div class="eyebrow">PRIVATE LEDGER</div><h2>眠龙勿扰已锁定</h2><form id="unlockForm"><label>六位密码<input name="pin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" required></label><div class="row"><button class="primary">解锁</button>'+(deviceConfig.credential?'<button type="button" id="unlockPlatform">指纹／设备认证</button>':'')+'</div></form><p class="muted" id="lockStatus" role="status"></p>';
+  modal.innerHTML='<div class="eyebrow">PRIVATE LEDGER</div><h2>眠龙勿扰已锁定</h2><form id="unlockForm"><label>六位密码<input name="pin" type="password" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" maxlength="6" required></label><div class="row"><button class="primary">解锁</button>'+(deviceConfig.credential?'<button type="button" id="unlockPlatform">指纹解锁</button>':'')+'</div></form><p class="muted" id="lockStatus" role="status"></p>';
   modal.showModal();
   $('unlockForm').onsubmit=e=>{e.preventDefault();unlockDevice(()=>checkPin(e.target.elements.pin.value));};
   if($('unlockPlatform'))$('unlockPlatform').onclick=()=>unlockDevice(verifyPlatform);
@@ -1763,7 +1763,7 @@ function initDeviceLock(){
   if(deviceConfig)engageDeviceLock();
   document.addEventListener('visibilitychange',()=>{
     clearTimeout(lockTimer);
-    if(!deviceConfig||deviceLocked)return;
+    if(!deviceConfig||deviceLocked||registeringPlatform)return;
     if(document.hidden){
       hiddenAt=Date.now();
       if(!deviceConfig.delay)engageDeviceLock();
@@ -1794,8 +1794,8 @@ function openDeviceSettings(){
     '<div class="fields">'+pin('newPin',config?'新六位密码（选填）':'设置六位密码',!config)+pin('confirmPin','确认新密码',!config)+'</div>'+
     '<label>离开页面后锁定<select name="delay">'+lockDelays.map(x=>'<option value="'+x+'" '+(x===(config?.delay||0)?'selected':'')+'>'+(x===0?'立即':x===60?'1 小时':x+' 分钟')+'</option>').join('')+'</select></label>'+
     '<div class="row"><button class="primary">'+(config?'保存设置':'开启设备锁')+'</button>'+
-    (config?'<button type="button" data-lock-command="platform">'+(config.credential?'重新登记指纹／设备认证':'登记指纹／设备认证')+'</button><button type="button" data-lock-command="disable">关闭设备锁</button>':'')+
-    '<button type="button" data-action="close">取消</button></div><p id="deviceStatus" class="muted" role="status">'+(config?.credential?'已登记设备认证。':'启用密码后可登记系统认证。')+'</p><p class="muted">设备锁用于防止他人直接打开页面查看。本机存档仍由浏览器保存。</p></form>');
+    (config?'<button type="button" data-lock-command="platform">'+(config.credential?'重新设置指纹解锁':'设置指纹解锁')+'</button><button type="button" data-lock-command="disable">关闭设备锁</button>':'')+
+    '<button type="button" data-action="close">取消</button></div><p id="deviceStatus" class="muted" role="status">'+(config?.credential?'指纹解锁已设置，由系统选择验证方式。':config?'输入当前六位密码，再点「设置指纹解锁」。':'开启设备锁后即可设置指纹解锁。')+'</p><p class="muted">设备锁用于防止他人直接打开页面查看。本机存档仍由浏览器保存。</p></form>');
   const form=$('deviceForm');
   form.onsubmit=e=>{e.preventDefault();changeDeviceSettings(form,'save');};
   for(const button of form.querySelectorAll('[data-lock-command]'))button.onclick=()=>changeDeviceSettings(form,button.dataset.lockCommand);
@@ -1810,7 +1810,8 @@ async function changeDeviceSettings(form,action){
     let next=current;
     if(action==='disable'){next=null;}
     else if(action==='platform'){
-      next={...current,credential:await registerPlatform(),delay:0};
+      registeringPlatform=true;
+      next={...current,credential:await registerPlatform()};
     }else{
       const pin=fields.newPin.value;
       if(pin!==fields.confirmPin.value)throw Error('两次输入的密码不一致。');
@@ -1823,8 +1824,15 @@ async function changeDeviceSettings(form,action){
     if(deviceLocked||deviceConfig!==current||!form.isConnected||!$('dialog').open)return;
     setDeviceConfig(next);
     $('dialog').close();render();
-    toast(next?(action==='platform'?'已登记设备认证，已设为立即锁定。':'设备锁设置已保存'):'设备锁已关闭');
-  }catch(e){status.textContent=deviceMessage(e);}finally{delete form.dataset.busy;}
+    if(!current&&next)openDeviceSettings();
+    toast(next?(action==='platform'?'指纹解锁已设置。':'设备锁设置已保存'):'设备锁已关闭');
+  }catch(e){status.textContent=deviceMessage(e);}finally{
+    delete form.dataset.busy;
+    if(action==='platform'){
+      registeringPlatform=false;
+      if(document.hidden)engageDeviceLock();
+    }
+  }
 }
 function checkClientData(buffer,challenge,type){
   const data=JSON.parse(new TextDecoder().decode(buffer));
@@ -1841,6 +1849,7 @@ async function registerPlatform(){
     pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
     authenticatorSelection:{authenticatorAttachment:'platform',residentKey:'preferred',userVerification:'required'},
     attestation:'none',timeout:60000}});
+  if(!credential)throw Error('未能设置指纹解锁，可继续使用六位密码。');
   checkClientData(credential.response.clientDataJSON,challenge,'webauthn.create');
   const publicKey=credential.response.getPublicKey?.();
   const alg=credential.response.getPublicKeyAlgorithm?.();
@@ -1865,6 +1874,7 @@ async function verifyPlatform(){
   const config=deviceConfig,record=config?.credential,challenge=randomBytes(32);
   if(!record||!navigator.credentials)throw Error('当前浏览器无法使用设备认证。');
   const assertion=await navigator.credentials.get({publicKey:{challenge,allowCredentials:[{type:'public-key',id:from64(record.id),transports:['internal']}],userVerification:'required',timeout:60000}});
+  if(!assertion)throw Error('未能完成指纹解锁，请使用六位密码。');
   const r=assertion.response;
   checkClientData(r.clientDataJSON,challenge,'webauthn.get');
   const auth=new Uint8Array(r.authenticatorData),rp=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(location.hostname)));
