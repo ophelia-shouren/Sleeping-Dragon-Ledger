@@ -636,9 +636,10 @@ function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
 function storyDialog(title,body,view='',back=null){
-  const moon=view==='moon',folder=view==='folder',reading=view==='reader',shelf=view==='shelf',compose=view==='compose'||moon;
-  const compact=folder||reading||shelf||compose;
-  const shortcut=moon?storyButton('moonBox','月匣'):compose||shelf?'<button type="button" class="story-header-icon" data-story-action="'+(shelf?'generator':'library')+
+  const moon=view==='moon',box=view==='moonBox',folder=view==='folder',reading=view==='reader',shelf=view==='shelf',compose=view==='compose'||moon;
+  const compact=folder||reading||shelf||compose||box;
+  const shortcut=moon||box?'<button type="button" class="story-header-icon" data-story-action="'+(moon?'moonBox':'moon')+'" aria-label="'+(moon?'月匣':'月下工坊')+'" title="'+(moon?'月匣':'月下工坊')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+
+    (moon?'<path d="M20 15.5A8.5 8.5 0 0 1 8.5 4a8.5 8.5 0 1 0 11.5 11.5Z"/>':'<path d="M3 9h18v4H3zM6 13v7m12-7v7M8 9V6h8v3M8 16h8"/>')+'</svg></button>':compose||shelf?'<button type="button" class="story-header-icon" data-story-action="'+(shelf?'generator':'library')+
     '" aria-label="'+(shelf?'写番外':'余晖藏书阁')+'" title="'+(shelf?'写番外':'余晖藏书阁')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">'+
     (shelf?'<path d="m4 16-1 5 5-1L21 7l-4-4L4 16Zm11-11 4 4M4 16l4 4"/>':'<path d="M3 4h4v16H3zM8 4h4v16H8zM13 5l4-1 4 15-4 1zM3 8h4m1 8h4"/>')+'</svg></button>':'';
   const navigation=compact?'':storyButton('library','余晖藏书阁');
@@ -701,9 +702,9 @@ function storyGenerator(){
     '<div class="story-compose-actions">'+storyStreamField()+'<button class="primary">开始写番外</button></div></form>','compose');
   $('storyStyleChoices').querySelectorAll('[data-custom-style]').forEach(bindStoryStyleChip);
 }
-function moonWorkshop(view='receive'){
+function moonWorkshop(view='generate'){
   if(view==='generate'&&storyJob?.html){storyProgress();return;}
-  const nav='<div class="row">'+storyButton('moon','接收 HTML 代码')+storyButton('moonGenerate','按人设生成代码')+storyButton('moonBox','月匣')+'</div>';
+  const nav='<div class="row">'+storyButton('moon','按人设生成 HTML 代码')+storyButton('moonReceive','接收 HTML 代码')+'</div>';
   const fields=view==='generate'
     ?'<form id="storyMoonGenerate" class="story-panel story-draft"><label>标题<input name="title" maxlength="120"></label>'+
       storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
@@ -712,10 +713,22 @@ function moonWorkshop(view='receive'){
     :'<form id="storyMoonReceive" class="story-panel story-draft"><label>标题<input name="title" maxlength="120"></label><label>HTML 代码<textarea name="source" rows="12" spellcheck="false" required></textarea></label><button class="primary">接收代码</button></form>';
   storyDialog('月下工坊',nav+fields,'moon');
 }
-function moonBox(){
-  const rows=state.stories.filter(card=>card.htmlCard).map(card=>'<div class="story-panel"><strong>'+esc(card.title)+'</strong><div class="muted">'+(card.componentReady===false?'代码已收纳 · 待生成组件':'代码与组件')+'</div>'+
+function moonCategories(){
+  return ['',...new Set([...(state.moonCategories||[]),...state.stories.filter(x=>x.htmlCard).map(x=>storyCategoryKey(x.category))].filter(Boolean))];
+}
+function moonBox(category=null){
+  const cards=state.stories.filter(card=>card.htmlCard), categories=moonCategories();
+  if(category===null||!categories.includes(category)){
+    const folders=categories.map(name=>'<button type="button" class="story-folder-card" data-story-action="moonFolder" data-story-id="'+esc(name)+'"><strong>'+esc(name||'未分类')+'</strong><small>'+cards.filter(card=>storyCategoryKey(card.category)===name).length+' 张卡片</small></button>').join('');
+    const named=categories.slice(1);
+    storyDialog('月匣','<div class="story-folder-tools"><details class="story-panel"><summary>＋ 新建分类</summary><form id="storyMoonFolderAdd" class="fields"><label>分类名称<input name="category" maxlength="80" required></label><button class="primary">新建分类</button></form></details>'+
+      (named.length?'<details class="story-panel"><summary>− 删除分类</summary><form id="storyMoonFolderDelete" class="fields"><label>分类<select name="category">'+named.map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('')+'</select></label><button class="archive-danger">删除分类</button></form></details>':'')+
+      '</div><div class="story-books">'+folders+'</div>','moonBox',moonWorkshop);
+    return;
+  }
+  const rows=cards.filter(card=>storyCategoryKey(card.category)===category).map(card=>'<div class="story-panel"><strong>'+esc(card.title)+'</strong><div class="muted">'+(card.componentReady===false?'代码已收纳 · 待生成组件':'代码与组件')+'</div>'+
     storyButton('moonOpen','打开',card.id)+'</div>').join('');
-  storyDialog('月匣','<div class="row">'+storyButton('moon','返回月下工坊')+'</div><div class="story-books">'+(rows||'<p class="muted">月匣还是空的。</p>')+'</div>','reader',moonWorkshop);
+  storyDialog(category||'未分类','<div class="story-books">'+(rows||'<p class="muted">此分类还没有卡片。</p>')+'</div>','reader',moonBox);
 }
 function moonCard(card){
   const ready=card.componentReady!==false;
@@ -723,7 +736,8 @@ function moonCard(card){
     (ready?'':storyButton('moonBuild','生成 HTML 组件',card.id))+
     '<button type="button" class="archive-danger" data-story-action="moonDelete" data-story-id="'+esc(card.id)+'">删除</button></div>'+
     (ready?storyHtmlPreview(card.body,card.title):'<p class="muted">代码已收纳。生成组件后可在这里互动预览。</p>')+
-    '<details class="story-panel" '+(ready?'':'open')+'><summary>HTML 代码</summary><textarea rows="12" spellcheck="false" readonly aria-label="HTML 代码">'+esc(card.body)+'</textarea></details>','reader',moonBox);
+    '<form id="storyMoonCategory" data-id="'+esc(card.id)+'" class="story-category-row">'+storyCategoryInput('卡片分类','category','moonCardCategories',storyCategoryKey(card.category),moonCategories())+'<button>保存分类</button></form>'+
+    '<details class="story-panel" '+(ready?'':'open')+'><summary>HTML 代码</summary><textarea rows="12" spellcheck="false" readonly aria-label="HTML 代码">'+esc(card.body)+'</textarea></details>','reader',()=>moonBox(storyCategoryKey(card.category)));
 }
 function storyEpubBlob(articles){
   if(articles.length>65531)throw Error('所选文章太多，请分批导出 EPUB。');
@@ -869,7 +883,7 @@ function updateStoryCount(body){
 }
 function storeStory(x){
   const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
-  if(!commit({...state,stories,storyCategories:storyCategories([storyCategoryKey(x.category)]).slice(1)}))throw Error('文章保存失败，请检查本机存储空间。');
+  if(!commit({...state,stories,storyCategories:storyCategories(x.htmlCard?[]:[storyCategoryKey(x.category)]).slice(1)}))throw Error('文章保存失败，请检查本机存储空间。');
 }
 function storyMemoryContext(people){
   return people.map(c=>{
@@ -1000,7 +1014,8 @@ async function storyAction(d){
       break;
     case 'generator':storyGenerator();break;
     case 'moon':moonWorkshop();break;
-    case 'moonGenerate':moonWorkshop('generate');break;
+    case 'moonReceive':moonWorkshop('receive');break;
+    case 'moonFolder':moonBox(d.storyId);break;
     case 'moonBox':moonBox();break;
     case 'moonOpen':if(x?.htmlCard)moonCard(x);break;
     case 'moonBuild':
@@ -1065,6 +1080,30 @@ async function submitStoryForm(form,submitter){
   const data=new FormData(form),value=k=>String(data.get(k)||'').trim();
   const x=state.stories.find(y=>y.id===form.dataset.id);
   switch(form.id){
+    case 'storyMoonFolderAdd':{
+      const name=storyCategoryKey(value('category'));
+      if(!name||name.length>80||moonCategories().includes(name))throw Error('请填写一个尚未使用的分类名称。');
+      if(commit({...state,moonCategories:[...moonCategories().slice(1),name]}))moonBox();
+      break;
+    }
+    case 'storyMoonFolderDelete':{
+      const name=storyCategoryKey(value('category'));
+      if(!name||!moonCategories().includes(name))return;
+      if(confirm('删除分类「'+name+'」？其中的卡片会移到未分类。')&&commit({...state,
+        moonCategories:moonCategories().slice(1).filter(category=>category!==name),
+        stories:state.stories.map(card=>card.htmlCard&&storyCategoryKey(card.category)===name?{...card,category:''}:card)}))moonBox();
+      break;
+    }
+    case 'storyMoonCategory':{
+      if(!x?.htmlCard)return;
+      const category=storyCategoryKey(value('category'));
+      if(category.length>80)throw Error('分类名称最多 80 字。');
+      const card={...x,category};
+      const categories=moonCategories().slice(1);
+      if(category&&!categories.includes(category))categories.push(category);
+      if(commit({...state,moonCategories:categories,stories:state.stories.map(item=>item.id===card.id?card:item)}))moonCard(card);
+      break;
+    }
     case 'storyMoonReceive':{
       const card={id:crypto.randomUUID(),title:value('title')||'未命名 HTML 卡片',body:parseHtmlCard(value('source')),category:'',cast:[],parent:'',htmlCard:true,componentReady:false};
       storeStory(card);moonCard(card);break;
@@ -1105,7 +1144,7 @@ async function submitStoryForm(form,submitter){
       if(!name||!storyCategories().includes(name))throw Error('请选择要删除的分类。');
       if(storyJob?.category===name)throw Error('请先停止或完成该分类中的番外生成。');
       if(!confirm('删除「'+name+'」分类？其中的文章会移入「未分类」。'))break;
-      const stories=state.stories.map(article=>storyCategoryKey(article.category)===name?{...article,category:''}:article);
+      const stories=state.stories.map(article=>!article.htmlCard&&storyCategoryKey(article.category)===name?{...article,category:''}:article);
       if(commit({...state,stories,storyCategories:state.storyCategories.filter(key=>key!==name)}))storyLibrary();
       break;
     }
@@ -3943,7 +3982,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -3970,6 +4009,7 @@ function validate(data){
   if(!Array.isArray(result.customStoryStyles)||!result.customStoryStyles.every(x=>x&&['id','name','content'].every(k=>typeof x[k]==='string'&&x[k].trim()))||!unique(result.customStoryStyles))throw Error('文风存档无效');
   if(!Number.isInteger(result.storyFont)||result.storyFont<14||result.storyFont>32)result.storyFont=18;
   result.storyCategories=Array.isArray(result.storyCategories)?[...new Set(result.storyCategories.filter(name=>typeof name==='string').map(storyCategoryKey).filter(Boolean))]:[];
+  result.moonCategories=Array.isArray(result.moonCategories)?[...new Set(result.moonCategories.filter(name=>typeof name==='string').map(storyCategoryKey).filter(Boolean))]:[];
   if(!Array.isArray(result.stories)||!result.stories.every(validStory)||!unique(result.stories))throw Error('余晖藏书阁存档无效');
   if(!Object.hasOwn(skins,result.skin))throw Error('存档皮肤无效');
   if(!result.imageApi||!Object.keys(imageDefaults()).every(k=>string(result.imageApi[k])))throw Error('图片 API 存档无效');
