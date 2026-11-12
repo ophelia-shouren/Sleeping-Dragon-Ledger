@@ -396,7 +396,26 @@ body:not(.full-chat)>aside #siteMenu{max-height:calc(100dvh - 80px);overflow-y:a
   body:not(.full-chat){display:grid;grid-template-columns:224px minmax(0,1fr);align-items:start;min-height:100dvh}
   body:not(.full-chat):has(#siteMenu[hidden]){grid-template-columns:76px minmax(0,1fr)}
   body:not(.full-chat)>aside{grid-area:1/1;min-width:0;height:100dvh;padding:16px 12px;border-right:1px solid var(--line);border-bottom:0}
-  body:not(.full-chat)>main{grid-area:1/2;min-width:0}
+  body:not(.full-chat)>main{grid-area:1/2;justify-self:stretch;width:100%;max-width:none;min-width:0;margin-inline:0;padding-inline:clamp(18px,3vw,56px)}
+  body:not(.full-chat)>main>#view{container-type:inline-size;min-width:0}
+  main .grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
+  main .columns{grid-template-columns:minmax(0,1.55fr) minmax(0,1fr)}
+  main .fields,#dialog .fields{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+  main :is(.columns,.grid,.fields)>*,#dialog .fields>*{min-width:0}
+  main :is(.panel,.card,.table,.contact-list),#dialog .table{min-width:0;max-width:100%}
+  main :is(.panel,.card) :is(h2,h3,label),#dialog :is(h2,h3,label){overflow-wrap:anywhere}
+  @container(max-width:680px){
+    main .columns{grid-template-columns:minmax(0,1fr)}
+  }
+  #dialog:has(#contactForm,#worldForm,#worldScopeForm,#localChatForm,#groupSettings,#batchForm):not(.story-fullscreen){width:min(1060px,calc(100vw - 48px))}
+  #dialog .group-settings-page{width:min(100%,1060px)}
+  #dialog.story-fullscreen .group-room,#dialog.story-fullscreen .tea-room{width:min(100%,1400px);max-width:none;margin-inline:auto}
+  .full-chat .chat-thread{padding-inline:clamp(18px,3vw,56px)}
+  .full-chat .chat-thread>:is(.chat-top,.messages,.notice,#chatForm,.message-selection){width:min(100%,1440px);margin-inline:auto}
+  #dialog.story-studio>.story-header,#dialog.story-studio>.story-shell,
+  #dialog.story-studio:has(.story-generation)>.story-shell{width:min(100%,1440px)}
+  #dialog.story-studio .story-compose{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+  #dialog.story-studio .story-books{grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
   body:not(.full-chat)>aside:has(#siteMenu[hidden]) .brand{justify-content:center}
   body:not(.full-chat)>aside:has(#siteMenu[hidden]) .brand>div{display:none}
   body:not(.full-chat)>aside .brand{font-size:20px;gap:9px;letter-spacing:1px}
