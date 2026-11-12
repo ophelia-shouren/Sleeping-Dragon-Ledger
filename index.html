@@ -3310,8 +3310,8 @@ async function screenshotSelectedMessages(button){
     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
     if(!ctx)throw Error('当前设备无法生成聊天截图。');
     await document.fonts?.ready;
-    const inset=24, bubbleWidth=mist?width-inset*2:Math.min(440,width-2*inset-avatarSize-gap);
-    const textWidth=bubbleWidth-24;
+    const inset=24, maxBubbleWidth=mist?width-inset*2:Math.min(440,width-2*inset-avatarSize-gap);
+    const textWidth=maxBubbleWidth-24;
     const wrapped=(text,size,max=textWidth,weight='')=>{
       ctx.font=weight+size+'px '+font;
       return screenshotLines(ctx,text,max);
@@ -3339,6 +3339,15 @@ async function screenshotSelectedMessages(button){
       }
       entry.imageWidth=picture?Math.min(textWidth,picture.naturalWidth,360*picture.naturalWidth/picture.naturalHeight):0;
       entry.imageHeight=picture?entry.imageWidth*picture.naturalHeight/picture.naturalWidth:0;
+      entry.bubbleWidth=maxBubbleWidth;
+      if(!entry.system&&!entry.cardLayout){
+        ctx.font=messageSize+'px '+font;
+        const lineWidth=entry.lines.reduce((max,line)=>Math.max(max,ctx.measureText(line).width),0);
+        ctx.font='17px '+font;
+        const quoteWidth=entry.quotes.reduce((max,line)=>Math.max(max,ctx.measureText(line).width),0);
+        const contentWidth=Math.max(lineWidth,quoteWidth,entry.imageWidth);
+        entry.bubbleWidth=Math.min(maxBubbleWidth,Math.max(38,Math.ceil(contentWidth)+24));
+      }
       entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*messageStep+(entry.cardLayout?.height||0)+(picture?entry.imageHeight+10:0);
       entry.metaHeight=mist&&entry.person?Math.max(avatarSize,entry.names.length*25+(entry.time?20:0))+verticalGap:entry.names.length*25;
       entry.footerHeight=entry.time&&!(mist&&entry.person)?24:0;
@@ -3388,6 +3397,7 @@ async function screenshotSelectedMessages(button){
     let y=headerHeight+20;
     for(const entry of entries){
       const sideInset=inset+(mist?0:avatarSize+gap);
+      const {bubbleWidth}=entry;
       const x=entry.system?(width-bubbleWidth)/2:entry.mine?width-sideInset-bubbleWidth:sideInset;
       if(entry.person)avatar(entry.person,entry.name,entry.mine?width-inset-avatarSize:inset,y,avatarSize);
       const nameX=entry.system?width/2:mist?(entry.mine?width-inset-avatarSize-gap:inset+avatarSize+gap):(entry.mine?x+bubbleWidth:x);
