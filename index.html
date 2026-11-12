@@ -3391,9 +3391,12 @@ async function screenshotSelectedMessages(button){
     };
     const metaInk=mist?'#0c1526':colors.muted;
     ctx.fillStyle=mist?'#72829c':colors.bg;ctx.fillRect(0,0,width,height);
-    ctx.fillStyle=mist?'#c7daf2':colors.panel;ctx.fillRect(0,0,width,headerHeight);
+    const mistGroupHeader=mist&&group;
+    ctx.fillStyle=mistGroupHeader?'#4a5b79':mist?'#c7daf2':colors.panel;
+    ctx.fillRect(0,0,width,headerHeight);
     avatar(c,title,28,(headerHeight-58)/2,58);
-    write(titleLines,106,(headerHeight-titleLines.length*38)/2,30,38,mist?'#243550':colors.ink,'left','700 ');
+    const titleInk=mistGroupHeader?'#f5f8ff':mist?'#243550':colors.ink;
+    write(titleLines,106,(headerHeight-titleLines.length*38)/2,30,38,titleInk,'left','700 ');
     ctx.fillStyle=colors.line;ctx.fillRect(0,headerHeight-1,width,1);
     let y=headerHeight+20;
     for(const entry of entries){
