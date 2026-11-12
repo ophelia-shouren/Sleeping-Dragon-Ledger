@@ -630,15 +630,15 @@ function validStory(x){
     ['castNames','styleNames'].every(key=>x[key]===undefined||(Array.isArray(x[key])&&x[key].every(name=>typeof name==='string')));
 }
 function storySun(){
-  return '<button type="button" class="story-sun" data-story-action="generator" aria-label="日隙拾光" title="日隙拾光"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/></svg></button>';
+  return '<button type="button" class="story-sun" data-story-action="moon" aria-label="月下工坊" title="月下工坊"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4a8.5 8.5 0 1 0 11.5 11.5Z"/></svg></button><button type="button" class="story-sun" data-story-action="generator" aria-label="日隙拾光" title="日隙拾光"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2"/></svg></button>';
 }
 function storyButton(action,label,id=''){
   return '<button type="button" data-story-action="'+esc(action)+'" data-story-id="'+esc(id)+'">'+esc(label)+'</button>';
 }
 function storyDialog(title,body,view='',back=null){
-  const folder=view==='folder',reading=view==='reader',shelf=view==='shelf',compose=view==='compose';
+  const moon=view==='moon',folder=view==='folder',reading=view==='reader',shelf=view==='shelf',compose=view==='compose'||moon;
   const compact=folder||reading||shelf||compose;
-  const shortcut=compose||shelf?'<button type="button" class="story-header-icon" data-story-action="'+(shelf?'generator':'library')+
+  const shortcut=moon?storyButton('moonBox','月匣'):compose||shelf?'<button type="button" class="story-header-icon" data-story-action="'+(shelf?'generator':'library')+
     '" aria-label="'+(shelf?'写番外':'余晖藏书阁')+'" title="'+(shelf?'写番外':'余晖藏书阁')+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">'+
     (shelf?'<path d="m4 16-1 5 5-1L21 7l-4-4L4 16Zm11-11 4 4M4 16l4 4"/>':'<path d="M3 4h4v16H3zM8 4h4v16H8zM13 5l4-1 4 15-4 1zM3 8h4m1 8h4"/>')+'</svg></button>':'';
   const navigation=compact?'':storyButton('library','余晖藏书阁');
@@ -687,7 +687,7 @@ function bindStoryStyleChip(chip){
   chip.onkeydown=event=>{if(event.key==='Delete'){event.preventDefault();remove();}};
 }
 function storyGenerator(){
-  if(storyJob){storyProgress();return;}
+  if(storyJob&&!storyJob.html){storyProgress();return;}
   storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
     '<section class="story-panel story-cast"><h3>角色与文风</h3>'+storyToggle('includeUser','让 User 加入剧情')+storyMemoryField()+
     storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
@@ -700,6 +700,30 @@ function storyGenerator(){
     '<label>目标字数<input type="number" name="length" min="100" max="100000" placeholder="默认 20000–40000"></label></div></section>'+
     '<div class="story-compose-actions">'+storyStreamField()+'<button class="primary">开始写番外</button></div></form>','compose');
   $('storyStyleChoices').querySelectorAll('[data-custom-style]').forEach(bindStoryStyleChip);
+}
+function moonWorkshop(view='receive'){
+  if(view==='generate'&&storyJob?.html){storyProgress();return;}
+  const nav='<div class="row">'+storyButton('moon','接收 HTML 代码')+storyButton('moonGenerate','按人设生成代码')+storyButton('moonBox','月匣')+'</div>';
+  const fields=view==='generate'
+    ?'<form id="storyMoonGenerate" class="story-panel story-draft"><label>标题<input name="title" maxlength="120"></label>'+
+      storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
+      storyMemoryField()+'<label>生成指令<textarea name="guide" rows="7" required></textarea></label>'+
+      '<div class="row">'+storyStreamField()+'<button class="primary">生成 HTML 代码</button></div></form>'
+    :'<form id="storyMoonReceive" class="story-panel story-draft"><label>标题<input name="title" maxlength="120"></label><label>HTML 代码<textarea name="source" rows="12" spellcheck="false" required></textarea></label><button class="primary">接收代码</button></form>';
+  storyDialog('月下工坊',nav+fields,'moon');
+}
+function moonBox(){
+  const rows=state.stories.filter(card=>card.htmlCard).map(card=>'<div class="story-panel"><strong>'+esc(card.title)+'</strong><div class="muted">'+(card.componentReady===false?'代码已收纳 · 待生成组件':'代码与组件')+'</div>'+
+    storyButton('moonOpen','打开',card.id)+'</div>').join('');
+  storyDialog('月匣','<div class="row">'+storyButton('moon','返回月下工坊')+'</div><div class="story-books">'+(rows||'<p class="muted">月匣还是空的。</p>')+'</div>','reader',moonWorkshop);
+}
+function moonCard(card){
+  const ready=card.componentReady!==false;
+  storyDialog(card.title,'<div class="row">'+storyButton('moonBox','返回月匣')+
+    (ready?'':storyButton('moonBuild','生成 HTML 组件',card.id))+
+    '<button type="button" class="archive-danger" data-story-action="moonDelete" data-story-id="'+esc(card.id)+'">删除</button></div>'+
+    (ready?storyHtmlPreview(card.body,card.title):'<p class="muted">代码已收纳。生成组件后可在这里互动预览。</p>')+
+    '<details class="story-panel" '+(ready?'':'open')+'><summary>HTML 代码</summary><textarea rows="12" spellcheck="false" readonly aria-label="HTML 代码">'+esc(card.body)+'</textarea></details>','reader',moonBox);
 }
 function storyEpubBlob(articles){
   if(articles.length>65531)throw Error('所选文章太多，请分批导出 EPUB。');
@@ -734,7 +758,7 @@ function storyCategoryKey(name){
   return key==='未分类'?'':key;
 }
 function storyCategories(extra=[]){
-  const names=new Set([...state.storyCategories,...state.stories.map(x=>storyCategoryKey(x.category)),...extra].filter(Boolean));
+  const names=new Set([...state.storyCategories,...state.stories.filter(x=>!x.htmlCard).map(x=>storyCategoryKey(x.category)),...extra].filter(Boolean));
   return ['',...[...names].sort((a,b)=>a.localeCompare(b,'zh-CN'))];
 }
 function storyCategoryInput(label,name,list,value='',choices=storyCategories()){
@@ -747,18 +771,19 @@ function storyLibrary(category=null){
   if(category===null){
     const counts=new Map();
     for(const article of state.stories){
+      if(article.htmlCard)continue;
       const key=storyCategoryKey(article.category);
       counts.set(key,(counts.get(key)||0)+1);
     }
     const namedOptions=categories.slice(1).map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('');
-    storyDialog('余晖藏书阁','<div class="story-shelf-summary"><span>馆藏 <strong>'+state.stories.length+'</strong> 篇</span><span>'+categories.length+' 个分类</span></div>'+
+    storyDialog('余晖藏书阁','<div class="story-shelf-summary"><span>馆藏 <strong>'+state.stories.filter(x=>!x.htmlCard).length+'</strong> 篇</span><span>'+categories.length+' 个分类</span></div>'+
       '<div class="story-folder-tools"><details class="story-panel"><summary>＋ 新建分类</summary><form id="storyFolderAdd" class="fields"><label>分类名称<input name="category" maxlength="80" required></label><button class="primary">新建分类</button></form></details>'+
       (namedOptions?'<details class="story-panel"><summary>− 删除分类</summary><form id="storyFolderDelete" class="fields"><label>选择分类<select name="category" required><option value="">请选择</option>'+namedOptions+'</select></label><button class="archive-danger">删除分类</button></form></details>':'')+'</div>'+
       '<div class="story-books">'+categories.map(key=>'<button type="button" class="story-folder-card" data-story-action="folder" data-story-id="'+esc(key)+'"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><strong>'+esc(key||'未分类')+'</strong><small>'+(counts.get(key)||0)+' 篇文章</small></button>').join('')+'</div>'+
       '<form id="storyImport" class="fields story-panel story-shelf-tools"><label>批量导入 JSON / TXT<input type="file" name="files" multiple accept=".json,.txt"></label><button>导入所选文件</button></form>','shelf');
     return;
   }
-  const visible=state.stories.filter(x=>storyCategoryKey(x.category)===category);
+  const visible=state.stories.filter(x=>!x.htmlCard&&storyCategoryKey(x.category)===category);
   storyDialog(category||'未分类','<div class="story-shelf-summary"><span>'+visible.length+' 篇文章</span></div>'+
     '<form id="storyExport" class="fields" data-category="'+esc(category)+'"><div class="story-panel story-shelf-tools">'+selectionTools()+
     '<div class="story-bulk-category story-category-row">'+storyCategoryInput('目标分类','destination','storyBulkCategoryOptions','',categories.filter(key=>key!==category))+
@@ -819,12 +844,12 @@ function bindStoryScrubber(editor){
   return sync;
 }
 function storyRead(x){
+  if(x.htmlCard){moonCard(x);return;}
   const parent=state.stories.find(y=>y.id===x.parent);
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
-    (x.htmlCard?storyHtmlPreview(x.body,x.title):'<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>')+
+    '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="story-category-row">'+storyCategoryInput('文章分类','category','storyCategoryOptions',storyCategoryKey(x.category))+'<button>保存分类</button></form>'+
     '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader',()=>storyLibrary(storyCategoryKey(x.category)));
-  if(x.htmlCard)return;
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -833,7 +858,7 @@ function storyRead(x){
   $('storyFont').onchange=event=>commit({...state,storyFont:Number(event.target.value)});
 }
 function storyProgress(){
-  storyDialog('日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>','compose');
+  storyDialog(storyJob.html?'月下工坊':'日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>',storyJob.html?'moon':'compose');
   $('storyStatus').textContent=storyJob.status;
   $('stopStory').disabled=storyJob.controller.signal.aborted;
   $('storyLive').textContent=storyJob.html?'':storyJob.preview;
@@ -853,14 +878,14 @@ function storyMemoryContext(people){
     return parts.length?'【'+displayName(c)+'的创作背景】\n'+parts.join('\n\n'):'';
   }).filter(Boolean).join('\n\n');
 }
-async function generateStory({parent,cast,title,guide,stream,target,pov,style,styleNames,includeUser,readMemory=false}){
+async function generateStory({parent,cast,title,guide,stream,target,pov,style,styleNames,includeUser,readMemory=false,html=false}){
   if(storyJob)throw Error('已有一篇番外正在生成。');
-  const html=wantsHtmlCard(guide);
+  if(!html&&wantsHtmlCard(guide))throw Error('HTML 生成已移至月下工坊，请从弯月入口打开。');
   const people=cast.map(contact).filter(Boolean);
   if(!parent&&!people.length)throw Error('请至少选择一位登场角色。');
   const p=state.profiles.find(x=>x.id===state.profile);
   if(!p?.url||!p.model)throw Error('请在 API 连接中设置可用的全局默认预设。');
-  let article={id:crypto.randomUUID(),title:title||(parent?parent.title+' · 续篇':'未题番外'),body:'',...(html?{htmlCard:true}:{}),category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
+  let article={id:crypto.randomUUID(),title:title||(html?'未命名 HTML 卡片':parent?parent.title+' · 续篇':'未题番外'),body:'',...(html?{htmlCard:true,componentReady:false}:{}),category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
   const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
     worldContext('front'),
@@ -920,7 +945,7 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     if($('storyLive'))$('storyLive').textContent=job.preview;
     updateStoryCount(job.preview);
     if($('storyStatus'))storyRead(article);
-    toast(html?'HTML 卡片已存入余晖藏书阁':(partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
+    toast(html?'HTML 代码已存入月匣':(partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
   }catch(error){
     checkpoint();
     if(controller.signal.aborted){
@@ -974,6 +999,19 @@ async function storyAction(d){
       }
       break;
     case 'generator':storyGenerator();break;
+    case 'moon':moonWorkshop();break;
+    case 'moonGenerate':moonWorkshop('generate');break;
+    case 'moonBox':moonBox();break;
+    case 'moonOpen':if(x?.htmlCard)moonCard(x);break;
+    case 'moonBuild':
+      if(x?.htmlCard&&x.componentReady===false){
+        const card={...x,body:parseHtmlCard(x.body),componentReady:true};
+        storeStory(card);moonCard(card);
+      }
+      break;
+    case 'moonDelete':
+      if(x?.htmlCard&&confirm('删除这份代码及对应组件？')&&commit({...state,stories:state.stories.filter(card=>card.id!==x.id)}))moonBox();
+      break;
     case 'saveStyle':{
       const form=$('storyGenerate'),name=form.elements.styleName.value.trim(),content=form.elements.styleContent.value.trim();
       if(!name||!content)throw Error('请填写文风名称和内容。');
@@ -1027,6 +1065,13 @@ async function submitStoryForm(form,submitter){
   const data=new FormData(form),value=k=>String(data.get(k)||'').trim();
   const x=state.stories.find(y=>y.id===form.dataset.id);
   switch(form.id){
+    case 'storyMoonReceive':{
+      const card={id:crypto.randomUUID(),title:value('title')||'未命名 HTML 卡片',body:parseHtmlCard(value('source')),category:'',cast:[],parent:'',htmlCard:true,componentReady:false};
+      storeStory(card);moonCard(card);break;
+    }
+    case 'storyMoonGenerate':
+      await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),stream:data.has('stream'),includeUser:true,readMemory:data.has('readMemory'),html:true});
+      break;
     case 'storyGenerate':{
       const styles=data.getAll('style').map(id=>state.customStoryStyles.find(x=>x.id===id)||{name:id});
       await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),style:styles.map(x=>x.content?x.name+'：'+x.content:x.name).join('\n'),styleNames:styles.map(x=>x.name),stream:data.has('stream'),target:Number(value('length'))||30000,pov:value('pov'),includeUser:data.has('includeUser'),readMemory:data.has('readMemory')});
@@ -2406,6 +2451,9 @@ async function writeTea(form){
   if(!p){toast('没有可用的参与角色或模型预设。');return;}
   const previous=x.turns.at(-1),input=form.elements.cue?.value.trim();
   if(previous?.output!==''&&!input)return;
+  if(x.bonus&&wantsHtmlCard(previous?.output===''?previous.input:input)){
+    toast('HTML 生成已移至月下工坊。');return;
+  }
   const current=previous?.output===''?x:{...x,draft:'',turns:[...x.turns,{input,output:''}]};
   if(current!==x&&!updateTea(current))return;
   teaPartial.delete(id);teaBusy.add(id);renderTea(id);
@@ -2415,17 +2463,16 @@ async function writeTea(form){
       JSON.stringify(recentDialogue((x.mode==='ai'?cast[0]:localConfig(cast[0])[x.mode]).messages)).slice(-6000);
     const roleId=cast.length===1?cast[0].id:undefined;
     const world=x.bonus||roleId!==undefined?[worldContext('front',roleId),worldContext('end',roleId)].filter(Boolean).join('\n'):'';
-    const html=x.bonus&&wantsHtmlCard(current.turns.at(-1).input);
-    const system=html?htmlCardRule+'\n'+storySafety:'你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。'+(x.bonus&&!x.includeUser?'':'第一人称默认从用户角色的视角叙述。')+'不得输出 NSFW 内容。\n'+chatTimeContext();
+    const system='你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。'+(x.bonus&&!x.includeUser?'':'第一人称默认从用户角色的视角叙述。')+'不得输出 NSFW 内容。\n'+chatTimeContext();
     const castRule=x.bonus?(x.includeUser?'User 参与剧情。':'User 不作为人物登场，其输入仅作创作指令。第一人称从所选角色的视角叙述。'):'';
     const response=await request(p,'chat/completions',{model:p.model,stream:true,messages:[
       {role:'system',content:[system,castRule].filter(Boolean).join('\n')},
-      {role:'user',content:JSON.stringify({参与角色:roles,用户:html?storyUserMask():x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1).filter(turn=>!turn.htmlCard)).slice(-32000),最新输入:current.turns.at(-1).input})}
-    ]},delta=>{if(!html)showTeaDelta(id,delta);},undefined,{htmlStream:html});
-    const output=html?htmlCardResponse(response):dialogueReply(response).trim();
+      {role:'user',content:JSON.stringify({参与角色:roles,用户:x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1).filter(turn=>!turn.htmlCard)).slice(-32000),最新输入:current.turns.at(-1).input})}
+    ]},delta=>showTeaDelta(id,delta));
+    const output=dialogueReply(response).trim();
     if(!output)throw Error('模型没有返回正文，可重试。');
     if(teaById(id)!==current)throw Error('茶叙存档已变化，请重新打开。');
-    if(updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output,...(html?{htmlCard:true}:{})}]}))teaPartial.delete(id);
+    if(updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output}]}))teaPartial.delete(id);
   }catch(error){toast(error.message);}
   finally{teaBusy.delete(id);if($('dialog').open&&$('dialog').querySelector('[data-tea-room]')?.dataset.teaRoom===id)renderTea(id);}
 }
