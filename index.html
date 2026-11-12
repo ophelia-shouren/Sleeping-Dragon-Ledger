@@ -392,6 +392,17 @@ body.full-chat{overflow:hidden}
 #storyExport .story-books{margin-top:12px}
 body:not(.full-chat)>aside{position:sticky;top:0;z-index:10}
 body:not(.full-chat)>aside #siteMenu{max-height:calc(100dvh - 80px);overflow-y:auto;overscroll-behavior:contain}
+@media(min-width:851px) and (hover:hover) and (pointer:fine){
+  body:not(.full-chat){display:grid;grid-template-columns:224px minmax(0,1fr);align-items:start;min-height:100dvh}
+  body:not(.full-chat):has(#siteMenu[hidden]){grid-template-columns:76px minmax(0,1fr)}
+  body:not(.full-chat)>aside{grid-area:1/1;min-width:0;height:100dvh;padding:16px 12px;border-right:1px solid var(--line);border-bottom:0}
+  body:not(.full-chat)>main{grid-area:1/2;min-width:0}
+  body:not(.full-chat)>aside:has(#siteMenu[hidden]) .brand{justify-content:center}
+  body:not(.full-chat)>aside:has(#siteMenu[hidden]) .brand>div{display:none}
+  body:not(.full-chat)>aside .brand{font-size:20px;gap:9px;letter-spacing:1px}
+  body:not(.full-chat)>aside .brand small{font-size:8px;letter-spacing:1px}
+  body:not(.full-chat)>aside #siteMenu nav{grid-template-columns:minmax(0,1fr)}
+}
 aside .brand{margin-bottom:0}
 #siteMenuToggle{border:0;padding:0;background:transparent;color:var(--gold);font:inherit;border-radius:9px}
 #siteMenuToggle:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
@@ -4065,6 +4076,7 @@ function commit(next){
   catch{toast('存档写入失败，请检查浏览器存储空间或权限。');return false;}
 }
 function toast(message){clearTimeout(toastTimer);$('toast').textContent=message;$('toast').style.display='block';toastTimer=setTimeout(()=>$('toast').style.display='none',4600);}
+const desktopSiteMenu=matchMedia('(min-width: 851px) and (hover: hover) and (pointer: fine)');
 function setSiteMenu(open){
   $('siteMenu').hidden=!open;
   $('siteMenuToggle').setAttribute('aria-expanded',String(open));
@@ -4339,7 +4351,7 @@ document.addEventListener('click',e=>{
     return;
   }
   if(d.storyAction)storyAction(d).catch(error=>toast(error.message));
-  if(d.page){setSiteMenu(false);if(d.page==='chat')activeContact='';go(d.page);}
+  if(d.page){if(!desktopSiteMenu.matches)setSiteMenu(false);if(d.page==='chat')activeContact='';go(d.page);}
   if(d.calcKey)calculatorAction(d.calcKey);
   if(d.chat)openThread(d.chat);
   if(d.messageCommand)messageCommand(d.messageCommand);
@@ -4721,6 +4733,8 @@ window.addEventListener('storage',e=>{
 $('calculator').addEventListener('keydown',e=>{
   if(e.target.id==='calcExpression'&&e.key==='Enter'&&!e.isComposing){e.preventDefault();calculatorAction('=');}
 });
+setSiteMenu(desktopSiteMenu.matches);
+desktopSiteMenu.addEventListener('change',event=>setSiteMenu(event.matches));
 initHomeOrb();
 initMessageTools();
 initDeviceLock();
