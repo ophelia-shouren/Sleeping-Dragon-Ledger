@@ -377,6 +377,8 @@ body.full-chat{overflow:hidden}
   .story-category-row button{justify-self:start}
 }
 #storyExport .story-books{margin-top:12px}
+body:not(.full-chat)>aside{position:sticky;top:0;z-index:10}
+body:not(.full-chat)>aside #siteMenu{max-height:calc(100dvh - 80px);overflow-y:auto;overscroll-behavior:contain}
 aside .brand{margin-bottom:0}
 #siteMenuToggle{border:0;padding:0;background:transparent;color:var(--gold);font:inherit;border-radius:9px}
 #siteMenuToggle:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
