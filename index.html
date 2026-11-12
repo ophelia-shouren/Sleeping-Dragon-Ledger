@@ -566,11 +566,44 @@ const htmlCardRule='按用户的最新指令生成一个完整、自包含的可
 function wantsHtmlCard(input){
   return /\bhtml\b/i.test(input)&&(/^\s*[$＄]|^\s*html\s*(?:卡片|互动)/i.test(input)||/(?:生成|制作|创建|写|输出|做|produce|generate|create)/i.test(input));
 }
+function htmlReplyText(value,depth=0){
+  if(depth>8)return '';
+  if(typeof value==='string'){
+    const text=value.trim();
+    if(/^[{[]/.test(text)){
+      try{return htmlReplyText(JSON.parse(text),depth+1);}catch{}
+    }
+    return value;
+  }
+  if(Array.isArray(value))return value.map(part=>htmlReplyText(part,depth+1)).join('');
+  if(!value||typeof value!=='object'||value.type&&!['text','output_text','message'].includes(value.type))return '';
+  for(const field of ['html','text','content','output_text','message','output']){
+    const text=htmlReplyText(value[field],depth+1);
+    if(text.trim())return text;
+  }
+  return '';
+}
 function parseHtmlCard(raw){
-  const source=raw.trim().replace(/^\x60\x60\x60(?:html)?[ \t]*\r?\n|\r?\n\x60\x60\x60$/gi,'').trim();
-  if(!/^(?:<!doctype html\s*>\s*)?<html(?:\s[^>]*)?>[\s\S]*<\/html>$/i.test(source)||
-     !/<body(?:\s[^>]*)?>[\s\S]*<\/body>/i.test(source))throw Error('模型没有返回完整的 HTML 卡片，请重试。');
-  return source;
+  const text=raw.replace(/^\s*(?:<(think|analysis|reasoning)\b[^>]*>[\s\S]*?<\/\1>\s*)+/i,'').trim();
+  const fenced=[...text.matchAll(/(?:^|\r?\n)[ \t]*\x60{3,}(?:html)?[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*\x60{3,}(?=[ \t]*(?:\r?\n|$))/gi)].map(match=>match[1]);
+  for(const candidate of [...fenced,text]){
+    const source=candidate.match(/(?:<!doctype html\s*>\s*)?<html(?:\s[^>]*)?>[\s\S]*?<\/html\s*>/i)?.[0];
+    if(source&&/<body(?:\s[^>]*)?>[\s\S]*<\/body\s*>/i.test(source))return source;
+    const body=candidate.trim().match(/^(?:<!doctype html\s*>\s*)?<html(?:\s[^>]*)?>[\s\S]*<body(?:\s[^>]*)?>[\s\S]*<\/body\s*>$/i)?.[0];
+    if(body)return body+'</html>';
+  }
+  throw Error('模型没有返回完整的 HTML 文档。请重试，或减少单次生成的内容。');
+}
+function htmlCardResponse(response){
+  const reason=response?.choices?.[0]?.finish_reason;
+  if(reason==='content_filter')throw Error('模型服务中止了这次 HTML 生成。');
+  const raw=dialogueReply(response,htmlReplyText);
+  try{return parseHtmlCard(raw);}
+  catch(error){
+    if(reason==='length')throw Error('HTML 超过了模型单次输出上限。请减少单次生成的内容，或换用输出上限更高的模型。');
+    if(response?.streamInterrupted)throw Error('模型连接中途断开，HTML 尚未收完整。请重试。');
+    throw error;
+  }
 }
 function storyHtmlPreview(source,title){
   const doc=new DOMParser().parseFromString(source,'text/html');
@@ -875,13 +908,12 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     if(controller.signal.aborted)throw controller.signal.reason;
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
-    if(html&&partial)throw Error('HTML 卡片生成中断，请重试。');
-    if(!save(dialogueReply(response),partial))throw Error('模型返回了空正文。');
+    if(!save(html?htmlCardResponse(response):dialogueReply(response),!html&&partial))throw Error('模型返回了空正文。');
     job.preview=article.body;
     if($('storyLive'))$('storyLive').textContent=job.preview;
     updateStoryCount(job.preview);
     if($('storyStatus'))storyRead(article);
-    toast((partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
+    toast(html?'HTML 卡片已存入余晖藏书阁':(partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
   }catch(error){
     checkpoint();
     if(controller.signal.aborted){
@@ -2383,9 +2415,7 @@ async function writeTea(form){
       {role:'system',content:[system,castRule].filter(Boolean).join('\n')},
       {role:'user',content:JSON.stringify({参与角色:roles,用户:html?storyUserMask():x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,-1).filter(turn=>!turn.htmlCard)).slice(-32000),最新输入:current.turns.at(-1).input})}
     ]},delta=>{if(!html)showTeaDelta(id,delta);});
-    const raw=dialogueReply(response).trim();
-    if(html&&(response.streamInterrupted||['length','content_filter'].includes(response.choices?.[0]?.finish_reason)))throw Error('HTML 卡片生成中断，可重试。');
-    const output=html?parseHtmlCard(raw):raw;
+    const output=html?htmlCardResponse(response):dialogueReply(response).trim();
     if(!output)throw Error('模型没有返回正文，可重试。');
     if(teaById(id)!==current)throw Error('茶叙存档已变化，请重新打开。');
     if(updateTea({...current,turns:[...current.turns.slice(0,-1),{...current.turns.at(-1),output,...(html?{htmlCard:true}:{})}]}))teaPartial.delete(id);
