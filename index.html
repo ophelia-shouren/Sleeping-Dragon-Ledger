@@ -3258,15 +3258,36 @@ async function screenshotSelectedMessages(button){
   const prefs=chatDisplay(c);
   const theme=getComputedStyle(document.documentElement);
   const colors=Object.fromEntries(['bg','panel','ink','muted','line','gold','control','selected','selected-ink','field'].map(key=>[key,theme.getPropertyValue('--'+key).trim()]));
-  const entries=selected.map(message=>{
+  const mist=state.skin==='mist';
+  const room=button.closest(group?'.group-room':'.chat-thread');
+  const bubble=room?.querySelector('.message-row .bubble:not(.typing-bubble)');
+  const bubbleStyle=getComputedStyle(bubble||room||document.body);
+  const viewportWidth=document.documentElement.clientWidth||window.innerWidth;
+  const outputWidth=Math.round(viewportWidth*(window.devicePixelRatio||1));
+  const width=640, units=width/viewportWidth;
+  const font=bubbleStyle.fontFamily;
+  const messageSize=(parseFloat(bubbleStyle.fontSize)||14)*units;
+  const messageStep=(parseFloat(bubbleStyle.lineHeight)||messageSize/units*1.5)*units;
+  const layout=room?.querySelector(mist?'.mist-chat-meta':'.message-row');
+  const layoutStyle=layout?getComputedStyle(layout):null;
+  const avatarSize=(layout?.querySelector('.avatar')?.getBoundingClientRect().width||26)*units;
+  const gap=(parseFloat(layoutStyle?.gap)||8)*units;
+  const verticalGap=(parseFloat(layout?.parentElement?getComputedStyle(layout.parentElement).rowGap:'')||4)*units;
+  const entries=selected.flatMap(message=>{
     const system=message.role==='system'||!!message.tea;
     const mine=!system&&(group?!message.roleId:message.role==='user');
     const person=system?null:mine?user:group?(contact(message.roleId)||{name:message.speaker}):c;
     const name=message.tea?teaTitle(message.tea):system?'系统提示':group&&!mine?message.speaker||displayName(person):displayName(person);
     const card=displayedChatCard(message);
     const text=message.tea?message.tea.pov+' · '+message.tea.turns.length+' 段':card?'':message.content;
-    return {system,mine,person,name,text,card,quote:quoteText(message.quote),image:safePicture(message.image||''),
-      time:(group?group.showTime!==false:prefs.showTime)?chatTime(message.sentAt):''};
+    const display=group?{...chatDisplay(person||c),split:group.split===true,showTime:group.showTime!==false}:prefs;
+    const role=mine?'user':'assistant';
+    const parts=system||card||message.storyForward?[text]:chatBubbleParts({...message,role},display);
+    return parts.map((part,index)=>{
+      const last=index===parts.length-1;
+      return {system,mine,person,name,text:part,card,quote:index===0?quoteText(message.quote):'',image:last?safePicture(message.image||''):'',
+        time:display.showTime&&(last||(mist&&display.split))?chatTime(message.sentAt):''};
+    });
   });
   button.disabled=true;
   const oldLabel=button.textContent;
@@ -3288,7 +3309,9 @@ async function screenshotSelectedMessages(button){
     }
     const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
     if(!ctx)throw Error('当前设备无法生成聊天截图。');
-    const width=640, font='system-ui, sans-serif', textWidth=416;
+    await document.fonts?.ready;
+    const inset=24, bubbleWidth=mist?width-inset*2:Math.min(440,width-2*inset-avatarSize-gap);
+    const textWidth=bubbleWidth-24;
     const wrapped=(text,size,max=textWidth,weight='')=>{
       ctx.font=weight+size+'px '+font;
       return screenshotLines(ctx,text,max);
@@ -3303,27 +3326,30 @@ async function screenshotSelectedMessages(button){
       entry.quotes=entry.quote?wrapped('引用 · '+entry.quote,17):[];
       const picture=pictures.get(entry.image);
       const text=[entry.text,entry.image&&!picture?'[图片未能载入]':''].filter(Boolean).join('\n');
-      entry.lines=text?wrapped(text,22):[];
+      entry.lines=text?wrapped(text,messageSize):[];
       if(entry.card){
         const title=wrapped(entry.card.title,23,textWidth,'700 ');
-        const body=entry.card.body?wrapped(entry.card.body,22):[];
+        const body=entry.card.body?wrapped(entry.card.body,messageSize):[];
         const rows=entry.card.rows.map(row=>{
-          const label=wrapped(row.label,22,labelWidth),value=wrapped(row.value,22,valueWidth);
-          return {label,value,height:Math.max(label.length,value.length)*33+12};
+          const label=wrapped(row.label,messageSize,labelWidth),value=wrapped(row.value,messageSize,valueWidth);
+          return {label,value,height:Math.max(label.length,value.length)*messageStep+12};
         });
         entry.cardLayout={title,body,rows,height:title.length*34+
-          (body.length?8+body.length*33:0)+(rows.length?8:0)+rows.reduce((sum,row)=>sum+row.height,0)};
+          (body.length?8+body.length*messageStep:0)+(rows.length?8:0)+rows.reduce((sum,row)=>sum+row.height,0)};
       }
       entry.imageWidth=picture?Math.min(textWidth,picture.naturalWidth,360*picture.naturalWidth/picture.naturalHeight):0;
       entry.imageHeight=picture?entry.imageWidth*picture.naturalHeight/picture.naturalWidth:0;
-      entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*33+(entry.cardLayout?.height||0)+(picture?entry.imageHeight+10:0);
-      height+=entry.names.length*25+entry.bubbleHeight+(entry.time?24:0)+22;
+      entry.bubbleHeight=24+entry.quotes.length*24+entry.lines.length*messageStep+(entry.cardLayout?.height||0)+(picture?entry.imageHeight+10:0);
+      entry.metaHeight=mist&&entry.person?Math.max(avatarSize,entry.names.length*25+(entry.time?20:0))+verticalGap:entry.names.length*25;
+      entry.footerHeight=entry.time&&!(mist&&entry.person)?24:0;
+      height+=entry.metaHeight+entry.bubbleHeight+entry.footerHeight+22;
     }
     height+=16;
-    const scale=Math.min(1,16000/height,Math.sqrt(8000000/(width*height)));
-    if(scale<0.5)throw Error('选中的聊天记录过长，请分批截图。');
-    canvas.width=Math.ceil(width*scale);
-    canvas.height=Math.ceil(height*scale);
+    const scale=outputWidth/width;
+    const pixelHeight=Math.ceil(height*scale);
+    if(pixelHeight>16000||outputWidth*pixelHeight>16000000)throw Error('选中的聊天记录过长，请分批截图。');
+    canvas.width=outputWidth;
+    canvas.height=pixelHeight;
     ctx.scale(scale,scale);
     const box=(x,y,w,h,r,color)=>{
       ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x+r,y);
@@ -3361,13 +3387,18 @@ async function screenshotSelectedMessages(button){
     ctx.fillStyle=colors.line;ctx.fillRect(0,headerHeight-1,width,1);
     let y=headerHeight+20;
     for(const entry of entries){
-      const x=entry.system?100:entry.mine?124:76, bubbleWidth=440;
-      if(entry.person)avatar(entry.person,entry.name,entry.mine?578:22,y,40);
-      write(entry.names,entry.system?320:entry.mine?564:76,y,18,25,colors.muted,entry.system?'center':entry.mine?'right':'left');
-      y+=entry.names.length*25;
-      box(x,y,bubbleWidth,entry.bubbleHeight,14,entry.system?colors.field:entry.mine?colors.selected:colors.control);
+      const sideInset=inset+(mist?0:avatarSize+gap);
+      const x=entry.system?(width-bubbleWidth)/2:entry.mine?width-sideInset-bubbleWidth:sideInset;
+      if(entry.person)avatar(entry.person,entry.name,entry.mine?width-inset-avatarSize:inset,y,avatarSize);
+      const nameX=entry.system?width/2:mist?(entry.mine?width-inset-avatarSize-gap:inset+avatarSize+gap):(entry.mine?x+bubbleWidth:x);
+      const align=entry.system?'center':entry.mine?'right':'left';
+      write(entry.names,nameX,y,18,25,colors.muted,align);
+      if(mist&&entry.person&&entry.time)write([entry.time],nameX,y+entry.names.length*25,15,20,colors.muted,align);
+      y+=entry.metaHeight;
+      const fill=entry.system?colors.field:mist?(entry.mine?'#e1e6f2ed':theme.getPropertyValue('--mist-char-paper').trim()||colors.panel):entry.mine?colors.selected:colors.control;
+      box(x,y,bubbleWidth,entry.bubbleHeight,mist?7:14,fill);
       let inside=y+12;
-      const ink=entry.mine?colors['selected-ink']:colors.ink;
+      const ink=entry.mine?(mist?'#24314e':colors['selected-ink']):colors.ink;
       write(entry.quotes,x+12,inside,17,24,ink);
       inside+=entry.quotes.length*24;
       const card=entry.cardLayout;
@@ -3377,22 +3408,22 @@ async function screenshotSelectedMessages(button){
         inside+=card.title.length*34;
         if(card.body.length){
           inside+=8;
-          write(card.body,left,inside,22,33,ink);
-          inside+=card.body.length*33;
+          write(card.body,left,inside,messageSize,messageStep,ink);
+          inside+=card.body.length*messageStep;
         }
         if(card.rows.length)inside+=8;
         for(const row of card.rows){
           ctx.fillStyle=colors.line;ctx.fillRect(left,inside,textWidth,1);
-          write(row.label,left,inside+6,22,33,colors.muted);
-          write(row.value,left+labelWidth+cardGap,inside+6,22,33,ink);
+          write(row.label,left,inside+6,messageSize,messageStep,colors.muted);
+          write(row.value,left+labelWidth+cardGap,inside+6,messageSize,messageStep,ink);
           inside+=row.height;
         }
       }
-      write(entry.lines,x+12,inside,22,33,ink);
-      inside+=entry.lines.length*33;
+      write(entry.lines,x+12,inside,messageSize,messageStep,ink);
+      inside+=entry.lines.length*messageStep;
       if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),x+12,inside+4,entry.imageWidth,entry.imageHeight);
       y+=entry.bubbleHeight;
-      if(entry.time){write([entry.time],entry.mine?564:x,y+4,15,20,colors.muted,entry.mine?'right':'left');y+=24;}
+      if(entry.footerHeight){write([entry.time],entry.mine?x+bubbleWidth:x,y+4,15,20,colors.muted,align);y+=entry.footerHeight;}
       y+=22;
     }
     const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
