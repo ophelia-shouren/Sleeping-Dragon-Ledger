@@ -327,6 +327,8 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .story-toggle>small{display:block;margin-top:2px}
 .chat-history-page{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;padding:8px 0 12px}
 .chat-history-page button{font-size:.85rem}
+.clear-chat-row{padding-top:12px;border-top:1px solid var(--line)}
+.clear-chat-row button{width:100%;min-height:44px}
 </style><link rel="stylesheet" href="./mist-theme.css"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div></aside>
 <main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1013,7 +1015,7 @@ function editGroup(id){
     '<div class="group-settings-edit"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><div class="row"><label>更换群聊头像<input id="groupAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" data-action="removeGroupAvatar">移除头像</button></div></div></details>'+
     '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>群成员</h3><span id="groupSettingsCount" class="muted" aria-live="polite"></span></div><div id="groupSettingsMembers" class="group-settings-members"></div><div id="groupSettingsPicker" hidden></div></section>'+
     '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+toggle('showTime','显示消息时间戳',g?.showTime!==false)+toggle('split','角色分句显示',g?.split===true)+'</section>'+
-    '<section class="group-settings-card group-settings-block"><h3>聊天记忆</h3>'+toggle('shared','与日常聊天互通记忆',g?.shared)+'<p class="muted">开启后，角色可以参考近期私聊、群聊与已保存的记忆，也可能在群里提到私聊内容。</p></section></form></div>',true);
+    '<section class="group-settings-card group-settings-block"><h3>聊天记忆</h3>'+toggle('shared','与日常聊天互通记忆',g?.shared)+'<p class="muted">开启后，角色可以参考近期私聊、群聊与已保存的记忆，也可能在群里提到私聊内容。</p></section>'+(g?'<div class="clear-chat-row">'+clearChatButton(g.messages.length,id)+'</div>':'')+'</form></div>',true);
   const form=$('groupSettings');
   form.avatarDraft=g?.avatar||'';
   form.memberDraft=[...(g?.members||[])];
@@ -1073,7 +1075,7 @@ function openGroup(id){
   const g=groupById(id);if(!g)return;
   const selected=messageSelection(g,'group',g.messages);
   const lock=teaLock(g.members),busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
-  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button data-group-edit="'+esc(id)+'" '+(busy?'disabled':'')+'>群聊设置</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
+  dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button type="button" class="star-button" data-group-edit="'+esc(id)+'" aria-label="打开群聊设置" title="群聊设置" '+(busy?'disabled':'')+'>★</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
     (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
     (speaker?typingBubble(speaker,true,true):'')+'</div>'+ (lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
@@ -2803,6 +2805,33 @@ async function submitChatHistory(form){
     if(patchSession(latest,mode,{messages:[...localSession(latest).messages,...rows]})){openChatDirectory();render();toast('已导入 '+rows.length+' 条消息。');}
   }finally{delete form.dataset.busy;}
 }
+function clearChatButton(count,groupId=''){
+  return '<button type="button" class="archive-danger" data-action="clearChatHistory" data-clear-group="'+esc(groupId)+'"'+(count?'':' disabled')+'>一键清除聊天记录</button>';
+}
+function clearChatHistory(groupId){
+  const group=groupId?groupById(groupId):null;
+  const c=!groupId?contact(activeContact):null;
+  if(!group&&!c)return;
+  const mode=group?'group':localConfig(c).mode;
+  const messages=group?group.messages:localSession(c).messages;
+  if(!messages.length)return;
+  if(group?groupJobs.has(groupId):messageBusy(c,mode)){toast('聊天正在更新，请稍后重试。');return;}
+  const name=group?group.name:displayName(c);
+  const note=mode==='ai'?' 已保存的记忆会保留。':'';
+  if(!confirm('确定清除「'+name+'」'+(group?'':'当前聊天模式下')+'的全部 '+messages.length+' 条聊天记录？此操作无法撤销。'+note))return;
+  if(group)patchGroup(group,{messages:[],pending:[]});
+  else if(mode==='ai'){
+    const memories=c.memories.map(m=>m.kind==='journal'?m:{...m,kind:'journal',from:0,to:0,title:m.title||'旧聊天摘要 · '+memoryRange(m)});
+    if(!replaceContact(c.id,{messages:[],memoryCursor:0,memories}))return;
+    memoryErrors.delete(c.id);
+    replyErrors.delete(c.id);
+  }else if(!patchSession(c,mode,{messages:[]}))return;
+  chatQuotes.delete(quoteKey(groupId||c.id,mode));
+  selection=null;
+  if(group)openGroup(groupId);
+  else{$('dialog').close();privateChatPage=0;render();}
+  toast('聊天记录已清除。');
+}
 function openChatDirectory(){
   const c=contact(activeContact);
   if(!c)return;
@@ -2811,7 +2840,7 @@ function openChatDirectory(){
     '<h3>当前模型</h3><p class="muted">'+esc(profileFor(c)?profileFor(c).name+' · '+profileFor(c).model:'尚未配置 API')+'</p>'+chatDisplaySettings(c)+
     '<h3>聊天记录</h3><div class="row"><button type="button" data-action="chatImport">导入聊天</button><button type="button" data-action="chatExport">导出聊天</button></div>'+
     '<h3>发送账单</h3><div class="row"><button type="button" data-share="day">今日账单</button><button type="button" data-share="week">本周账单</button><button type="button" data-share="month">本月账单</button></div>'+
-    '<div class="row actions"><button type="button" data-action="close">关闭</button></div></div>');
+    '<div class="row actions"><button type="button" data-action="close">关闭</button></div><div class="clear-chat-row">'+clearChatButton(localSession(c).messages.length)+'</div></div>');
 }
 function deckPresetMenu(decks){
   return '<section class="deck-presets"><h3>分组预设</h3><p class="muted">每个分组可单独编辑和保存。</p><div class="row">'+
@@ -3871,6 +3900,7 @@ document.addEventListener('click',e=>{
     case 'exportMessages':exportSelectedMessages();break;
     case 'screenshotMessages':screenshotSelectedMessages(b).catch(error=>toast(error.message));break;
     case 'deleteMessages':deleteSelectedMessages();break;
+    case 'clearChatHistory':try{clearChatHistory(d.clearGroup);}catch(error){toast(error.message);}break;
     case 'cancelMessageMenu':closeMessageTools(messageScope());break;
     case 'clearQuote':{const scope=messageScope();if(scope){chatQuotes.delete(quoteKey(scope.c.id,scope.mode));renderMessageTools(scope);}break;}
     case 'exitMessages':selection=null;renderMessageTools();break;
