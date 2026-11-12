@@ -4365,6 +4365,11 @@ function archive(includeKeys){
   const a=document.createElement('a');a.href=url;a.download='sleeping-dragon-'+dateString()+(includeKeys?'-with-keys':'')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
 document.addEventListener('click',e=>{
+  if(desktopSiteMenu.matches&&!document.body.classList.contains('full-chat')&&
+     !$('siteMenu').hidden&&e.target.closest('main')&&
+     e.target.matches('main,#view,.panel,.card,.hero,.pagehead,.grid,.columns')){
+    setSiteMenu(false);
+  }
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
   if(d.clearKeep){
@@ -4374,7 +4379,12 @@ document.addEventListener('click',e=>{
     return;
   }
   if(d.storyAction)storyAction(d).catch(error=>toast(error.message));
-  if(d.page){if(!desktopSiteMenu.matches)setSiteMenu(false);if(d.page==='chat')activeContact='';go(d.page);}
+  if(d.page){
+    if(b.closest('.desktop-menu-rail')&&desktopSiteMenu.matches)setSiteMenu(true);
+    else if(!desktopSiteMenu.matches)setSiteMenu(false);
+    if(d.page==='chat')activeContact='';
+    go(d.page);
+  }
   if(d.calcKey)calculatorAction(d.calcKey);
   if(d.chat)openThread(d.chat);
   if(d.messageCommand)messageCommand(d.messageCommand);
