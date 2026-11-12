@@ -2808,29 +2808,62 @@ async function submitChatHistory(form){
 function clearChatButton(count,groupId=''){
   return '<button type="button" class="archive-danger" data-action="clearChatHistory" data-clear-group="'+esc(groupId)+'"'+(count?'':' disabled')+'>一键清除聊天记录</button>';
 }
-function clearChatHistory(groupId){
+function clearChatScope(groupId){
   const group=groupId?groupById(groupId):null;
   const c=!groupId?contact(activeContact):null;
-  if(!group&&!c)return;
-  const mode=group?'group':localConfig(c).mode;
-  const messages=group?group.messages:localSession(c).messages;
-  if(!messages.length)return;
-  if(group?groupJobs.has(groupId):messageBusy(c,mode)){toast('聊天正在更新，请稍后重试。');return;}
+  if(!group&&!c)return null;
+  return group?{group,c:group,mode:'group',messages:group.messages}:{c,mode:localConfig(c).mode,messages:localSession(c).messages};
+}
+function clearChatKeep(value){
+  if(value==='')return 0;
+  const count=Number(value);
+  return Number.isSafeInteger(count)&&count>0?count:null;
+}
+function openClearChatHistory(groupId){
+  const scope=clearChatScope(groupId);
+  if(!scope?.messages.length)return;
+  const {group,c,mode,messages}=scope;
+  if(group?groupJobs.has(c.id):messageBusy(c,mode)){toast('聊天正在更新，请稍后重试。');return;}
   const name=group?group.name:displayName(c);
-  const note=mode==='ai'?' 已保存的记忆会保留。':'';
-  if(!confirm('确定清除「'+name+'」'+(group?'':'当前聊天模式下')+'的全部 '+messages.length+' 条聊天记录？此操作无法撤销。'+note))return;
-  if(group)patchGroup(group,{messages:[],pending:[]});
+  dialog('<h2>确认清除聊天记录</h2><p>「'+esc(name)+'」'+(group?'':'当前聊天模式下')+'共有 '+messages.length+' 条消息，删除后无法撤销。'+
+    (mode==='ai'?'已保存的记忆会保留。':'')+'</p><form id="clearChatForm">'+
+    '<label>保留最近几条<input name="keep" type="number" min="1" step="1" placeholder="留空则全部删除"></label>'+
+    '<div class="row">'+[20,30,50].map(n=>'<button type="button" data-clear-keep="'+n+'">保留 '+n+' 条</button>').join('')+'</div>'+
+    '<p><output aria-live="polite" name="preview"></output></p><div class="row"><button type="submit" class="archive-danger">确认删除</button>'+
+    '<button type="button" data-action="cancelClearChat">取消</button></div></form>');
+  const form=$('clearChatForm'),field=form.elements.keep;
+  form.scope=scope;
+  form.oninput=()=>{
+    const keep=field.validity.valid?clearChatKeep(field.value):null;
+    const removed=keep===null?0:Math.max(0,messages.length-keep);
+    form.elements.preview.textContent=keep===null?'请输入正整数，或留空删除全部。':'将删除 '+removed+' 条，保留 '+(messages.length-removed)+' 条。';
+    form.querySelector('[type="submit"]').disabled=!removed;
+  };
+  form.oninput();
+}
+function submitClearChatHistory(form){
+  const original=form.scope;
+  const scope=clearChatScope(original.group?.id);
+  if(!sameMessageScope(original,scope))throw Error('聊天记录已变化，请重新打开清除确认。');
+  const {group,c,mode,messages}=scope;
+  if(group?groupJobs.has(c.id):messageBusy(c,mode))throw Error('聊天正在更新，请稍后重试。');
+  const field=form.elements.keep,keep=field.validity.valid?clearChatKeep(field.value):null;
+  if(keep===null)throw Error('请输入正整数，或留空删除全部。');
+  const removed=Math.max(0,messages.length-keep);
+  if(!removed)return;
+  const remaining=messages.slice(removed);
+  if(group)patchGroup(group,{messages:remaining,pending:remaining.some(m=>!m.roleId)?group.pending:[]});
   else if(mode==='ai'){
     const memories=c.memories.map(m=>m.kind==='journal'?m:{...m,kind:'journal',from:0,to:0,title:m.title||'旧聊天摘要 · '+memoryRange(m)});
-    if(!replaceContact(c.id,{messages:[],memoryCursor:0,memories}))return;
+    if(!replaceContact(c.id,{messages:remaining,memoryCursor:0,memories}))return;
     memoryErrors.delete(c.id);
     replyErrors.delete(c.id);
-  }else if(!patchSession(c,mode,{messages:[]}))return;
-  chatQuotes.delete(quoteKey(groupId||c.id,mode));
+  }else if(!patchSession(c,mode,{messages:remaining}))return;
+  chatQuotes.delete(quoteKey(c.id,mode));
   selection=null;
-  if(group)openGroup(groupId);
+  if(group)openGroup(c.id);
   else{$('dialog').close();privateChatPage=0;render();}
-  toast('聊天记录已清除。');
+  toast('已删除 '+removed+' 条聊天记录。');
 }
 function openChatDirectory(){
   const c=contact(activeContact);
@@ -3827,6 +3860,12 @@ function archive(includeKeys){
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
+  if(d.clearKeep){
+    const form=b.form;
+    form.elements.keep.value=d.clearKeep;
+    form.oninput();
+    return;
+  }
   if(d.storyAction)storyAction(d).catch(error=>toast(error.message));
   if(d.page){setSiteMenu(false);if(d.page==='chat')activeContact='';go(d.page);}
   if(d.calcKey)calculatorAction(d.calcKey);
@@ -3900,7 +3939,12 @@ document.addEventListener('click',e=>{
     case 'exportMessages':exportSelectedMessages();break;
     case 'screenshotMessages':screenshotSelectedMessages(b).catch(error=>toast(error.message));break;
     case 'deleteMessages':deleteSelectedMessages();break;
-    case 'clearChatHistory':try{clearChatHistory(d.clearGroup);}catch(error){toast(error.message);}break;
+    case 'clearChatHistory':openClearChatHistory(d.clearGroup);break;
+    case 'cancelClearChat':{
+      const group=$('clearChatForm')?.scope?.group;
+      if(group)editGroup(group.id);else openChatDirectory();
+      break;
+    }
     case 'cancelMessageMenu':closeMessageTools(messageScope());break;
     case 'clearQuote':{const scope=messageScope();if(scope){chatQuotes.delete(quoteKey(scope.c.id,scope.mode));renderMessageTools(scope);}break;}
     case 'exitMessages':selection=null;renderMessageTools();break;
@@ -4095,6 +4139,7 @@ document.addEventListener('submit',e=>{
     if(f.id.startsWith('story'))submitStoryForm(f,e.submitter).catch(error=>toast(error.message));
     if(f.id==='chatGameForm')playChatGame('options',f.elements.options.value);
     if(f.id==='messageEditForm')submitMessageEdit(f);
+    if(f.id==='clearChatForm')submitClearChatHistory(f);
     if(f.id==='deckPresetForm')saveDeckPreset(f);
     if(f.id==='localChatForm')saveLocalChatForm(f);
     if(f.id==='contactSelection')removeContacts(new FormData(f).getAll('contact'));
