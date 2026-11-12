@@ -378,6 +378,9 @@ body.full-chat{overflow:hidden}
 .story-compact-header .story-heading h2{line-height:1.12}
 .story-compact-header .story-header-icon svg,.story-compact-header .story-header-exit svg{display:block}
 .moon-workshop-nav{margin-block-end:16px}
+.moon-card-title{cursor:context-menu;user-select:none;-webkit-touch-callout:none}
+.moon-card-title:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:4px}
+#storyMoonRename{margin-block:12px}
 .story-header-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;color:var(--gold);border-radius:10px}
 .story-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px}
 .story-bulk-category{flex:1 1 100%;min-width:0}
@@ -778,12 +781,48 @@ function moonBox(category=null){
 }
 function moonCard(card){
   const ready=card.componentReady!==false;
-  storyDialog(card.title,'<div class="row">'+storyButton('moonBox','返回月匣')+
+  storyDialog(card.title,'<form id="storyMoonRename" class="story-panel" data-id="'+esc(card.id)+'" hidden><label>卡片名称<input name="title" maxlength="120" required></label><div class="row"><button type="submit" class="primary">保存名称</button><button type="button" data-moon-rename-cancel>取消</button></div></form>'+
+    '<div class="row">'+storyButton('moonBox','返回月匣')+
     (ready?'':storyButton('moonBuild','生成 HTML 组件',card.id))+
     '<button type="button" class="archive-danger" data-story-action="moonDelete" data-story-id="'+esc(card.id)+'">删除</button></div>'+
     (ready?storyHtmlPreview(card.body,card.title):'<p class="muted">代码已收纳。生成组件后可在这里互动预览。</p>')+
     '<form id="storyMoonCategory" data-id="'+esc(card.id)+'" class="story-category-row">'+storyCategoryInput('卡片分类','category','moonCardCategories',storyCategoryKey(card.category),moonCategories())+'<button>保存分类</button></form>'+
     '<details class="story-panel" '+(ready?'':'open')+'><summary>HTML 代码</summary><textarea rows="12" spellcheck="false" readonly aria-label="HTML 代码">'+esc(card.body)+'</textarea></details>','reader',()=>moonBox(storyCategoryKey(card.category)));
+  bindMoonRename();
+}
+function bindMoonRename(){
+  const heading=$('dialog').querySelector('.story-heading h2');
+  const form=$('storyMoonRename'),input=form.elements.title;
+  heading.classList.add('moon-card-title');
+  heading.tabIndex=0;
+  heading.setAttribute('role','button');
+  heading.setAttribute('aria-label','编辑卡片名称：'+heading.textContent);
+  heading.title='长按编辑卡片名称';
+  let timer, start;
+  const cancelPress=()=>{clearTimeout(timer);start=null;};
+  const open=()=>{
+    cancelPress();
+    if(!form.isConnected||!form.hidden)return;
+    input.value=heading.textContent;
+    form.hidden=false;
+    input.focus();
+    input.select();
+  };
+  heading.onpointerdown=event=>{
+    if(event.button!==0||!event.isPrimary)return;
+    cancelPress();
+    start={x:event.clientX,y:event.clientY};
+    timer=setTimeout(open,500);
+  };
+  heading.onpointermove=event=>{
+    if(start&&Math.hypot(event.clientX-start.x,event.clientY-start.y)>10)cancelPress();
+  };
+  heading.onpointerup=heading.onpointercancel=heading.onpointerleave=cancelPress;
+  heading.oncontextmenu=event=>{event.preventDefault();open();};
+  heading.onkeydown=event=>{
+    if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}
+  };
+  form.querySelector('[data-moon-rename-cancel]').onclick=()=>{form.hidden=true;heading.focus();};
 }
 function storyEpubBlob(articles){
   if(articles.length>65531)throw Error('所选文章太多，请分批导出 EPUB。');
@@ -1126,6 +1165,21 @@ async function submitStoryForm(form,submitter){
   const data=new FormData(form),value=k=>String(data.get(k)||'').trim();
   const x=state.stories.find(y=>y.id===form.dataset.id);
   switch(form.id){
+    case 'storyMoonRename':{
+      if(!x?.htmlCard)return;
+      const title=value('title');
+      if(!title||title.length>120)throw Error('请填写 1–120 字的卡片名称。');
+      storeStory({...x,title});
+      const heading=$('dialog').querySelector('.moon-card-title');
+      heading.textContent=title;
+      heading.setAttribute('aria-label','编辑卡片名称：'+title);
+      const preview=$('dialog').querySelector('iframe');
+      if(preview)preview.title=title;
+      form.hidden=true;
+      heading.focus();
+      toast('卡片名称已保存。');
+      break;
+    }
     case 'storyMoonFolderAdd':{
       const name=storyCategoryKey(value('category'));
       if(!name||name.length>80||moonCategories().includes(name))throw Error('请填写一个尚未使用的分类名称。');
