@@ -1639,7 +1639,7 @@ function cards(){
     if(!groups.has(group))groups.set(group,[]);
     groups.get(group).push(entry);
   }
-  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3>'+(mysteryWorldGroup(name)?'<p class="muted">绑定世界书 · 关闭后暂停绑定角色聊天</p>':'<label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name))+entries.map(x=>'<div class="world-row"><button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>'+(isMysteryBound(x.id)?'查看条目':'编辑条目')+'</small></span><b>›</b></button><button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
+  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3>'+(mysteryWorldGroup(name)?'<p class="muted">绑定世界书 · 关闭后暂停绑定角色聊天</p>':'<label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name))+entries.map(x=>'<div class="world-row">'+(isMysteryBound(x.id)?'<div class="directory-item"><strong>'+esc(x.title)+'</strong></div>':'<button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button>')+'<button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
   return heading('CHARACTER ARCHIVE','人设与世界书','从目录打开卡片。开启的世界书条目会加入角色对话。')+
     '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><div class="row"><button type="button" data-action="selectContacts">批量管理</button><button class="primary" data-action="newContact">＋ 新建角色</button></div></div><div class="persona-grid"><button class="persona-tile" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong></span></button>'+roles+'</div></section>'+
     '<section class="panel"><div class="row between"><h2>世界书目录</h2><button data-action="newWorld">＋ 新建条目</button></div>'+(worlds||'<p class="empty">还没有世界书条目。</p>')+'</section></div>';
@@ -1661,7 +1661,7 @@ function openCard(id){
   const fields=[['姓名','name'],['性别','gender'],['性格','personality'],['人设','description']];
   if(!isUser){fields.splice(1,0,['昵称','nickname']);fields.push(['Char 与 User 的关系','relationship']);}
   const locked=isMysteryBound(id);
-  const labels=fields.map(([label,k])=>'<label>'+label+(['description','personality'].includes(k)?'<textarea name="'+k+'" '+(locked?'readonly':'')+'>'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(locked&&k!=='relationship'?'readonly ':'')+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
+  const labels=fields.filter(([,key])=>!locked||key==='relationship').map(([label,k])=>'<label>'+label+(['description','personality'].includes(k)?'<textarea name="'+k+'">'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===c.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
   if(locked){
     dialog('<h2>人设卡</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label><div class="row"><button class="primary">保存</button><button type="button" data-look="'+esc(id)+'">头像与头像框</button><button type="button" data-action="close">关闭</button></div></form>');
@@ -1721,10 +1721,7 @@ function saveCard(form){
 }
 function openWorld(id){
   const x=state.worlds.find(y=>y.id===id)||{title:'',group:'',content:'',enabled:true};
-  if(isMysteryBound(id)){
-    dialog('<h2>'+esc(x.title)+'</h2><label>世界书内容<textarea rows="16" readonly>'+esc(x.content)+'</textarea></label><button type="button" data-action="close">关闭</button>');
-    return;
-  }
+  if(isMysteryBound(id))return;
   const groups=[...new Set(state.worlds.map(y=>y.group).filter(group=>group&&!mysteryWorldGroup(group)))];
   dialog('<h2>'+(id?'编辑世界书条目':'新建世界书条目')+'</h2><form id="worldForm" data-id="'+esc(id)+'"><label>条目名称<input name="title" required maxlength="80" value="'+esc(x.title)+'"></label><label>分组<input name="group" list="worldGroups" maxlength="60" value="'+esc(x.group)+'" placeholder="选择已有分组或输入新分组"></label><datalist id="worldGroups">'+groups.map(g=>'<option value="'+esc(g)+'"></option>').join('')+'</datalist><label>内容<textarea name="content" required>'+esc(x.content)+'</textarea></label><div class="row"><button class="primary">保存条目</button><button type="button" data-action="close">取消</button>'+(id?'<button type="button" data-remove-world="'+esc(id)+'">删除条目</button>':'')+'</div></form>');
 }
