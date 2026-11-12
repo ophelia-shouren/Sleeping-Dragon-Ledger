@@ -3389,10 +3389,11 @@ async function screenshotSelectedMessages(button){
         ctx.drawImage(overlay,x+(size-side)/2+size*(frame.x||0)/100,y+(size-side)/2+size*(frame.y||0)/100,side,side);
       }
     };
-    ctx.fillStyle=colors.bg;ctx.fillRect(0,0,width,height);
-    ctx.fillStyle=colors.panel;ctx.fillRect(0,0,width,headerHeight);
+    const metaInk=mist?'#344562':colors.muted;
+    ctx.fillStyle=mist?'#dce9fa':colors.bg;ctx.fillRect(0,0,width,height);
+    ctx.fillStyle=mist?'#c7daf2':colors.panel;ctx.fillRect(0,0,width,headerHeight);
     avatar(c,title,28,(headerHeight-58)/2,58);
-    write(titleLines,106,(headerHeight-titleLines.length*38)/2,30,38,colors.ink,'left','700 ');
+    write(titleLines,106,(headerHeight-titleLines.length*38)/2,30,38,mist?'#243550':colors.ink,'left','700 ');
     ctx.fillStyle=colors.line;ctx.fillRect(0,headerHeight-1,width,1);
     let y=headerHeight+20;
     for(const entry of entries){
@@ -3402,8 +3403,8 @@ async function screenshotSelectedMessages(button){
       if(entry.person)avatar(entry.person,entry.name,entry.mine?width-inset-avatarSize:inset,y,avatarSize);
       const nameX=entry.system?width/2:mist?(entry.mine?width-inset-avatarSize-gap:inset+avatarSize+gap):(entry.mine?x+bubbleWidth:x);
       const align=entry.system?'center':entry.mine?'right':'left';
-      write(entry.names,nameX,y,18,25,colors.muted,align);
-      if(mist&&entry.person&&entry.time)write([entry.time],nameX,y+entry.names.length*25,15,20,colors.muted,align);
+      write(entry.names,nameX,y,18,25,metaInk,align);
+      if(mist&&entry.person&&entry.time)write([entry.time],nameX,y+entry.names.length*25,15,20,metaInk,align);
       y+=entry.metaHeight;
       const fill=entry.system?colors.field:mist?(entry.mine?'#e1e6f2ed':theme.getPropertyValue('--mist-char-paper').trim()||colors.panel):entry.mine?colors.selected:colors.control;
       box(x,y,bubbleWidth,entry.bubbleHeight,mist?7:14,fill);
@@ -3433,7 +3434,7 @@ async function screenshotSelectedMessages(button){
       inside+=entry.lines.length*messageStep;
       if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),x+12,inside+4,entry.imageWidth,entry.imageHeight);
       y+=entry.bubbleHeight;
-      if(entry.footerHeight){write([entry.time],entry.mine?x+bubbleWidth:x,y+4,15,20,colors.muted,align);y+=entry.footerHeight;}
+      if(entry.footerHeight){write([entry.time],entry.mine?x+bubbleWidth:x,y+4,15,20,metaInk,align);y+=entry.footerHeight;}
       y+=22;
     }
     const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
