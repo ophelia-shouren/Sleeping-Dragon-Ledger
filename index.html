@@ -1639,7 +1639,7 @@ function cards(){
     if(!groups.has(group))groups.set(group,[]);
     groups.get(group).push(entry);
   }
-  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><h3>'+esc(name||'未分组')+'</h3>'+(mysteryWorldGroup(name)?'<p class="muted">绑定世界书 · 关闭后暂停绑定角色聊天</p>':'<label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name))+entries.map(x=>'<div class="world-row">'+(isMysteryBound(x.id)?'<div class="directory-item"><strong>'+esc(x.title)+'</strong></div>':'<button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button>')+'<button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
+  const worlds=[...groups].map(([name,entries])=>'<div class="world-group"><div class="row between"><h3>'+esc(name||'未分组')+'</h3><button type="button" class="theme-switch" role="switch" aria-label="启用分组 '+esc(name||'未分组')+'" aria-checked="'+entries.some(x=>x.enabled)+'" data-toggle-world-group="'+esc(name)+'" '+(!entries.some(x=>x.enabled)&&!restorableWorldEntries(name).size?'disabled':'')+'><span></span></button></div>'+(mysteryWorldGroup(name)?'<p class="muted">绑定世界书 · 关闭后暂停绑定角色聊天</p>':'<label class="world-position">注入位置<select data-world-position="'+esc(name)+'"><option value="front" '+(worldPosition(name)==='front'?'selected':'')+'>输入最前</option><option value="end" '+(worldPosition(name)==='end'?'selected':'')+'>输入最后</option></select></label>'+worldScopeButton(name))+entries.map(x=>'<div class="world-row">'+(isMysteryBound(x.id)?'<div class="directory-item"><strong>'+esc(x.title)+'</strong></div>':'<button class="directory-item" data-world="'+esc(x.id)+'"><span><strong>'+esc(x.title)+'</strong><small>编辑条目</small></span><b>›</b></button>')+'<button class="theme-switch" role="switch" aria-label="启用'+esc(x.title)+'" aria-checked="'+x.enabled+'" data-toggle-world="'+esc(x.id)+'"><span></span></button></div>').join('')+'</div>').join('');
   return heading('CHARACTER ARCHIVE','人设与世界书','从目录打开卡片。开启的世界书条目会加入角色对话。')+
     '<div class="columns archive-columns"><section class="panel"><div class="row between"><h2>人设目录</h2><div class="row"><button type="button" data-action="selectContacts">批量管理</button><button class="primary" data-action="newContact">＋ 新建角色</button></div></div><div class="persona-grid"><button class="persona-tile" data-card="user">'+avatarMarkup(appearance('user'))+'<span><strong>'+esc(state.userName||'我的人设')+'</strong></span></button>'+roles+'</div></section>'+
     '<section class="panel"><div class="row between"><h2>世界书目录</h2><button data-action="newWorld">＋ 新建条目</button></div>'+(worlds||'<p class="empty">还没有世界书条目。</p>')+'</section></div>';
@@ -1724,6 +1724,27 @@ function openWorld(id){
   if(isMysteryBound(id))return;
   const groups=[...new Set(state.worlds.map(y=>y.group).filter(group=>group&&!mysteryWorldGroup(group)))];
   dialog('<h2>'+(id?'编辑世界书条目':'新建世界书条目')+'</h2><form id="worldForm" data-id="'+esc(id)+'"><label>条目名称<input name="title" required maxlength="80" value="'+esc(x.title)+'"></label><label>分组<input name="group" list="worldGroups" maxlength="60" value="'+esc(x.group)+'" placeholder="选择已有分组或输入新分组"></label><datalist id="worldGroups">'+groups.map(g=>'<option value="'+esc(g)+'"></option>').join('')+'</datalist><label>内容<textarea name="content" required>'+esc(x.content)+'</textarea></label><div class="row"><button class="primary">保存条目</button><button type="button" data-action="close">取消</button>'+(id?'<button type="button" data-remove-world="'+esc(id)+'">删除条目</button>':'')+'</div></form>');
+}
+function restorableWorldEntries(group){
+  const saved=new Set(state.worldGroupSnapshots.find(x=>x.group===group)?.ids||[]);
+  return new Set(state.worlds.filter(x=>x.group===group&&saved.has(x.id)).map(x=>x.id));
+}
+function rememberWorldGroup(group,ids){
+  return [...state.worldGroupSnapshots.filter(x=>x.group!==group),{group,ids}];
+}
+function toggleWorldGroup(group){
+  const enabled=state.worlds.filter(x=>x.group===group&&x.enabled).map(x=>x.id);
+  const restore=enabled.length?new Set():restorableWorldEntries(group);
+  if(!enabled.length&&!restore.size)return false;
+  const worlds=state.worlds.map(x=>x.group===group?{...x,enabled:restore.has(x.id)}:x);
+  return commit({...state,worlds,worldGroupSnapshots:enabled.length?rememberWorldGroup(group,enabled):state.worldGroupSnapshots});
+}
+function toggleWorldEntry(id){
+  const entry=state.worlds.find(x=>x.id===id);
+  if(!entry)return false;
+  const worlds=state.worlds.map(x=>x===entry?{...x,enabled:!x.enabled}:x);
+  const groupTurnedOff=entry.enabled&&!worlds.some(x=>x.group===entry.group&&x.enabled);
+  return commit({...state,worlds,worldGroupSnapshots:groupTurnedOff?rememberWorldGroup(entry.group,[id]):state.worldGroupSnapshots});
 }
 function saveWorld(form){
   const id=form.dataset.id,d=new FormData(form);
@@ -3373,17 +3394,66 @@ function openHomeOrb(){
   const panel=$('orbQuickDialog'),canGoBack=$('dialog').open||page!=='home';
   const html='<h2>快捷导航</h2><div class="row"><button type="button" class="primary" data-action="orbHome">回到主页</button>'+(canGoBack?'<button type="button" data-action="orbBack">← 返回上一级</button>':'')+'<button type="button" data-action="orbCancel">取消</button></div>'+
     '<h3 class="quick-model-heading">快速更换 API 预设</h3><p class="muted">'+(c?'应用于 '+esc(displayName(c)):'应用于全局默认预设')+'</p>'+
-    (options?'<form id="quickProfileForm" data-contact="'+esc(c?.id||'')+'"><label>API 预设<select name="profile"><option value="">'+(c?'跟随全局预设':'未选择预设')+'</option>'+options+'</select></label><button class="primary">应用预设</button></form>':'<p class="muted">还没有已保存的 API 预设。</p>');
+    (options?'<form id="quickProfileForm" data-contact="'+esc(c?.id||'')+'"><label>API 预设<select name="profile"><option value="">'+(c?'跟随全局预设':'未选择预设')+'</option>'+options+'</select></label><label>预设模型<select name="quickModel" disabled></select></label><p class="muted" role="status" aria-live="polite"></p><div class="row"><button type="button" data-load-quick-models>读取模型</button><button class="primary">应用预设</button></div></form>':'<p class="muted">还没有已保存的 API 预设。</p>');
   panel.innerHTML=html;
+  const form=panel.querySelector('#quickProfileForm');
+  if(form){
+    refreshQuickProfileModel(form);
+    form.elements.profile.addEventListener('change',()=>refreshQuickProfileModel(form));
+    form.querySelector('[data-load-quick-models]').addEventListener('click',()=>loadQuickProfileModels(form));
+  }
   panel.showModal();
+}
+function quickProfile(form){
+  const id=form.elements.profile.value||(form.dataset.contact?state.profile:'');
+  return state.profiles.find(p=>p.id===id);
+}
+function refreshQuickProfileModel(form){
+  const profile=quickProfile(form),model=form.elements.quickModel;
+  form.modelRequest=null;
+  model.replaceChildren(new Option(profile?.model||'未选择模型',profile?.model||''));
+  model.disabled=true;
+  form.querySelector('[data-load-quick-models]').disabled=!profile?.url;
+  form.querySelector('[role=status]').textContent='';
+}
+async function loadQuickProfileModels(form){
+  const profile=quickProfile(form);
+  if(!profile)return;
+  const button=form.querySelector('[data-load-quick-models]'),status=form.querySelector('[role=status]');
+  const requestToken={};
+  form.modelRequest=requestToken;
+  const current=()=>form.isConnected&&form.closest('dialog').open&&form.modelRequest===requestToken&&quickProfile(form)===profile;
+  button.disabled=true;
+  status.textContent='正在读取模型…';
+  try{
+    const ids=await fetchModelIds(profile);
+    if(!current())return;
+    if(!ids.length)throw Error('接口未返回可选模型。');
+    const model=form.elements.quickModel;
+    const choices=profile.model&&!ids.includes(profile.model)?[profile.model,...ids]:ids;
+    model.replaceChildren(...choices.map(id=>new Option(id,id)));
+    model.value=profile.model||'';
+    if(!profile.model)model.prepend(new Option('选择模型','',true,true));
+    model.disabled=false;
+    status.textContent='已读取 '+ids.length+' 个模型。选好后点击应用预设。';
+  }catch(e){
+    if(current())status.textContent=e.name==='AbortError'?'读取模型超时，请重试。':e.message;
+  }finally{
+    if(form.modelRequest===requestToken)button.disabled=false;
+  }
 }
 function saveQuickProfile(form){
   const id=form.elements.profile.value;
   if(id&&!state.profiles.some(p=>p.id===id))throw Error('该预设已删除，请重新选择。');
   const c=form.dataset.contact?contact(form.dataset.contact):null;
   if(form.dataset.contact&&!c)return;
-  const saved=c?replaceContact(c.id,{preset:id}):commit({...state,profile:id});
-  if(saved){form.closest('dialog').close();render();toast('API 预设已切换');}
+  const profile=quickProfile(form),model=form.elements.quickModel.value;
+  const modelChanged=Boolean(profile&&model&&model!==profile.model);
+  const profiles=modelChanged?state.profiles.map(p=>p===profile?{...p,model}:p):state.profiles;
+  const selection=c?{contacts:state.contacts.map(x=>x===c?{...x,preset:id}:x)}:{profile:id};
+  if(commit({...state,...selection,profiles})){
+    form.closest('dialog').close();render();toast(modelChanged?'预设模型已保存':'API 预设已应用');
+  }
 }
 function initHomeOrb(){
   const orb=$('homeOrb');
@@ -4103,7 +4173,7 @@ const fontOptions={source:'思源宋体',mincho:'明朝'};
 const activeLedgerFont=(skin,preferences)=>preferences[skin]||(skin==='mist'?'mincho':'source');
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航'};
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
 let page='home', period='week', anchor='', toastTimer;
@@ -4172,6 +4242,7 @@ function validate(data){
   if(!result.worldScopes||Array.isArray(result.worldScopes)||typeof result.worldScopes!=='object'||
     !Object.values(result.worldScopes).every(x=>x&&['all','selected','off'].includes(x.mode)&&Array.isArray(x.roles)&&x.roles.every(string)))throw Error('世界书使用范围存档无效');
   Object.assign(result,{messages:[],draft:'',charName:'',character:'',charGender:'',charPersonality:'',lore:''});
+  if(!Array.isArray(result.worldGroupSnapshots)||!result.worldGroupSnapshots.every(x=>x&&string(x.group)&&Array.isArray(x.ids)&&x.ids.every(string)))throw Error('世界书分组开关存档无效');
   return result;
 }
 let archiveResetting=false, draftSaveTimer;
@@ -4299,6 +4370,7 @@ function removeMysteryBundle(prefix){
   const removedWorldGroups=new Set(state.worlds.filter(w=>owned(w.id)).map(w=>w.group));
   const worldScopes=Object.fromEntries(Object.entries(state.worldScopes).filter(([name])=>!removedWorldGroups.has(name)).map(([name,scope])=>[name,{...scope,roles:scope.roles.filter(id=>!owned(id))}]));
   const next={...state,contacts,worldScopes,worlds:state.worlds.filter(w=>!owned(w.id)),
+    worldGroupSnapshots:state.worldGroupSnapshots.filter(x=>!removedWorldGroups.has(x.group)),
     teaSessions:state.teaSessions.filter(t=>!related(t)),
     groups:state.groups.map(g=>({...g,members:g.members.filter(id=>!owned(id)),pending:g.pending.filter(id=>!owned(id)),
       messages:g.messages.filter(keepMessage).map(m=>m.audience?{...m,audience:m.audience.filter(id=>!owned(id))}:m)})),
@@ -4518,13 +4590,16 @@ function profileForm(form){
   const d=new FormData(form),v=k=>String(d.get(k)||'').trim();
   return {id:state.profile||crypto.randomUUID(),name:v('name'),url:v('url'),key:v('key'),model:v('model')};
 }
+async function fetchModelIds(profile){
+  const data=await request(profile,'models');
+  return [...new Set((Array.isArray(data?.data)?data.data:[]).map(x=>x?.id).filter(x=>typeof x==='string'&&x))].sort();
+}
 async function loadModels(button,image=false){
   const form=$(image?'imageForm':'apiForm'),status=$(image?'imageModelStatus':'apiStatus');
   const {url,key}=profileForm(form);
   button.disabled=true;status.textContent='正在从中转站读取模型…';
   try{
-    const data=await request({url,key},'models');
-    const ids=[...new Set((Array.isArray(data.data)?data.data:[]).map(x=>x?.id).filter(x=>typeof x==='string'&&x))].sort();
+    const ids=await fetchModelIds({url,key});
     if(!ids.length)throw Error('接口未返回可选模型，可以手动填写模型 ID。');
     if(!form.isConnected)return;
     const options=ids.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
@@ -4609,7 +4684,8 @@ document.addEventListener('click',e=>{
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
   if(d.world)openWorld(d.world);
   if(b.hasAttribute('data-world-scope'))openWorldScope(d.worldScope);
-  if(d.toggleWorld&&commit({...state,worlds:state.worlds.map(x=>x.id===d.toggleWorld?{...x,enabled:!x.enabled}:x)}))render();
+  if(b.hasAttribute('data-toggle-world-group')&&toggleWorldGroup(d.toggleWorldGroup))render();
+  if(d.toggleWorld&&toggleWorldEntry(d.toggleWorld))render();
   if(d.removeWorld&&!isMysteryBound(d.removeWorld)&&confirm('删除这个世界书条目？')&&commit({...state,worlds:state.worlds.filter(x=>x.id!==d.removeWorld)})){$('dialog').close();render();}
   if(d.clearLook){
     const form=$('lookForm'),target=d.clearLook;
