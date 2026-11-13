@@ -1739,6 +1739,17 @@ function toggleWorldGroup(group){
   const worlds=state.worlds.map(x=>x.group===group?{...x,enabled:restore.has(x.id)}:x);
   return commit({...state,worlds,worldGroupSnapshots:enabled.length?rememberWorldGroup(group,enabled):state.worldGroupSnapshots});
 }
+function refreshWorldGroupSwitches(group,container,changedEntry){
+  const enabled=new Set(state.worlds.filter(x=>x.group===group&&x.enabled).map(x=>x.id));
+  const groupSwitch=container.querySelector('[data-toggle-world-group]');
+  groupSwitch.setAttribute('aria-checked',String(enabled.size>0));
+  groupSwitch.disabled=!enabled.size&&!restorableWorldEntries(group).size;
+  const switches=changedEntry?[changedEntry]:container.querySelectorAll('[data-toggle-world]');
+  for(const button of switches){
+    const checked=String(enabled.has(button.dataset.toggleWorld));
+    if(button.getAttribute('aria-checked')!==checked)button.setAttribute('aria-checked',checked);
+  }
+}
 function toggleWorldEntry(id){
   const entry=state.worlds.find(x=>x.id===id);
   if(!entry)return false;
@@ -4684,8 +4695,14 @@ document.addEventListener('click',e=>{
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
   if(d.world)openWorld(d.world);
   if(b.hasAttribute('data-world-scope'))openWorldScope(d.worldScope);
-  if(b.hasAttribute('data-toggle-world-group')&&toggleWorldGroup(d.toggleWorldGroup))render();
-  if(d.toggleWorld&&toggleWorldEntry(d.toggleWorld))render();
+  if(d.toggleWorldGroup!==undefined||d.toggleWorld!==undefined){
+    const container=b.closest('.world-group');
+    const group=container.querySelector('[data-toggle-world-group]').dataset.toggleWorldGroup;
+    const entry=d.toggleWorld!==undefined?b:null;
+    const saved=entry?toggleWorldEntry(d.toggleWorld):toggleWorldGroup(group);
+    if(saved)refreshWorldGroupSwitches(group,container,entry);
+    return;
+  }
   if(d.removeWorld&&!isMysteryBound(d.removeWorld)&&confirm('删除这个世界书条目？')&&commit({...state,worlds:state.worlds.filter(x=>x.id!==d.removeWorld)})){$('dialog').close();render();}
   if(d.clearLook){
     const form=$('lookForm'),target=d.clearLook;
