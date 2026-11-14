@@ -56,6 +56,20 @@
 [data-skin="mist"] button.primary:hover { color:#fff; background:#35466b; }
 [data-skin="mist"] :is(input,textarea,select) { border-radius:8px; }
 [data-skin="mist"] dialog::backdrop { background:#28385276; backdrop-filter:blur(4px); }
+
+/* Keep nested translucent panels out of the scrollable dialog's blur layer. */
+[data-skin="mist"] #dialog:not(.story-fullscreen) {
+  background:#2d3c55;
+}
+[data-skin="mist"] #dialog:not(.story-fullscreen),
+[data-skin="mist"] #dialog:not(.story-fullscreen) :is(.panel,.card),
+[data-skin="mist"] #dialog:not(.story-fullscreen)::backdrop {
+  -webkit-backdrop-filter:none;
+  backdrop-filter:none;
+}
+[data-skin="mist"] #dialog:not(.story-fullscreen)::backdrop {
+  background:#202d47b8;
+}
 [data-skin="mist"] :is(.full-chat .chat-thread,#dialog.story-fullscreen) {
   background:var(--mist-backdrop);
 }
