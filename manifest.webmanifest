@@ -1,0 +1,8 @@
+{
+  "name": "眠龙勿扰 · 私人账本",
+  "short_name": "眠龙勿扰",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait"
+}
