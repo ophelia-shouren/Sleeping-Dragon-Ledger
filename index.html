@@ -1605,7 +1605,7 @@ function chat(){
   const typing=busy||(mode==='cards'&&localRuns.has(c.id));
   const now=Date.now(),selected=messageSelection(c,mode,session.messages);
   const history=privateChatWindow(session.messages,privateChatPage);
-  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools">'+storySun()+'<button class="star-button" data-action="chatDirectory" aria-label="打开聊天目录" title="聊天目录">★</button></div></div>'+
+  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开聊天目录" title="聊天目录">★</button></div></div>'+
     messageActionBar(selected)+'<div id="messages" class="messages">'+
     (history.start?'<div class="chat-history-page"><button type="button" data-action="olderChatPage">查看更早的消息</button></div>':'')+
     (history.messages.length?history.messages.map((x,offset)=>{
