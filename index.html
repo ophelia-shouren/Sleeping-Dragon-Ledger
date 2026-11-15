@@ -252,7 +252,7 @@ body.full-chat{overflow:hidden}
 .full-chat .messages{flex:1 1 auto;height:auto;min-height:0;overscroll-behavior:contain}
 .full-chat #chatForm{max-height:45%;overflow:auto;overscroll-behavior:contain}
 .full-chat #chatForm textarea{min-height:48px;max-height:120px;margin-bottom:4px}
-.chat-directory h3,.deck-presets h3{margin-top:12px}
+.deck-presets h3{margin-top:12px}
 .deck-presets{margin:12px 0;padding:10px 0;border-top:1px solid var(--line)}
 .home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;touch-action:none;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
 .home-orb[hidden],.home-orb [hidden]{display:none}
@@ -308,7 +308,10 @@ body.full-chat{overflow:hidden}
 .world-scope-choice{display:flex;align-items:center;gap:8px;padding:4px 0}.world-scope-choice input{width:auto;margin:0;accent-color:var(--gold)}
 .world-scope-roles{display:none;max-height:210px;overflow:auto}
 #worldScopeForm:has(input[name="scopeMode"][value="selected"]:checked) .world-scope-roles{display:block}
-.chat-display-settings{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--control)}
+.private-settings-cards{display:grid;gap:14px}
+.private-settings-cards .group-settings-card>.row{margin-top:10px}
+.private-settings-model{margin:8px 0 0;overflow-wrap:anywhere}
+.private-settings-page .chat-display-settings{gap:0}
 .chat-display-settings .chat-bubble-limit{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0}.chat-bubble-limit input{width:68px;margin:0}
 .quick-model-heading{margin:15px 0 3px;color:var(--gold)}
 .amount-control{display:flex;align-items:flex-end;gap:6px;min-width:0}.amount-control label{flex:1;min-width:0}.amount-control button{margin-bottom:10px;white-space:nowrap;color:var(--gold)}
@@ -531,9 +534,6 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .chat-history-page button{font-size:.85rem}
 .clear-chat-row{padding-top:12px;border-top:1px solid var(--line)}
 .clear-chat-row button{width:100%;min-height:44px}
-.chat-directory-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-.chat-directory-heading h2{margin:0}
-.chat-directory-heading button{min-width:44px;min-height:44px}
 
 :root{--ledger-font:"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif}
 :root[data-ledger-font="mincho"]{--ledger-font:"Huiwen Mincho","Source Han Serif SC","Noto Serif SC","Songti SC",SimSun,serif}
@@ -1851,7 +1851,7 @@ function chat(){
   const typing=busy||(mode==='cards'&&localRuns.has(c.id));
   const now=Date.now(),selected=messageSelection(c,mode,session.messages);
   const history=privateChatWindow(session.messages,privateChatPage);
-  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开聊天目录" title="聊天目录">★</button></div></div>'+
+  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开私聊设置" title="私聊设置">★</button></div></div>'+
     messageActionBar(selected)+'<div id="messages" class="messages">'+
     (history.start?'<div class="chat-history-page"><button type="button" data-action="olderChatPage">查看更早的消息</button></div>':'')+
     (history.messages.length?history.messages.map((x,offset)=>{
@@ -3610,12 +3610,17 @@ function submitClearChatHistory(form){
 function openChatDirectory(){
   const c=contact(activeContact);
   if(!c)return;
-  dialog('<div class="chat-directory-heading"><h2>聊天目录</h2><button type="button" data-action="close" aria-label="返回私聊" title="返回私聊">←</button></div><div class="chat-directory"><h3>角色</h3><div class="row"><button type="button" data-card="'+esc(c.id)+'">人设卡</button>'+
-    memoryButton(c)+'</div><h3>聊天模式</h3>'+chatModeBar(c)+
-    '<h3>当前模型</h3><p class="muted">'+esc(profileFor(c)?profileFor(c).name+' · '+profileFor(c).model:'尚未配置 API')+'</p>'+chatDisplaySettings(c)+
-    '<h3>聊天记录</h3><div class="row"><button type="button" data-action="chatImport">导入聊天</button><button type="button" data-action="chatExport">导出聊天</button></div>'+
-    '<h3>发送账单</h3><div class="row"><button type="button" data-share="day">今日账单</button><button type="button" data-share="week">本周账单</button><button type="button" data-share="month">本月账单</button></div>'+
-    '<div class="row actions"><button type="button" data-action="close">关闭</button></div><div class="clear-chat-row">'+clearChatButton(localSession(c).messages.length)+'</div></div>');
+  const profile=profileFor(c);
+  const section=(title,body)=>'<section class="group-settings-card group-settings-block"><h3>'+title+'</h3>'+body+'</section>';
+  dialog('<div class="group-settings-page private-settings-page"><header class="group-settings-header"><button type="button" data-action="close" aria-label="返回私聊" title="返回私聊">‹</button><h2>私聊设置</h2><button type="submit" form="chatDisplayForm">保存</button></header>'+
+    '<div class="private-settings-cards">'+
+    section('角色','<div class="row"><button type="button" data-card="'+esc(c.id)+'">人设卡</button>'+memoryButton(c)+'</div>')+
+    section('聊天模式',chatModeBar(c))+
+    section('当前模型','<p class="muted private-settings-model">'+esc(profile?profile.name+' · '+profile.model:'尚未配置 API')+'</p>')+
+    section('聊天显示',chatDisplaySettings(c))+
+    section('聊天记录','<div class="row"><button type="button" data-action="chatImport">导入聊天</button><button type="button" data-action="chatExport">导出聊天</button></div>')+
+    section('发送账单','<div class="row"><button type="button" data-share="day">今日账单</button><button type="button" data-share="week">本周账单</button><button type="button" data-share="month">本月账单</button></div>')+
+    '<div class="clear-chat-row">'+clearChatButton(localSession(c).messages.length)+'</div></div></div>',true);
 }
 function deckPresetMenu(decks){
   return '<section class="deck-presets"><h3>分组预设</h3><p class="muted">每个分组可单独编辑和保存。</p><div class="row">'+
@@ -3790,10 +3795,10 @@ function chatDisplay(c){
 }
 function chatDisplaySettings(c){
   const p=chatDisplay(c);
-  const toggle=(name,label,checked)=>'<label class="mode-toggle"><input type="checkbox" name="'+name+'" '+(checked?'checked':'')+'><span></span>'+label+'</label>';
-  return '<h3>聊天显示</h3><form id="chatDisplayForm" data-contact="'+esc(c.id)+'" class="chat-display-settings">'+
+  const toggle=(name,label,checked)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="'+name+'" '+(checked?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
+  return '<form id="chatDisplayForm" data-contact="'+esc(c.id)+'" class="chat-display-settings">'+
     toggle('showTime','显示消息时间戳',p.showTime)+toggle('showName','在气泡里显示角色名',p.showName)+toggle('split','角色分句显示',p.split)+
-    '<label class="chat-bubble-limit">每次回复最多显示几条<input type="number" name="limit" min="1" max="30" step="1" required value="'+p.limit+'"></label><button type="submit">保存聊天显示</button></form>';
+    '<label class="chat-bubble-limit">每次回复最多显示几条<input type="number" name="limit" min="1" max="30" step="1" required value="'+p.limit+'"></label></form>';
 }
 function saveChatDisplay(form){
   const c=contact(form.dataset.contact);if(!c)return;
