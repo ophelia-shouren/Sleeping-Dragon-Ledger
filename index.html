@@ -1631,7 +1631,7 @@ function editGroup(id){
     '<form id="groupSettings" data-id="'+esc(id)+'"><details class="group-settings-card" '+(g?'':'open')+'><summary class="group-settings-profile"><span id="groupAvatarPreview">'+groupAvatar(g)+'</span><span><strong id="groupSettingsName">'+esc(g?.name||'设置群聊名称')+'</strong><small>编辑群聊名称与头像</small></span><span aria-hidden="true">›</span></summary>'+
     '<div class="group-settings-edit"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><div class="row"><label>更换群聊头像<input id="groupAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" data-action="removeGroupAvatar">移除头像</button></div></div></details>'+
     '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>群成员</h3><span id="groupSettingsCount" class="muted" aria-live="polite"></span></div><div id="groupSettingsMembers" class="group-settings-members"></div><div id="groupSettingsPicker" hidden></div></section>'+
-    '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+toggle('showTime','显示消息时间戳',g?.showTime!==false)+toggle('split','角色分句显示',g?.split===true)+'</section>'+
+    '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+toggle('showTime','显示消息时间戳',g?.showTime!==false)+toggle('showName','在气泡里显示角色名',g?.showName!==false)+toggle('split','角色分句显示',g?.split===true)+'</section>'+
     '<section class="group-settings-card group-settings-block"><h3>聊天记忆</h3>'+toggle('shared','与日常聊天互通记忆',g?.shared)+'<p class="muted">开启后，角色可以参考近期私聊、群聊与已保存的记忆，也可能在群里提到私聊内容。</p></section>'+(g?'<div class="clear-chat-row">'+clearChatButton(g.messages.length,id)+'</div>':'')+'</form></div>',true);
   const form=$('groupSettings');
   form.avatarDraft=g?.avatar||'';
@@ -1652,7 +1652,7 @@ function saveGroupSettings(form){
   const name=String(data.get('name')||'').trim();
   if(!name||members.length<2)throw Error('请填写群聊名称，并选择至少两位角色。');
   if(groupJobs.has(id))return;
-  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,avatar:form.avatarDraft||'',shared:data.has('shared'),showTime:data.has('showTime'),split:data.has('split')};
+  const group={id:id||crypto.randomUUID(),messages:[],pending:[],...old,name,members,avatar:form.avatarDraft||'',shared:data.has('shared'),showTime:data.has('showTime'),showName:data.has('showName'),split:data.has('split')};
   if(old)group.messages=old.messages.map(m=>m.audience?m:{...m,audience:old.members});
   group.pending=group.pending.filter(roleId=>members.includes(roleId));
   if(commit({...state,groups:old?state.groups.map(g=>g.id===id?group:g):[...state.groups,group]})){render();openGroup(group.id);}
@@ -1677,7 +1677,7 @@ function groupBubble(m,g,index,selected){
   const mine=!m.roleId,role=mine?'user':'assistant';
   const person=appearance(m.roleId||'user')||{name:m.speaker,avatar:'',frame:{src:'',ring:false}};
   const avatar='<span class="avatar-button">'+avatarMarkup(person)+'</span>';
-  const name=mine?'':'<small>'+esc(m.speaker)+'</small>';
+  const name=mine||g.showName===false?'':'<small>'+esc(m.speaker)+'</small>';
   return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>{
     const last=i===parts.length-1;
     const layout=chatMessageLayout(avatar,name,bubbleTimestamp(m,g.showTime!==false,g.split===true,last));
@@ -1694,7 +1694,7 @@ function openGroup(id){
   const lock=teaLock(g.members),busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
   dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button type="button" class="star-button" data-group-edit="'+esc(id)+'" aria-label="打开群聊设置" title="群聊设置" '+(busy?'disabled':'')+'>★</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
     (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
-    (speaker?typingBubble(speaker,true,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
+    (speaker?typingBubble(speaker,g.showName!==false,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
 }
@@ -4088,7 +4088,7 @@ async function screenshotSelectedMessages(button){
     const parts=system||card||message.storyForward?[text]:chatBubbleParts({...message,role},display);
     return parts.map((part,index)=>{
       const last=index===parts.length-1;
-      return {system,mine,person,name,text:part,card,quote:index===0?quoteText(message.quote):'',image:last?safePicture(message.image||''):'',
+      return {system,mine,person,name,hideName:group?.showName===false&&!system&&!mine,text:part,card,quote:index===0?quoteText(message.quote):'',image:last?safePicture(message.image||''):'',
         time:display.showTime&&(last||(mist&&display.split))?chatTime(message.sentAt):''};
     });
   });
@@ -4125,7 +4125,7 @@ async function screenshotSelectedMessages(button){
     const headerHeight=Math.max(104,36+titleLines.length*38);
     let height=headerHeight+20;
     for(const entry of entries){
-      entry.names=wrapped(entry.name,18,500);
+      entry.names=entry.hideName?[]:wrapped(entry.name,18,500);
       entry.quotes=entry.quote?wrapped('引用 · '+entry.quote,17):[];
       const picture=pictures.get(entry.image);
       const text=[entry.text,entry.image&&!picture?'[图片未能载入]':''].filter(Boolean).join('\n');
@@ -4791,7 +4791,12 @@ async function submitMysteryEntry(form){
     if(Object.hasOwn(skinUnlockIds,bundle.skin)&&bundle.id===skinUnlockIds[bundle.skin]){
       const label=skins[bundle.skin];
       if(skinAvailable(bundle.skin,state)){
-        status.textContent='「'+label+'」已解锁。';
+        const skin=state.skin===bundle.skin?initial().skin:state.skin;
+        const mysteryActive=state.mysteryActive.filter(id=>id!==bundle.id);
+        if(commit({...state,skin,mysteryActive})){
+          render();
+          $('mysteryEntryStatus').textContent='已关闭「'+label+'」。';
+        }
       }else if(commit({...state,mysteryActive:[...state.mysteryActive,bundle.id]})){
         status.textContent='已解锁「'+label+'」，可在 API 连接 → 皮肤中启用。';
       }
