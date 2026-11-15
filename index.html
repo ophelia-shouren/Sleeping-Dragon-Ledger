@@ -582,7 +582,6 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #ledgerReleaseNotice p{margin:0;line-height:1.65;overflow-wrap:anywhere}
 #ledgerReleaseNotice .release-notice-setting{border:1px solid var(--line);border-radius:14px;background:var(--field);padding:clamp(12px,3vw,18px)}
 #ledgerReleaseNotice footer{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted)}
-#ledgerReleaseNotice form{margin:0}
 #ledgerReleaseNotice button{min-height:44px;min-width:96px}
 </style><link rel="stylesheet" href="./mist-theme.css"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
@@ -5495,7 +5494,8 @@ function showLedgerReleaseNotice(){
     '<p>眠龙记账安卓版新增番外后台生成。切到其他应用或锁屏时，支持后台运行的手机可以继续生成。</p>'+
     '<div class="release-notice-setting"><p><strong>请在手机设置中，为「眠龙记账」开启「允许后台活动」。</strong></p>'+
     '<p class="muted">不同手机的设置入口可能不同，可在设置中搜索「后台活动」。</p></div>'+
-    '<footer><span><time datetime="2026-11-15">2026.11.15</time> · 鸟鸟</span><form method="dialog"><button class="primary" autofocus>知道了</button></form></footer></div>';
+    '<footer><span><time datetime="2026-11-15">2026.11.15</time> · 鸟鸟</span><button type="button" class="primary" autofocus>知道了</button></footer></div>';
+  modal.querySelector('button').addEventListener('click',()=>modal.close());
   modal.addEventListener('close',()=>modal.remove(),{once:true});
   document.body.append(modal);
   modal.showModal();
