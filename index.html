@@ -497,6 +497,14 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 :root[data-ledger-font="mincho"]{--ledger-font:"Huiwen Mincho","Source Han Serif SC","Noto Serif SC","Songti SC",SimSun,serif}
 :root[data-skin="mist"][data-ledger-font]{--mist-font:var(--ledger-font)}
 .font-choice-row{display:flex;flex-wrap:wrap;gap:8px}
+.expense-category summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:8px 0}
+.expense-category summary::-webkit-details-marker{display:none}
+.expense-category summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1px 1px 0;transform:rotate(45deg);margin:0 4px 3px}
+.expense-category[open]>summary::after{transform:rotate(225deg);margin-bottom:0}
+.expense-category-label,.expense-category li>span:first-child{overflow-wrap:anywhere}
+.expense-category ul{margin:0 0 12px;padding:0;list-style:none}
+.expense-category li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.expense-category li small{display:block}
 </style><link rel="stylesheet" href="./mist-theme.css"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -4294,10 +4302,24 @@ function table(bills,limit=Infinity){
   if(!bills.length)return '<div class="empty">✧　这一页还是空白的。</div>';
   return '<div class="table"><table><thead><tr><th>日期</th><th>项目</th><th>分类</th><th>金额</th><th>操作</th></tr></thead><tbody>'+[...bills].reverse().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,limit).map(x=>'<tr><td>'+esc(x.date)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.category)+'</td><td class="'+(x.type==='income'?'in':'out')+'">'+(x.type==='income'?'+':'−')+money(x.cents)+'</td><td><button data-edit="'+esc(x.id)+'">编辑</button></td></tr>').join('')+'</tbody></table></div>';
 }
-function breakdown(bills){
+function breakdown(bills,expandable=false){
   const groups=new Map();let sum=0;
-  for(const x of bills) if(x.type==='expense'){groups.set(x.category,(groups.get(x.category)||0)+x.cents);sum+=x.cents;}
-  return sum?[...groups].sort((a,b)=>b[1]-a[1]).map(([label,n])=>'<div class="row between"><span>'+esc(label)+'</span><span>'+money(n)+'</span></div><div class="bar"><b style="width:'+n/sum*100+'%"></b></div>').join(''):'<div class="empty">本期暂无支出</div>';
+  for(const bill of bills){
+    if(bill.type!=='expense')continue;
+    if(!groups.has(bill.category))groups.set(bill.category,{total:0,items:[]});
+    const group=groups.get(bill.category);
+    group.total+=bill.cents;
+    if(expandable)group.items.push(bill);
+    sum+=bill.cents;
+  }
+  if(!groups.size)return '<div class="empty">本期暂无支出</div>';
+  return [...groups].sort((a,b)=>b[1].total-a[1].total).map(([label,group])=>{
+    const bar='<div class="bar" aria-hidden="true"><b style="width:'+(sum?group.total/sum*100:0)+'%"></b></div>';
+    if(!expandable)return '<div class="row between"><span>'+esc(label)+'</span><span>'+money(group.total)+'</span></div>'+bar;
+    const items=group.items.reverse().sort((a,b)=>b.date.localeCompare(a.date)).map(bill=>
+      '<li><span>'+esc(bill.title)+'<small class="muted">'+esc(bill.date)+'</small></span><span class="out">'+money(bill.cents)+'</span></li>').join('');
+    return '<details class="expense-category"><summary><span class="expense-category-label">'+esc(label)+'</span><span>'+money(group.total)+'</span></summary>'+bar+'<ul>'+items+'</ul></details>';
+  }).join('');
 }
 const recordButtons='<button class="primary" data-action="new">＋ 记一笔</button><button data-action="parse">✦ 识别账单</button>';
 function heroCrest(skin){
@@ -4325,7 +4347,7 @@ function report(){
   return heading('PERIOD CLOSE','周期结算','按自然日、周一至周日或自然月汇总，可回看任意日期。')+
     '<section class="panel"><div class="row between"><div class="row">'+[['day','日'],['week','周'],['month','月']].map(([id,label])=>'<button class="'+(id===period?'active':'')+'" data-period="'+id+'">按'+label+'</button>').join('')+'</div><label>选择日期 <input id="anchor" type="date" value="'+esc(anchor||dateString())+'"></label></div><div class="muted">'+s.from+' 至 '+s.to+' · '+s.bills.length+' 笔</div></section>'+
     metrics([['本期净结余',s.income-s.expense],['本期收入',s.income,'in'],['本期支出',s.expense,'out']])+
-    '<div class="columns"><section class="panel"><h2>本期账目</h2>'+table(s.bills)+'</section><section class="panel"><h2>支出分类</h2>'+breakdown(s.bills)+'<button data-share="'+period+'">✉ 整理给角色</button></section></div>';
+    '<div class="columns"><section class="panel"><h2>本期账目</h2>'+table(s.bills)+'</section><section class="panel"><h2>支出分类</h2>'+breakdown(s.bills,true)+'<button data-share="'+period+'">✉ 整理给角色</button></section></div>';
 }
 function api(){
   const p=state.profiles.find(x=>x.id===state.profile), img=state.imageApi;
