@@ -584,7 +584,7 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #ledgerReleaseNotice .release-notice-setting{border:1px solid var(--line);border-radius:14px;background:var(--field);padding:clamp(12px,3vw,18px)}
 #ledgerReleaseNotice footer{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted)}
 #ledgerReleaseNotice button{min-height:44px;min-width:96px}
-</style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css"></head>
+</style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button></div><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
@@ -4192,7 +4192,10 @@ async function screenshotSelectedMessages(button){
         ctx.drawImage(overlay,x+(size-side)/2+size*(frame.x||0)/100,y+(size-side)/2+size*(frame.y||0)/100,side,side);
       }
     };
-    const metaInk=mist?'#0c1526':colors.muted;
+    const roleColors=Object.fromEntries(['char','user'].map(role=>[role,
+    Object.fromEntries(['paper','ink'].map(part=>[part,theme.getPropertyValue('--chat-'+role+'-'+part).trim()]))
+  ]));
+  const metaInk=mist?'#0c1526':colors.muted;
     ctx.fillStyle=mist?'#72829c':colors.bg;ctx.fillRect(0,0,width,height);
     ctx.fillStyle=mist?'#4a5b79':colors.panel;
     ctx.fillRect(0,0,width,headerHeight);
@@ -4208,19 +4211,21 @@ async function screenshotSelectedMessages(button){
       if(entry.person)avatar(entry.person,entry.name,entry.mine?width-inset-avatarSize:inset,y,avatarSize);
       const nameX=entry.system?width/2:mist?(entry.mine?width-inset-avatarSize-gap:inset+avatarSize+gap):(entry.mine?x+bubbleWidth:x);
       const align=entry.system?'center':entry.mine?'right':'left';
-      write(entry.names,nameX,y,18,25,metaInk,align);
+      const palette=entry.system?null:roleColors[entry.mine?'user':'char'];
+      const speakerInk=palette?.ink||metaInk;
+      write(entry.names,nameX,y,18,25,speakerInk,align);
       if(mist&&entry.person&&entry.time)write([entry.time],nameX,y+entry.names.length*25,15,20,metaInk,align);
       y+=entry.metaHeight;
       const fill=entry.system?colors.field:mist?(entry.mine?'#e1e6f2ed':theme.getPropertyValue('--mist-char-paper').trim()||colors.panel):entry.mine?colors.selected:colors.control;
-      box(x,y,bubbleWidth,entry.bubbleHeight,mist?7:14,fill);
+      box(x,y,bubbleWidth,entry.bubbleHeight,mist?7:14,palette?.paper||fill);
       let inside=y+12;
-      const ink=entry.mine?(mist?'#24314e':colors['selected-ink']):colors.ink;
+      const ink=palette?.ink||(entry.mine?(mist?'#24314e':colors['selected-ink']):colors.ink);
       write(entry.quotes,x+12,inside,17,24,ink);
       inside+=entry.quotes.length*24;
       const card=entry.cardLayout;
       if(card){
         const left=x+12;
-        write(card.title,left,inside,23,34,colors.gold,'left','700 ');
+        write(card.title,left,inside,23,34,palette?.ink||colors.gold,'left','700 ');
         inside+=card.title.length*34;
         if(card.body.length){
           inside+=8;
@@ -4230,7 +4235,7 @@ async function screenshotSelectedMessages(button){
         if(card.rows.length)inside+=8;
         for(const row of card.rows){
           ctx.fillStyle=colors.line;ctx.fillRect(left,inside,textWidth,1);
-          write(row.label,left,inside+6,messageSize,messageStep,colors.muted);
+          write(row.label,left,inside+6,messageSize,messageStep,palette?.ink||colors.muted);
           write(row.value,left+labelWidth+cardGap,inside+6,messageSize,messageStep,ink);
           inside+=row.height;
         }
@@ -4239,7 +4244,7 @@ async function screenshotSelectedMessages(button){
       inside+=entry.lines.length*messageStep;
       if(entry.imageWidth)ctx.drawImage(pictures.get(entry.image),x+12,inside+4,entry.imageWidth,entry.imageHeight);
       y+=entry.bubbleHeight;
-      if(entry.footerHeight){write([entry.time],entry.mine?x+bubbleWidth:x,y+4,15,20,metaInk,align);y+=entry.footerHeight;}
+      if(entry.footerHeight){write([entry.time],entry.mine?x+bubbleWidth:x,y+4,15,20,speakerInk,align);y+=entry.footerHeight;}
       y+=22;
     }
     const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
