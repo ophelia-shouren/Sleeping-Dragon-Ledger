@@ -705,23 +705,25 @@ const storySafety='保持角色设定一致。内容不能含性暗示，不得�
 let storyJob=null, storyOrbResult='';
 function refreshStoryOrb(){
   const orb=$('homeOrb'),panel=$('dialog');
-  const job=storyJob&&!storyJob.html?storyJob:null;
+  const job=storyJob;
   const result=storyOrbResult&&state.stories.find(x=>x.id===storyOrbResult);
-  const show=Boolean(!(panel.open&&panel.classList.contains('story-orb-page'))&&(job||result));
+  const html=job?job.html:result?.htmlCard;
+  const page=html?'moon':'story';
+  const show=Boolean((job||result)&&!(panel.open&&panel.dataset.storyOrbPage===page));
   orb.classList.toggle('story-active',show);
   $('storyOrbStatus').hidden=!show;
   const jump=$('storyOrbJump'),count=$('storyOrbCount');
   jump.hidden=!show;
   if(show){
-    const label=job?'番外生成中':result.partial?'番外未完稿已保存':'番外已生成';
+    const label=html?(job?'HTML 生成中':'HTML 已生成'):job?'番外生成中':result.partial?'番外未完稿已保存':'番外已生成';
     $('storyOrbLabel').textContent=label;
-    jump.setAttribute('aria-label',job?'返回番外生成进度':'阅读刚生成的番外');
+    jump.setAttribute('aria-label',html?(job?'返回 HTML 生成进度':'查看刚生成的 HTML 卡片'):(job?'返回番外生成进度':'阅读刚生成的番外'));
     count.hidden=!job?.stream;
     if(job?.stream)count.textContent='已生成 '+storyCount(job.preview)+' 字';
   }
 }
 function jumpToStoryFromOrb(){
-  if(storyJob&&!storyJob.html){storyProgress();return;}
+  if(storyJob){storyProgress();return;}
   const result=state.stories.find(x=>x.id===storyOrbResult);
   if(result)storyRead(result);
   else refreshStoryOrb();
@@ -812,7 +814,7 @@ function storyDialog(title,body,view='',back=null){
     '<button type="button" class="story-header-exit" '+exitAction+' aria-label="'+exitLabel+'" title="'+exitLabel+'"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">'+
     (folder||reading?'<path d="M20 12H4m7-7-7 7 7 7"/>':'<path d="m6 6 12 12M18 6 6 18"/>')+'</svg></button></div></header><div class="story-shell">'+body+'</div>',true);
   $('dialog').classList.add('story-studio');
-  $('dialog').classList.toggle('story-orb-page',!moon&&!box&&back!==moonBox&&!$('storyMoonRename'));
+  $('dialog').dataset.storyOrbPage=moon||box||back===moonBox||$('storyMoonRename')?'moon':'story';
   refreshStoryOrb();
   $('dialog').orbBack=back||(folder?()=>storyLibrary():null);
 }
@@ -896,6 +898,7 @@ function moonBox(category=null){
   storyDialog(category||'未分类','<div class="story-books">'+(rows||'<p class="muted">此分类还没有卡片。</p>')+'</div>','reader',moonBox);
 }
 function moonCard(card){
+  if(storyOrbResult===card.id)storyOrbResult='';
   const ready=card.componentReady!==false;
   storyDialog(card.title,'<form id="storyMoonRename" class="story-panel" data-id="'+esc(card.id)+'" hidden><label>卡片名称<input name="title" maxlength="120" required></label><div class="row"><button type="submit" class="primary">保存名称</button><button type="button" data-moon-rename-cancel>取消</button></div></form>'+
     '<div class="row">'+storyButton('moonBox','返回月匣')+
@@ -1083,7 +1086,7 @@ function storyProgress(){
 function updateStoryCount(body){
   const count=$('storyLiveCount'),words=storyCount(body);
   if(count)count.textContent='已生成 '+words+' 字';
-  if(storyJob?.stream&&!storyJob.html){
+  if(storyJob?.stream){
     const orbCount=$('storyOrbCount');
     if(!orbCount.hidden)orbCount.textContent='已生成 '+words+' 字';
   }
@@ -1216,7 +1219,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
   }
   const controller=new AbortController();
   storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller,html,stream};
-  if(!html)storyOrbResult='';
+  storyOrbResult='';
   if(!recovering)storyProgress();
   else {refreshStoryOrb();openNativeStory();}
   let live='',saved='',timer;
@@ -1261,7 +1264,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     if($('storyLive'))$('storyLive').textContent=job.preview;
     updateStoryCount(job.preview);
     if($('dialog').open&&$('storyStatus'))storyRead(article);
-    else if(!html)storyOrbResult=article.id;
+    else storyOrbResult=article.id;
     toast(html?'HTML 代码已存入月匣':(partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
   }catch(error){
     checkpoint();
@@ -4792,7 +4795,8 @@ function dialog(html,full=false){
   panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
-  panel.classList.remove('story-studio','story-orb-page');
+  panel.classList.remove('story-studio');
+  delete panel.dataset.storyOrbPage;
   panel.innerHTML=html;
   if(full)panel.append(orb);
   panel.scrollTop=0;
