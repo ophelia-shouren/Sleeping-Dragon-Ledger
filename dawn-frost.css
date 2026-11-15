@@ -36,8 +36,8 @@
   --notice: #f6ebed;
   --green: #2e6655;
   --expense: #a93b46;
-  --dawn: #a93b46;
-  --frost: #30325e;
+  --dawn: #a66b76;
+  --frost: #6d809b;
   --chat-char-paper: #efe0e1;
   --chat-char-ink: #83303e;
   --chat-char-edge: #d9bec7;
@@ -76,7 +76,7 @@
   inset: 0 5% 0 auto;
   width: min(37%, 250px);
   transform: none;
-  opacity: .9;
+  opacity: 1;
   z-index: 0;
 }
 
@@ -110,9 +110,10 @@
 
 .frost-seal {
   color: var(--frost);
-  background: #98bde6;
+  background: #dbe6f2;
   transform: translate(35%, 18%);
   font: 400 clamp(28px, 5vw, 51px)/1 sans-serif;
+  font-variant-emoji: text;
 }
 
 [data-skin="dawn-frost"] :is(.panel, .card, .chat-top, dialog) {
@@ -162,10 +163,5 @@
     inset: 12px 12px auto auto;
     height: 100px;
     width: 106px;
-    opacity: .56;
-  }
-
-  [data-skin="dawn-frost"] .hero .frost-seal {
-    opacity: .4;
   }
 }
