@@ -1124,6 +1124,14 @@ function openNativeStory(){
   if(!nativeStoryOpenPending||deviceLocked)return;
   nativeStoryOpenPending=false;
   if(storyJob&&!storyJob.html){storyProgress();return;}
+  const failure=JSON.parse(localStorage.getItem(nativeStoryKey+'-failure')||'null');
+  if(failure){
+    const draft=state.stories.find(x=>x.id===failure.id&&x.partial&&!x.htmlCard);
+    dialog('<h2>番外生成中断</h2><p class="notice">'+esc(failure.message)+'</p><div class="row">'+
+      (draft?storyButton('read','打开已保存的未完稿',draft.id):'')+
+      '<button type="button" data-action="close">关闭</button></div>');
+    return;
+  }
   const id=localStorage.getItem(nativeStoryKey+'-last');
   const article=id&&state.stories.find(x=>x.id===id&&!x.htmlCard);
   if(article)storyRead(article);
@@ -1194,6 +1202,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
   if(native&&!recovering){
     localStorage.setItem(nativeStoryKey,JSON.stringify({article,firstTitle,stream,model}));
     localStorage.removeItem(nativeStoryKey+'-last');
+    localStorage.removeItem(nativeStoryKey+'-failure');
   }
   const controller=new AbortController();
   storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller,html,stream};
@@ -1252,7 +1261,10 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
       }
       toast(saved?'已停止生成，正文已保存为未完稿。':'已停止生成，尚未收到正文。');return;
     }
-    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(saved?'。已保存未完稿。':'');
+    if(native){
+      try{localStorage.setItem(nativeStoryKey+'-failure',JSON.stringify({id:article.id,message:error.message}));}catch{}
+    }
+    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(saved?' 已保存未完稿。':'');
     if(saved)toast('生成中断，已保存未完稿。');else throw error;
   }finally{if($('stopStory'))$('stopStory').hidden=true;clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;if(native)localStorage.removeItem(nativeStoryKey);refreshStoryOrb();}
 }
@@ -4742,6 +4754,7 @@ function formatArchive(){
     if(storyJob)storyJob.controller.abort();
     localStorage.removeItem(nativeStoryKey);
     localStorage.removeItem(nativeStoryKey+'-last');
+    localStorage.removeItem(nativeStoryKey+'-failure');
     localStorage.removeItem(key);
   }
   catch{archiveResetting=false;toast('清除存档失败，请检查存储权限。');return;}
