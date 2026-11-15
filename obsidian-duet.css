@@ -74,13 +74,25 @@
 [data-skin="obsidian-duet"] .story-entry button::before {
   --animal-mark: var(--dog-mark);
 }
+[data-skin="obsidian-duet"] {
+  --chat-char-paper: #c8ad7e;
+  --chat-char-ink: #171716;
+  --chat-user-paper: #bfbebf;
+  --chat-user-ink: #171716;
+}
+[data-skin="obsidian-duet"] :is(.chat-thread, .group-room) .messages {
+  background: #171716;
+}
 [data-skin="obsidian-duet"] .message-row.assistant .bubble:not(.message-picked) {
-  background: #48262d;
-  border-color: var(--rose);
-  color: var(--ink);
+  background: var(--chat-char-paper);
+  border-color: #b1986e;
+  color: var(--chat-char-ink);
 }
 [data-skin="obsidian-duet"] .message-row.user .bubble:not(.message-picked) {
-  background: var(--selected);
-  border-color: var(--sage);
-  color: var(--selected-ink);
+  background: var(--chat-user-paper);
+  border-color: #a7a6a7;
+  color: var(--chat-user-ink);
+}
+[data-skin="obsidian-duet"] .message-row:is(.assistant, .user) .bubble:not(.message-picked) :is(small, .typing-dots) {
+  color: inherit;
 }
