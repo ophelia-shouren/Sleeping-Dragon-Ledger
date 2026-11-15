@@ -513,10 +513,29 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .expense-category ul{margin:0 0 12px;padding:0;list-style:none}
 .expense-category li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .expense-category li small{display:block}
-.bill-batch-tools{margin-bottom:8px}
+.bill-batch-tools{display:flex;justify-content:space-between;align-items:center;gap:10px 16px;padding:10px 12px;margin-bottom:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-hi,var(--panel))}
+.bill-batch-heading,.bill-batch-actions{display:flex;align-items:center;gap:8px}
+.bill-batch-heading strong{color:var(--gold);white-space:nowrap}
+.bill-batch-heading .bill-batch-cancel{background:transparent;border-color:transparent;color:var(--muted)}
+.bill-batch-actions button{min-height:40px}
+.bill-batch-actions .bill-batch-delete{background:transparent;color:var(--expense);border-color:currentColor}
 [data-bill-row]{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-[data-bill-row].bill-selected td{background:var(--selected);color:var(--selected-ink)}
-[data-select-bill]{width:20px;height:20px;margin:0;accent-color:var(--gold);cursor:pointer}
+.bill-selection-table table{white-space:normal}
+.bill-selection-table [data-bill-row]{cursor:pointer}
+.bill-selection-table td:nth-child(3),.bill-selection-table td:nth-child(4){overflow-wrap:anywhere}
+.bill-selection-table .bill-check{width:50px;text-align:center}
+.bill-selection-table [data-select-bill]{display:inline-grid;vertical-align:middle;place-items:center;appearance:none;width:22px;height:22px;padding:0;margin:0;border:1px solid var(--accent-border);border-radius:7px;background:var(--field);cursor:pointer}
+.bill-selection-table [data-select-bill]:checked{background:var(--gold);border-color:var(--gold);color:var(--bg)}
+.bill-selection-table [data-select-bill]:checked::after{content:"";width:8px;height:4px;border:solid currentColor;border-width:0 0 2px 2px;transform:translateY(-1px) rotate(-45deg)}
+.bill-selection-table .bill-selected td{background:var(--selected);color:var(--selected-ink,var(--ink))}
+.bill-selection-table .bill-selected td:first-child{box-shadow:inset 3px 0 var(--gold)}
+@media(max-width:560px){
+  .bill-batch-tools{display:grid;gap:6px}
+  .bill-batch-heading{justify-content:space-between}
+  .bill-batch-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bill-selection-table td,.bill-selection-table th{padding-inline:5px}
+  .bill-selection-table .bill-check{width:40px}
+}
 </style><link rel="stylesheet" href="./mist-theme.css"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button></div><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -4346,11 +4365,19 @@ function metrics(items){return '<div class="grid">'+items.map(([label,value,cls]
 function heading(k,title,detail){return '<div class="pagehead"><div class="eyebrow">'+k+'</div><h1>'+title+'</h1><p class="muted">'+detail+'</p></div>';}
 function table(bills,limit=Infinity,selectable=false){
   if(!bills.length)return '<div class="empty">✧　这一页还是空白的。</div>';
-  return '<div class="table"><table><thead><tr><th>日期</th><th>项目</th><th>分类</th><th>金额</th><th>操作</th></tr></thead><tbody>'+[...bills].reverse().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,limit).map(x=>'<tr'+(selectable?' data-bill-row="'+esc(x.id)+'" class="'+(billSelection?.has(x.id)?'bill-selected':'')+'"':'')+'><td>'+esc(x.date)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.category)+'</td><td class="'+(x.type==='income'?'in':'out')+'">'+(x.type==='income'?'+':'−')+money(x.cents)+'</td><td>'+(selectable&&billSelection?'<input type="checkbox" data-select-bill aria-label="选择 '+esc(x.title)+'" '+(billSelection.has(x.id)?'checked':'')+'>':'<button data-edit="'+esc(x.id)+'">编辑</button>')+'</td></tr>').join('')+'</tbody></table></div>';
+  const selecting=selectable&&billSelection!==null;
+  return '<div class="table'+(selecting?' bill-selection-table':'')+'"><table><thead><tr>'+(selecting?'<th class="bill-check"><span>选择</span></th>':'')+'<th>日期</th><th>项目</th><th>分类</th><th>金额</th>'+(selecting?'':'<th>操作</th>')+'</tr></thead><tbody>'+
+    [...bills].reverse().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,limit).map(x=>{
+      const checked=selecting&&billSelection.has(x.id);
+      const row=selectable?' data-bill-row="'+esc(x.id)+'"'+(checked?' class="bill-selected"':''):'';
+      const checkbox=selecting?'<td class="bill-check"><input type="checkbox" data-select-bill aria-label="选择 '+esc(x.title)+'" '+(checked?'checked':'')+'></td>':'';
+      const edit=selecting?'':'<td><button data-edit="'+esc(x.id)+'">编辑</button></td>';
+      return '<tr'+row+'>'+checkbox+'<td>'+esc(x.date)+'</td><td>'+esc(x.title)+'</td><td>'+esc(x.category)+'</td><td class="'+(x.type==='income'?'in':'out')+'">'+(x.type==='income'?'+':'−')+money(x.cents)+'</td>'+edit+'</tr>';
+    }).join('')+'</tbody></table></div>';
 }
 let billSelection=null;
 function ledgerDetails(){
-  const tools=billSelection?'<div class="row bill-batch-tools"><span id="billSelectionCount" role="status">已选 '+billSelection.size+' 笔</span><button data-action="billBatchCategory" '+(billSelection.size?'':'disabled')+'>编辑分类</button><button class="archive-danger" data-action="billBatchDelete" '+(billSelection.size?'':'disabled')+'>删除所选</button><button data-action="billSelectionCancel">取消</button></div>':
+  const tools=billSelection?'<div class="bill-batch-tools" role="group" aria-label="批量操作"><div class="bill-batch-heading"><strong id="billSelectionCount" role="status">已选 '+billSelection.size+' 笔</strong><button class="bill-batch-cancel" data-action="billSelectionCancel">取消</button></div><div class="bill-batch-actions"><button class="primary" data-action="billBatchCategory" '+(billSelection.size?'':'disabled')+'>编辑分类</button><button class="bill-batch-delete" data-action="billBatchDelete" '+(billSelection.size?'':'disabled')+'>删除所选</button></div></div>':
     '<div class="row">'+recordButtons+(state.bills.length?'<button data-action="billSelectionStart">多选</button>':'')+'</div>';
   return heading('TRANSACTION REGISTER','收支明细','每一笔交易都会即时计入结余。')+'<section class="panel">'+tools+table(state.bills,Infinity,true)+'</section>';
 }
