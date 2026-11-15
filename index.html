@@ -222,10 +222,17 @@ body.full-chat{overflow:hidden}
 .full-chat #chatForm textarea{min-height:48px;max-height:120px;margin-bottom:4px}
 .chat-directory h3,.deck-presets h3{margin-top:12px}
 .deck-presets{margin:12px 0;padding:10px 0;border-top:1px solid var(--line)}
-.home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));width:44px;height:44px;border-radius:50%;padding:0;touch-action:none;cursor:grab;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005;font-size:20px}
-.home-orb:active{cursor:grabbing}.home-orb[hidden]{display:none}
-@media(max-width:850px){.full-chat .chat-thread{left:0;padding:calc(8px + env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}}
-.home-orb{display:grid;place-items:center}.home-orb svg{width:31px;height:31px;pointer-events:none}
+.home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;touch-action:none;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
+.home-orb[hidden],.home-orb [hidden]{display:none}
+.home-orb>button{display:grid;place-items:center;padding:0;border:none;background:transparent;color:inherit}
+.home-orb .home-orb-owl{width:42px;height:42px;cursor:grab;border-radius:50%}
+.home-orb .home-orb-owl:active{cursor:grabbing}
+.home-orb svg{width:31px;height:31px;pointer-events:none}
+.home-orb.story-active{border-radius:12px;gap:4px}
+.story-orb-status{display:grid;gap:2px;line-height:1.2;font-size:12px}
+.story-orb-status small{font-size:11px;color:var(--muted)}
+#storyOrbJump{width:36px;height:42px;font-size:20px;border-radius:8px}
+
 .composer-actions{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:7px 0 1px}
 .composer-tools{display:flex;gap:5px;min-width:0;flex-wrap:wrap}
 .composer-tool,.composer-send{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:38px;white-space:nowrap}
@@ -508,7 +515,7 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .expense-category li small{display:block}
 </style><link rel="stylesheet" href="./mist-theme.css"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small>HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span>霍格沃茨 <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
-<main><div id="view"></div></main><button type="button" id="homeOrb" class="home-orb" data-action="homeOrb" aria-label="主页快捷菜单" hidden><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
+<main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button></div><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
 'use strict';
 
@@ -625,7 +632,30 @@ function avatarButton(id,person,cls=''){
 const storyStyles=['治愈日常','温柔抒情','轻喜剧','慢热浪漫','哥特奇谭','魔法冒险','悬疑推理','复古书信','诗意童话','电影叙事'];
 const storySequelRequest='<Request：以上为故事前文，请以此为序章生成一篇20000字以上的后续发展，请有头有尾并进行扩展续写，不得ooc，禁止照搬原文。内容不能含性暗示，不得输出nsfw剧情。>';
 const storySafety='保持角色设定一致。内容不能含性暗示，不得输出 NSFW 剧情。';
-let storyJob=null;
+let storyJob=null, storyOrbResult='';
+function refreshStoryOrb(){
+  const orb=$('homeOrb'),panel=$('dialog');
+  const job=storyJob&&!storyJob.html?storyJob:null;
+  const result=storyOrbResult&&state.stories.find(x=>x.id===storyOrbResult);
+  const show=Boolean(!(panel.open&&panel.classList.contains('story-orb-page'))&&(job||result));
+  orb.classList.toggle('story-active',show);
+  $('storyOrbStatus').hidden=!show;
+  const jump=$('storyOrbJump'),count=$('storyOrbCount');
+  jump.hidden=!show;
+  if(show){
+    const label=job?'番外生成中':result.partial?'番外未完稿已保存':'番外已生成';
+    $('storyOrbLabel').textContent=label;
+    jump.setAttribute('aria-label',job?'返回番外生成进度':'阅读刚生成的番外');
+    count.hidden=!job?.stream;
+    if(job?.stream)count.textContent='已生成 '+storyCount(job.preview)+' 字';
+  }
+}
+function jumpToStoryFromOrb(){
+  if(storyJob&&!storyJob.html){storyProgress();return;}
+  const result=state.stories.find(x=>x.id===storyOrbResult);
+  if(result)storyRead(result);
+  else refreshStoryOrb();
+}
 const htmlCardRule='按用户的最新指令生成一个完整、自包含的可互动 HTML 文档。只输出 HTML，可放在一个 html 代码块内。CSS 和 JavaScript 写在文档内，使用原生浏览器能力，素材可用内联 SVG 或 data URI；禁止外部网络资源。按用户指定尺寸设计，窄屏仍可查看。尊重提供的角色设定、关系和用户面具。不要复述指令或附小说正文。';
 function wantsHtmlCard(input){
   return /\bhtml\b/i.test(input)&&(/^\s*[$＄]|^\s*html\s*(?:卡片|互动)/i.test(input)||/(?:生成|制作|创建|写|输出|做|produce|generate|create)/i.test(input));
@@ -712,6 +742,8 @@ function storyDialog(title,body,view='',back=null){
     '<button type="button" class="story-header-exit" '+exitAction+' aria-label="'+exitLabel+'" title="'+exitLabel+'"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6">'+
     (folder||reading?'<path d="M20 12H4m7-7-7 7 7 7"/>':'<path d="m6 6 12 12M18 6 6 18"/>')+'</svg></button></div></header><div class="story-shell">'+body+'</div>',true);
   $('dialog').classList.add('story-studio');
+  $('dialog').classList.toggle('story-orb-page',!moon&&!box&&back!==moonBox&&!$('storyMoonRename'));
+  refreshStoryOrb();
   $('dialog').orbBack=back||(folder?()=>storyLibrary():null);
 }
 function storyChecks(items,name,legend,selected=''){
@@ -958,6 +990,7 @@ function bindStoryScrubber(editor){
 }
 function storyRead(x){
   if(x.htmlCard){moonCard(x);return;}
+  if(storyOrbResult===x.id)storyOrbResult='';
   const parent=state.stories.find(y=>y.id===x.parent);
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
@@ -978,7 +1011,12 @@ function storyProgress(){
   updateStoryCount(storyJob.preview);
 }
 function updateStoryCount(body){
-  const count=$('storyLiveCount');if(count)count.textContent='已生成 '+storyCount(body)+' 字';
+  const count=$('storyLiveCount'),words=storyCount(body);
+  if(count)count.textContent='已生成 '+words+' 字';
+  if(storyJob?.stream&&!storyJob.html){
+    const orbCount=$('storyOrbCount');
+    if(!orbCount.hidden)orbCount.textContent='已生成 '+words+' 字';
+  }
 }
 function storeStory(x){
   const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
@@ -1011,7 +1049,8 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     worldContext('end')
   ].filter(Boolean).join('\n');
   const controller=new AbortController();
-  storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller,html};
+  storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller,html,stream};
+  if(!html)storyOrbResult='';
   storyProgress();
   let live='',saved='',timer;
   const firstTitle=!html&&!title&&!parent;
@@ -1057,7 +1096,8 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     job.preview=article.body;
     if($('storyLive'))$('storyLive').textContent=job.preview;
     updateStoryCount(job.preview);
-    if($('storyStatus'))storyRead(article);
+    if($('dialog').open&&$('storyStatus'))storyRead(article);
+    else if(!html)storyOrbResult=article.id;
     toast(html?'HTML 代码已存入月匣':(partial?'已保存未完稿':'番外已存入余晖藏书阁')+' · '+storyCount(article.body)+' 字');
   }catch(error){
     checkpoint();
@@ -1069,7 +1109,7 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
     }
     if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(saved?'。已保存未完稿。':'');
     if(saved)toast('生成中断，已保存未完稿。');else throw error;
-  }finally{if($('stopStory'))$('stopStory').hidden=true;clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;}
+  }finally{if($('stopStory'))$('stopStory').hidden=true;clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;refreshStoryOrb();}
 }
 function formatStoryBody(body){
   return body.replace(/\r\n?/g,'\n').split('\n').map(line=>line.replace(/^[ \t\u3000]+|[ \t\u3000]+$/g,'')).filter(Boolean).join('\n\n');
@@ -3499,7 +3539,7 @@ function initHomeOrb(){
     if(e.button!==0)return;
     const box=orb.getBoundingClientRect();
     drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:box.left,top:box.top};moved=false;
-    orb.setPointerCapture(e.pointerId);
+    (e.target.closest('button')||orb).setPointerCapture(e.pointerId);
   });
   orb.addEventListener('pointermove',e=>{
     if(!drag||drag.id!==e.pointerId)return;
@@ -3515,6 +3555,7 @@ function initHomeOrb(){
     if(viewportFrame!==null)return;
     viewportFrame=requestAnimationFrame(()=>{viewportFrame=null;resize();});
   };
+  if(typeof ResizeObserver==='function')new ResizeObserver(()=>{if(orb.style.left)scheduleResize();}).observe(orb);
   window.addEventListener('resize',scheduleResize);
   window.visualViewport?.addEventListener('resize',scheduleResize);
   window.visualViewport?.addEventListener('scroll',scheduleResize);
@@ -4470,6 +4511,7 @@ function render(){
   const fullChat=page==='chat'&&!!contact(activeContact)&&!deviceLocked;
   document.body.classList.toggle('full-chat',fullChat);
   $('homeOrb').hidden=deviceLocked;
+  refreshStoryOrb();
   document.documentElement.dataset.skin=state.skin;
   document.documentElement.dataset.ledgerFont=activeLedgerFont(state.skin,state.skinFonts);
   if(deviceLocked)return;
@@ -4487,11 +4529,12 @@ function dialog(html,full=false){
   panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
-  panel.classList.remove('story-studio');
+  panel.classList.remove('story-studio','story-orb-page');
   panel.innerHTML=html;
   if(full)panel.append(orb);
   panel.scrollTop=0;
   if(!panel.open)panel.showModal();
+  refreshStoryOrb();
 }
 function handleLedgerAndroidBack(){
   if(typeof deviceLocked==='undefined'||deviceLocked)return true;
@@ -4775,6 +4818,7 @@ document.addEventListener('click',e=>{
     case 'chatExport':chatHistoryDialog(false);break;
     case 'chatDirectory':openChatDirectory();break;
     case 'homeOrb':openHomeOrb();break;
+    case 'storyOrbJump':jumpToStoryFromOrb();break;
     case 'storyBack':$('dialog').orbBack?.();break;
     case 'orbCancel':$('orbQuickDialog').close();break;
     case 'orbBack':{
@@ -5071,6 +5115,7 @@ document.addEventListener('visibilitychange',resetIdleTimer);
 $('dialog').addEventListener('close',()=>{
   const panel=$('dialog'),orb=$('homeOrb');
   if(!panel.open&&panel.contains(orb))panel.before(orb);
+  refreshStoryOrb();
   resetIdleTimer();
 });
 render();
