@@ -703,6 +703,17 @@ const storyStyles=['治愈日常','温柔抒情','轻喜剧','慢热浪漫','哥
 const storySequelRequest='<Request：以上为故事前文，请以此为序章生成一篇20000字以上的后续发展，请有头有尾并进行扩展续写，不得ooc，禁止照搬原文。内容不能含性暗示，不得输出nsfw剧情。>';
 const storySafety='保持角色设定一致。内容不能含性暗示，不得输出 NSFW 剧情。';
 let storyJob=null, storyOrbResult='';
+const storyFailures=new Map();
+const storyRetryButton=html=>storyButton('retryGeneration','重试',String(html));
+function retryStoryGeneration(html){
+  if(storyJob)throw Error('已有生成任务正在运行。');
+  const retry=storyFailures.get(html)?.options;
+  if(!retry)return;
+  const {parentId,...options}=retry;
+  const parent=parentId?state.stories.find(x=>x.id===parentId):undefined;
+  if(parentId&&!parent)throw Error('原来的前文已删除，无法按原选项重试。');
+  return generateStory({...options,parent});
+}
 function refreshStoryOrb(){
   const orb=$('homeOrb'),panel=$('dialog');
   const job=storyJob;
@@ -856,6 +867,7 @@ function bindStoryStyleChip(chip){
 }
 function storyGenerator(){
   if(storyJob&&!storyJob.html){storyProgress();return;}
+  if(storyFailures.has(false)){storyProgress(storyFailures.get(false));return;}
   storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
     '<section class="story-panel story-cast"><h3>角色与文风</h3>'+storyToggle('includeUser','让 User 加入剧情')+storyMemoryField()+
     storyChecks(state.contacts.map(c=>[c.id,displayName(c)]),'cast','登场角色 · 可多选',activeContact)+
@@ -871,6 +883,7 @@ function storyGenerator(){
 }
 function moonWorkshop(view='generate'){
   if(view==='generate'&&storyJob?.html){storyProgress();return;}
+  if(view==='generate'&&storyFailures.has(true)){storyProgress(storyFailures.get(true));return;}
   const nav='<div class="row moon-workshop-nav">'+storyButton('moon','按人设生成 HTML 代码')+storyButton('moonReceive','接收 HTML 代码')+'</div>';
   const fields=view==='generate'
     ?'<form id="storyMoonGenerate" class="story-panel story-draft"><label>标题<input name="title" maxlength="120"></label>'+
@@ -1076,12 +1089,14 @@ function storyRead(x){
   };
   $('storyFont').onchange=event=>commit({...state,storyFont:Number(event.target.value)});
 }
-function storyProgress(){
-  storyDialog(storyJob.html?'月下工坊':'日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong><button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button></div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>',storyJob.html?'moon':'compose');
-  $('storyStatus').textContent=storyJob.status;
-  $('stopStory').disabled=storyJob.controller.signal.aborted;
-  $('storyLive').textContent=storyJob.html?'':storyJob.preview;
-  updateStoryCount(storyJob.preview);
+function storyProgress(failure){
+  const {html,status,preview}=failure||storyJob;
+  const actions=failure?((failure.options?storyRetryButton(html):'')+storyButton('dismissGenerationFailure','新建生成',String(html))):'<button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button>';
+  storyDialog(html?'月下工坊':'日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong>'+actions+'</div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>',html?'moon':'compose');
+  $('storyStatus').textContent=status;
+  if(!failure)$('stopStory').disabled=storyJob.controller.signal.aborted;
+  $('storyLive').textContent=html?'':preview;
+  updateStoryCount(preview);
 }
 function updateStoryCount(body){
   const count=$('storyLiveCount'),words=storyCount(body);
@@ -1129,7 +1144,8 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
   ].filter(Boolean).join('\n\n');
   const body={model:p.model,stream,messages:[{role:'system',content:context},{role:'user',content:prompt}]};
   const native=!html&&ledgerAndroid.supportsStory()&&apiEndpoint(p.url,'chat/completions').startsWith('https:');
-  return runStory(article,{firstTitle,stream,html,model:p.model,native,p,body});
+  const options={parentId:parent?.id,cast,title,guide,stream,target,pov,style,styleNames,includeUser,readMemory,html};
+  return runStory(article,{firstTitle,stream,html,model:p.model,native,p,body,options});
 }
 const nativeStoryKey='sleeping-dragon-native-story';
 let nativeStoryOpenPending=false;
@@ -1140,8 +1156,9 @@ function openNativeStory(){
   const failure=JSON.parse(localStorage.getItem(nativeStoryKey+'-failure')||'null');
   if(failure){
     const draft=state.stories.find(x=>x.id===failure.id&&x.partial&&!x.htmlCard);
+    if(failure.options)storyFailures.set(false,{html:false,status:'生成中断：'+failure.message,preview:draft?.body||'',options:failure.options});
     dialog('<h2>番外生成中断</h2><p class="notice">'+esc(failure.message)+'</p><div class="row">'+
-      (draft?storyButton('read','打开已保存的未完稿',draft.id):'')+
+      (failure.options?storyRetryButton(false):'')+(draft?storyButton('read','打开已保存的未完稿',draft.id):'')+
       '<button type="button" data-action="close">关闭</button></div>');
     return;
   }
@@ -1211,12 +1228,13 @@ async function requestNativeStory(id,p,body,onDelta,signal){
     try{return JSON.parse(raw);}catch{ return raw; }
   }finally{signal.removeEventListener('abort',cancel);}
 }
-async function runStory(article,{firstTitle,stream,html=false,model,native=false,p,body,recovering=false}){
+async function runStory(article,{firstTitle,stream,html=false,model,native=false,p,body,options,recovering=false}){
   if(native&&!recovering){
-    localStorage.setItem(nativeStoryKey,JSON.stringify({article,firstTitle,stream,model}));
+    localStorage.setItem(nativeStoryKey,JSON.stringify({article,firstTitle,stream,model,options}));
     localStorage.removeItem(nativeStoryKey+'-last');
     localStorage.removeItem(nativeStoryKey+'-failure');
   }
+  storyFailures.delete(html);
   const controller=new AbortController();
   storyJob={articleId:article.id,category:storyCategoryKey(article.category),status:'正在准备番外…',preview:'',controller,html,stream};
   storyOrbResult='';
@@ -1259,6 +1277,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
     if(!save(html?htmlCardResponse(response):dialogueReply(response),!html&&partial))throw Error('模型返回了空正文。');
+    if(response?.streamInterrupted===true&&!html)throw Error('生成连接提前结束。');
     if(native)localStorage.setItem(nativeStoryKey+'-last',article.id);
     job.preview=article.body;
     if($('storyLive'))$('storyLive').textContent=job.preview;
@@ -1275,9 +1294,12 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
       toast(saved?'已停止生成，正文已保存为未完稿。':'已停止生成，尚未收到正文。');return;
     }
     if(native){
-      try{localStorage.setItem(nativeStoryKey+'-failure',JSON.stringify({id:article.id,message:error.message}));}catch{}
+      try{localStorage.setItem(nativeStoryKey+'-failure',JSON.stringify({id:article.id,message:error.message,options}));}catch{}
     }
-    if($('storyStatus'))$('storyStatus').textContent='生成中断：'+error.message+(saved?' 已保存未完稿。':'');
+    const status='生成中断：'+error.message+(saved?' 已保存未完稿。':'');
+    const failure={html,status,preview:live||saved,options};
+    storyFailures.set(html,failure);
+    if($('dialog').open&&$('stopStory'))storyProgress(failure);
     if(saved)toast('生成中断，已保存未完稿。');else throw error;
   }finally{if($('stopStory'))$('stopStory').hidden=true;clearTimeout(timer);window.removeEventListener('pagehide',checkpoint);document.removeEventListener('visibilitychange',visibility);storyJob=null;if(native)localStorage.removeItem(nativeStoryKey);refreshStoryOrb();}
 }
@@ -1313,6 +1335,11 @@ function storyEdit(x){
 async function storyAction(d){
   const x=state.stories.find(y=>y.id===d.storyId);
   switch(d.storyAction){
+    case 'retryGeneration':await retryStoryGeneration(d.storyId==='true');break;
+    case 'dismissGenerationFailure':
+      storyFailures.delete(d.storyId==='true');
+      if(d.storyId==='true')moonWorkshop();else storyGenerator();
+      break;
     case 'stop':
       if(storyJob&&!storyJob.controller.signal.aborted){
         storyJob.status='正在停止生成…';
