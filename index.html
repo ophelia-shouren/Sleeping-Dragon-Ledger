@@ -357,6 +357,7 @@ body.full-chat{overflow:hidden}
 .story-studio .story-reader{margin-bottom:18px}
 .story-studio .story-reader-actions{margin-top:14px}
 .story-studio #storyEdit textarea{line-height:1.85}
+.story-scrubber.story-scrubber-reader{top:calc(26% + 16px)}
 #dialog.story-studio:has(.story-scrubber){padding-right:max(38px,var(--studio-pad),env(safe-area-inset-right))}
 #dialog.story-studio:has(.story-generation)>.story-shell{width:min(100%,1040px);margin-inline:auto;padding-bottom:0}
 .story-generation .story-reader-bar{padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
@@ -992,7 +993,7 @@ function bindStoryScrubber(editor){
   const panel=$('dialog'),article=panel.querySelector('.story-reader');
   const scroller=editor||panel;
   if(!article&&!editor)return;
-  panel.insertAdjacentHTML('beforeend','<div class="story-scrubber"><output aria-hidden="true">0%</output><div class="story-track" tabindex="0" role="slider" aria-label="'+(editor?'正文编辑位置':'文章阅读进度')+'" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"><span></span></div></div>');
+  panel.insertAdjacentHTML('beforeend','<div class="story-scrubber'+(editor?'':' story-scrubber-reader')+'"><output aria-hidden="true">0%</output><div class="story-track" tabindex="0" role="slider" aria-label="'+(editor?'正文编辑位置':'文章阅读进度')+'" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100"><span></span></div></div>');
   const rail=panel.querySelector('.story-scrubber'),track=rail.querySelector('.story-track'),output=rail.querySelector('output');
   const clamp=value=>Math.max(0,Math.min(1,value));
   const bounds=()=>{if(editor)return [0,Math.max(1,editor.scrollHeight-editor.clientHeight)];const start=panel.scrollTop+article.getBoundingClientRect().top-panel.getBoundingClientRect().top;return [start,Math.max(1,article.offsetHeight-panel.clientHeight+48)];};
