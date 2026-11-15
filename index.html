@@ -499,7 +499,8 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .font-choice-row{display:flex;flex-wrap:wrap;gap:8px}
 .expense-category summary{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;cursor:pointer;list-style:none;padding:8px 0}
 .expense-category summary::-webkit-details-marker{display:none}
-.expense-category summary::after{content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1px 1px 0;transform:rotate(45deg);margin:0 4px 3px}
+.expense-category summary>.bar{grid-column:1/-1;margin:0 0 4px}
+.expense-category summary::after{grid-column:3;grid-row:1;content:"";width:6px;height:6px;border:solid currentColor;border-width:0 1px 1px 0;transform:rotate(45deg);margin:0 4px 3px}
 .expense-category[open]>summary::after{transform:rotate(225deg);margin-bottom:0}
 .expense-category-label,.expense-category li>span:first-child{overflow-wrap:anywhere}
 .expense-category ul{margin:0 0 12px;padding:0;list-style:none}
@@ -4318,7 +4319,7 @@ function breakdown(bills,expandable=false){
     if(!expandable)return '<div class="row between"><span>'+esc(label)+'</span><span>'+money(group.total)+'</span></div>'+bar;
     const items=group.items.reverse().sort((a,b)=>b.date.localeCompare(a.date)).map(bill=>
       '<li><span>'+esc(bill.title)+'<small class="muted">'+esc(bill.date)+'</small></span><span class="out">'+money(bill.cents)+'</span></li>').join('');
-    return '<details class="expense-category"><summary><span class="expense-category-label">'+esc(label)+'</span><span>'+money(group.total)+'</span></summary>'+bar+'<ul>'+items+'</ul></details>';
+    return '<details class="expense-category"><summary><span class="expense-category-label">'+esc(label)+'</span><span>'+money(group.total)+'</span>'+bar+'</summary><ul>'+items+'</ul></details>';
   }).join('');
 }
 const recordButtons='<button class="primary" data-action="new">＋ 记一笔</button><button data-action="parse">✦ 识别账单</button>';
