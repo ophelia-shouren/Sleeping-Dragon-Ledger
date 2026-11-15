@@ -75,22 +75,22 @@
   --animal-mark: var(--dog-mark);
 }
 [data-skin="obsidian-duet"] {
-  --chat-char-paper: #c8ad7e;
-  --chat-char-ink: #171716;
-  --chat-user-paper: #bfbebf;
-  --chat-user-ink: #171716;
+  --chat-char-paper: #171716;
+  --chat-char-ink: #c8ad7e;
+  --chat-user-paper: #171716;
+  --chat-user-ink: #bfbebf;
 }
 [data-skin="obsidian-duet"] :is(.chat-thread, .group-room) .messages {
   background: #171716;
 }
 [data-skin="obsidian-duet"] .message-row.assistant .bubble:not(.message-picked) {
   background: var(--chat-char-paper);
-  border-color: #b1986e;
+  border-color: var(--chat-char-ink);
   color: var(--chat-char-ink);
 }
 [data-skin="obsidian-duet"] .message-row.user .bubble:not(.message-picked) {
   background: var(--chat-user-paper);
-  border-color: #a7a6a7;
+  border-color: var(--chat-user-ink);
   color: var(--chat-user-ink);
 }
 [data-skin="obsidian-duet"] .message-row:is(.assistant, .user) .bubble:not(.message-picked) :is(small, .typing-dots) {
