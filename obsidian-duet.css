@@ -1,0 +1,86 @@
+.swatch.obsidian-duet {
+  --swatch: linear-gradient(135deg, #171716 0 36%, #d6b36a 36% 57%, #8b3042 57% 77%, #7d8776 77%);
+}
+
+:root[data-skin="obsidian-duet"] {
+  color-scheme: dark;
+  --bg: #171716;
+  --glow: #171716;
+  --ink: #f5efe6;
+  --muted: #c3bcb1;
+  --gold: #d6b36a;
+  --rose: #8b3042;
+  --sage: #7d8776;
+  --line: #56534a;
+  --accent-border: #8e7850;
+  --sidebar: #1d1b1b;
+  --panel: #222020;
+  --panel-hi: #2c2728;
+  --field: #1a1919;
+  --control: #2c2926;
+  --label: #e9dfcd;
+  --selected: #3c453a;
+  --selected-ink: #f5efe6;
+  --hover-ink: #f9df9f;
+  --hero-light: #4b252d;
+  --hero-dark: #211d1d;
+  --hero-end: #30362c;
+  --hero-copy: #e5d9ca;
+  --ornament: #8e7850;
+  --button-hi: #d6b36a;
+  --button-lo: #c5a15c;
+  --button-border: #d6b36a;
+  --button-ink: #171716;
+  --badge: #40322c;
+  --track: #3a3534;
+  --bar-low: #7d8776;
+  --notice: #332627;
+  --green: #bbc7b1;
+  --expense: #efa8b5;
+  --dog-mark: url("./obsidian/dog.svg");
+  --dragon-mark: url("./obsidian/dragon.svg");
+}
+
+[data-skin="obsidian-duet"] .hero {
+  isolation: isolate;
+}
+[data-skin="obsidian-duet"] .hero > .eyebrow {
+  font-size: clamp(10px, 2.8vw, 12px);
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+[data-skin="obsidian-duet"] .hero .obsidian-watermark {
+  position: absolute;
+  inset: 10px clamp(8px, 4vw, 54px) auto auto;
+  width: clamp(156px, 42%, 280px);
+  height: auto;
+  opacity: .32;
+  pointer-events: none;
+  z-index: 0;
+}
+[data-skin="obsidian-duet"] :is(.story-reader-bar strong, .story-entry button)::before {
+  --animal-mark: var(--dragon-mark);
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-inline-end: .45em;
+  vertical-align: -.12em;
+  color: var(--gold);
+  background: currentColor;
+  -webkit-mask: var(--animal-mark) center / contain no-repeat;
+  mask: var(--animal-mark) center / contain no-repeat;
+}
+[data-skin="obsidian-duet"] .story-entry button::before {
+  --animal-mark: var(--dog-mark);
+}
+[data-skin="obsidian-duet"] .message-row.assistant .bubble:not(.message-picked) {
+  background: #48262d;
+  border-color: var(--rose);
+  color: var(--ink);
+}
+[data-skin="obsidian-duet"] .message-row.user .bubble:not(.message-picked) {
+  background: var(--selected);
+  border-color: var(--sage);
+  color: var(--selected-ink);
+}
