@@ -1,0 +1,193 @@
+.swatch.baker-street {
+  --swatch: linear-gradient(135deg, #19191b 0 54%, #dedbd5 54% 76%, #a23e47 76%);
+}
+
+:root[data-skin="baker-street"] {
+  color-scheme: dark;
+  --bg: #101011;
+  --glow: #242325;
+  --ink: #f0ede8;
+  --muted: #bcb7b5;
+  --gold: #e48b90;
+  --line: #4a4446;
+  --panel: #1b1a1c;
+  --panel-hi: #242224;
+  --sidebar: #151416;
+  --field: #161517;
+  --control: #272427;
+  --label: #ddd5d2;
+  --accent-border: #8f4b51;
+  --selected: #54282e;
+  --selected-ink: #fff3f1;
+  --hover-ink: #ffced0;
+  --hero-light: #333032;
+  --hero-dark: #19181a;
+  --hero-end: #252224;
+  --hero-copy: #d4cdca;
+  --ornament: #50484a;
+  --button-hi: #963b44;
+  --button-lo: #7d3038;
+  --button-border: #b75b64;
+  --button-ink: #fff4f3;
+  --badge: #392a2e;
+  --track: #363134;
+  --bar-low: #9a535a;
+  --notice: #36272b;
+  --green: #d2d5cb;
+  --expense: #f0a0a4;
+  --chat-char-paper: #252426;
+  --chat-char-ink: #f0ede8;
+  --chat-user-paper: #44272c;
+  --chat-user-ink: #fff3f1;
+  --baker-art: url("./baker-street-cover.webp");
+}
+
+[data-skin="baker-street"] body {
+  background: radial-gradient(ellipse at 84% 0, #282629, transparent 54%), var(--bg);
+}
+[data-skin="baker-street"] :is(button, input, select, textarea, .panel, .card, .messages) { border-radius: 3px; }
+[data-skin="baker-street"] :is(.card, .panel) { box-shadow: none; }
+[data-skin="baker-street"] #view { width: min(100%, 1230px); margin-inline: auto; }
+[data-skin="baker-street"] :is(.pagehead, .brand) {
+  padding-bottom: 12px;
+  border-bottom: 3px double var(--accent-border);
+}
+[data-skin="baker-street"] .pagehead {
+  padding: clamp(15px, 3vw, 30px);
+  border-inline: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  background: linear-gradient(95deg, #1b1a1c 45%, #1b1a1c99), var(--baker-art) right 48% / cover;
+}
+[data-skin="baker-street"] nav button { border-color: transparent; }
+[data-skin="baker-street"] nav button.active {
+  background: var(--selected);
+  color: var(--selected-ink);
+  border-color: var(--accent-border);
+}
+.baker-home { display: grid; gap: clamp(12px, 2vw, 20px); }
+.baker-home > * { margin: 0; min-width: 0; }
+[data-skin="baker-street"] .hero.baker-cover {
+  padding: 0;
+  border-color: #665c5f;
+  border-radius: 3px;
+  background: #19181a;
+}
+[data-skin="baker-street"] .baker-cover::before { content: none; }
+.baker-masthead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 7px 12px;
+  padding: 9px clamp(14px, 3vw, 29px);
+  background: #762e36;
+  color: #fff1ed;
+  font: 600 .72rem/1.55 var(--ledger-font);
+  letter-spacing: .13em;
+}
+.baker-sheet {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  min-height: 225px;
+}
+.baker-sheet > * { min-width: 0; }
+.baker-sheet .baker-title {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  padding: clamp(17px, 4vw, 44px);
+}
+.baker-cover h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4.15rem);
+  letter-spacing: -.035em;
+}
+.baker-plate {
+  background: linear-gradient(90deg, #19181a33, transparent 40%), var(--baker-art) center / cover, #29282b;
+  border-inline-start: 1px solid var(--line);
+}
+.baker-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: clamp(14px, 2vw, 24px);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--accent-border);
+  background: #1b1a1c;
+}
+.baker-command > * { min-width: 0; }
+.baker-command .grid { margin: 0; }
+[data-skin="baker-street"] .baker-command .card {
+  min-width: 0;
+  padding: 12px;
+  background: #222124;
+}
+[data-skin="baker-street"] .baker-command .card .number {
+  font-size: clamp(18px, 3vw, 28px);
+  overflow-wrap: anywhere;
+}
+.baker-command .baker-actions {
+  align-content: center;
+  justify-content: flex-end;
+}
+[data-skin="baker-street"] .baker-home .columns > .panel { border-top: 2px solid var(--accent-border); }
+[data-skin="baker-street"] .baker-home h2 { color: var(--ink); }
+[data-skin="baker-street"] :is(.chat-top, .story-reader-bar) {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--accent-border);
+  background: var(--panel);
+}
+[data-skin="baker-street"] :is(.group-room, .chat-thread) .messages {
+  background: #111113;
+  border-color: var(--line);
+}
+[data-skin="baker-street"] .story-reader-bar { font-size: .84rem; }
+[data-skin="baker-street"] .story-reader-bar label { white-space: nowrap; }
+[data-skin="baker-street"] .message-row.assistant .bubble:not(.message-picked) {
+  background: var(--chat-char-paper);
+  color: var(--chat-char-ink);
+  border-inline-start: 3px solid #8c8487;
+}
+[data-skin="baker-street"] .message-row.user .bubble:not(.message-picked) {
+  background: var(--chat-user-paper);
+  color: var(--chat-user-ink);
+  border-inline-end: 3px solid var(--accent-border);
+}
+[data-skin="baker-street"] #dialog.story-studio > .story-header {
+  padding: clamp(14px, 3vw, 24px);
+  border-bottom: 3px double var(--accent-border);
+  background: #1d1c1e;
+}
+[data-skin="baker-street"] #dialog.story-studio .story-paper {
+  border-radius: 3px;
+  background: var(--field);
+}
+[data-skin="baker-street"] :is(.contact-row, .directory-item, .story-entry, .group-settings-card) {
+  border-color: var(--line);
+  border-radius: 3px;
+  background: var(--field);
+}
+@media (max-width: 740px) {
+  .baker-sheet, .baker-command { grid-template-columns: minmax(0, 1fr); }
+  .baker-plate {
+    min-height: clamp(104px, 38vw, 182px);
+    border-inline-start: 0;
+    border-top: 1px solid var(--line);
+  }
+  .baker-command .baker-actions { justify-content: flex-start; }
+}
+
+[data-skin="baker-street"] #siteMenuToggle > span {
+  display: grid;
+  place-items: center;
+  font-size: 0;
+}
+[data-skin="baker-street"] #siteMenuToggle > span::before {
+  content: "";
+  width: 23px;
+  height: 23px;
+  background: currentColor;
+  --baker-lens: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cg fill='none' stroke='black' stroke-linecap='round'%3E%3Ccircle cx='11.5' cy='11.5' r='7.5' stroke-width='1.8'/%3E%3Cpath d='M8 9a4.4 4.4 0 0 1 5-1.8' stroke-width='1.4'/%3E%3Cpath d='m17 17 7 7' stroke-width='2.8'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask: var(--baker-lens) center / contain no-repeat;
+  mask: var(--baker-lens) center / contain no-repeat;
+}
