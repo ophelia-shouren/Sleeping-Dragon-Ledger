@@ -1689,13 +1689,18 @@ function groupBubble(m,g,index,selected){
       (last?imageInMessage(m):'')+layout.time+'</article></div>';
   }).join('');
 }
-function openGroup(id){
+let groupHistoryId='',groupHistoryPage=0;
+function openGroup(id,page=groupHistoryId===id?groupHistoryPage:0){
   const g=groupById(id);if(!g)return;
+  const history=chatHistoryWindow(g.messages,page);
+  groupHistoryId=id;
+  groupHistoryPage=history.current;
   const selected=messageSelection(g,'group',g.messages);
   const lock=teaLock(g.members),busy=groupJobs.has(id),speaker=busy&&contact(groupRerolls.get(id)||g.pending[0]),locked=busy||g.pending.length;
   dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button type="button" class="star-button" data-group-edit="'+esc(id)+'" aria-label="打开群聊设置" title="群聊设置" '+(busy?'disabled':'')+'>★</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
-    (g.messages.map((m,i)=>groupBubble(m,g,i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
-    (speaker?typingBubble(speaker,g.showName!==false,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
+    (history.start?'<div class="chat-history-page"><button type="button" data-action="olderGroupPage">查看更早的消息</button></div>':'')+
+    (history.messages.map((m,i)=>groupBubble(m,g,history.start+i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
+    (history.current?'<div class="chat-history-page"><button type="button" data-action="newerGroupPage">查看较新的消息</button><button type="button" data-action="latestGroupPage">回到最新</button></div>':speaker?typingBubble(speaker,g.showName!==false,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
 }
@@ -1813,6 +1818,7 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false){
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
       patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
     }
+    if((message||file)&&groupHistoryId===id)groupHistoryPage=0;
     if(!game&&!storyForward&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);chatQuotes.delete(quoteKey(id,'group'));}
     refreshNeeded=true;
     refreshGroup(id);
@@ -1825,13 +1831,13 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false){
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);if(refreshNeeded)refreshGroup(id);}
 }
-const privateChatPageSize=20;
+const chatHistoryPageSize=20;
 let privateChatPage=0;
-function privateChatWindow(messages,page){
-  const lastPage=Math.max(0,Math.ceil(messages.length/privateChatPageSize)-1);
+function chatHistoryWindow(messages,page){
+  const lastPage=Math.max(0,Math.ceil(messages.length/chatHistoryPageSize)-1);
   const current=Math.max(0,Math.min(page,lastPage));
-  const end=messages.length-current*privateChatPageSize;
-  const start=Math.max(0,end-privateChatPageSize);
+  const end=messages.length-current*chatHistoryPageSize;
+  const start=Math.max(0,end-chatHistoryPageSize);
   return {start,end,current,messages:messages.slice(start,end)};
 }
 function chat(){
@@ -1854,7 +1860,7 @@ function chat(){
   const busy=ai&&threads.has(c.id),name=displayName(c),prefs=chatDisplay(c);
   const typing=busy||(mode==='cards'&&localRuns.has(c.id));
   const now=Date.now(),selected=messageSelection(c,mode,session.messages);
-  const history=privateChatWindow(session.messages,privateChatPage);
+  const history=chatHistoryWindow(session.messages,privateChatPage);
   return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开私聊设置" title="私聊设置">★</button></div></div>'+
     messageActionBar(selected)+'<div id="messages" class="messages">'+
     (history.start?'<div class="chat-history-page"><button type="button" data-action="olderChatPage">查看更早的消息</button></div>':'')+
@@ -5162,7 +5168,7 @@ document.addEventListener('click',e=>{
   if(d.teaRead)readTeaCard(d.teaRead,d.teaMode,Number(d.teaIndex));
   if(d.teaExport)exportTeaCard(d.teaExport,d.teaMode,Number(d.teaIndex));
   if(d.teaBack)teaBack(d.teaBack,d.teaMode);
-  if(d.groupOpen)openGroup(d.groupOpen);
+  if(d.groupOpen)openGroup(d.groupOpen,b.matches('.directory-item')?0:undefined);
   if(d.groupGames)openGroupGames(d.groupGames);
   if(d.groupRetry)sendGroup(d.groupRetry);
   if(d.groupSkip&&!groupJobs.has(d.groupSkip)){
@@ -5288,12 +5294,20 @@ document.addEventListener('click',e=>{
       $('chatImage').value='';$('chatImagePreview').replaceChildren();break;
     }
     case 'contacts':localRuns.clear();activeContact='';go('chat');break;
+    case 'olderGroupPage':case 'newerGroupPage':case 'latestGroupPage':{
+      const id=b.closest('[data-group-room]')?.dataset.groupRoom;
+      if(!id)break;
+      const next=d.action==='latestGroupPage'?0:groupHistoryPage+(d.action==='olderGroupPage'?1:-1);
+      openGroup(id,next);
+      if(d.action==='newerGroupPage'&&groupHistoryPage)$('groupMessages').scrollTop=0;
+      break;
+    }
     case 'olderChatPage':case 'newerChatPage':case 'latestChatPage':{
       const c=contact(activeContact);
       if(!c||page!=='chat')break;
-      const current=privateChatWindow(localSession(c).messages,privateChatPage).current;
+      const current=chatHistoryWindow(localSession(c).messages,privateChatPage).current;
       const next=d.action==='latestChatPage'?0:current+(d.action==='olderChatPage'?1:-1);
-      privateChatPage=privateChatWindow(localSession(c).messages,next).current;
+      privateChatPage=chatHistoryWindow(localSession(c).messages,next).current;
       render();
       if(d.action==='newerChatPage'&&privateChatPage)$('messages').scrollTop=0;
       break;
