@@ -98,10 +98,6 @@
 [data-skin="mist"] #dialog.story-studio {
   --studio-serif:var(--mist-font); background:var(--mist-backdrop);
 }
-[data-skin="mist"] .bonus-tea {
-  --gold:#e3eafa; --line:#7f92bc; --panel:#40547c; --ink:#f5f7ff; --muted:#e0e8fb;
-  background:linear-gradient(140deg,#51668e,#283b63);
-}
 
 [data-skin="mist"] :is(.chat-thread,.group-room) {
   background:var(--mist-backdrop); color:var(--ink);

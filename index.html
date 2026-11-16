@@ -352,7 +352,16 @@ body.full-chat{overflow:hidden}
 .bulk-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px;margin:8px 0 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel-hi)}.bulk-tools output,.bulk-tools strong{color:var(--gold);padding:4px 7px}.bulk-tools button{border-radius:10px}.bulk-tools button[aria-pressed="true"]{background:var(--selected);color:var(--selected-ink)}input.bulk-check{appearance:none;display:inline-grid;place-items:center;width:22px;height:22px;min-width:22px;padding:0;margin:0;border:1px solid var(--accent-border);border-radius:6px;background:var(--field);cursor:pointer}input.bulk-check:checked{background:var(--gold);color:var(--field)}input.bulk-check:checked::after{content:"✓";font-weight:800;line-height:1}.contact-choice{display:flex;align-items:center;gap:12px;padding:8px 0}
 .persona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:9px;margin-top:12px}.persona-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;aspect-ratio:1;min-width:0;padding:6px;border-radius:12px}.persona-tile>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
 .imported-system{align-self:center;max-width:min(90%,520px);margin:5px auto;padding:8px 14px;border:1px solid var(--line);border-radius:12px;background:var(--notice);color:var(--ink);text-align:center;white-space:pre-wrap;overflow-wrap:anywhere}.imported-system small,.imported-system time{display:block;color:var(--muted);font-size:.75rem}
-.bonus-tea{--gold:#d5adf0;--line:#765791;--panel:#30233e;--ink:#fff1ff;--muted:#ddc8eb;color:var(--ink);background:radial-gradient(ellipse at top,#4b315e,#241a31 64%);border-radius:16px;padding:12px}.bonus-tea h2,.bonus-tea .eyebrow{color:var(--gold)}.bonus-tea-button{color:#f2dcff;background:#543764;border-color:#a780bd}.bonus-tea .tea-top{border-color:var(--line)}
+.bonus-tea{
+  background:radial-gradient(ellipse at top,color-mix(in srgb,var(--gold) 10%,transparent),transparent 64%),var(--panel);
+  border-radius:16px;
+  padding:12px;
+}
+.bonus-tea-button{
+  color:var(--selected-ink);
+  background:var(--selected);
+  border-color:var(--accent-border);
+}
 
 /* 日隙拾光与余晖藏书阁 */
 #dialog.story-studio{--studio-serif:var(--ledger-font);--studio-pad:clamp(14px,4vw,56px);padding-inline:max(var(--studio-pad),env(safe-area-inset-left)) max(var(--studio-pad),env(safe-area-inset-right));background:radial-gradient(ellipse at 75% 0,var(--glow),transparent 54%),var(--bg)}
