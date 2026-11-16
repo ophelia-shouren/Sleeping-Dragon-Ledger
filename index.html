@@ -2888,7 +2888,7 @@ function teaLockNotice(x){
 }
 function validTeaSession(x){
   return x&&['id','owner','mode','style','pov'].every(k=>typeof x[k]==='string')&&['group','ai','cards','keyword'].includes(x.mode)&&
-    Array.isArray(x.cast)&&x.cast.every(id=>typeof id==='string')&&Number.isInteger(x.words)&&x.words>=300&&x.words<=5000&&
+    Array.isArray(x.cast)&&x.cast.every(id=>typeof id==='string')&&Number.isInteger(x.words)&&x.words>=300&&
     Array.isArray(x.turns)&&x.turns.every(t=>t&&typeof t.input==='string'&&typeof t.output==='string');
 }
 function teaBack(id,mode){
@@ -2900,7 +2900,7 @@ function openTea(id,mode,bonus=false){
   if(saved){renderTea(saved.id);return;}
   const cast=mode==='group'?(groupById(id)?.members||[]).map(contact).filter(Boolean):[contact(id)].filter(Boolean);
   if(!cast.length)return;
-  dialog('<div class="eyebrow">TEA INTERLUDE</div><h2>'+teaTitle({bonus})+'</h2><p class="muted">'+(bonus?'独立剧情 · 不计入角色记忆':'暂歇来信，写一段与你和角色同场的故事。')+'</p><form id="teaSettings" data-bonus="'+bonus+'" data-owner="'+esc(id)+'" data-mode="'+esc(mode)+'"><div class="fields"><label>每次续写目标字数<input name="words" type="number" min="300" max="5000" value="1200" required></label><label>叙事视角<select name="pov"><option>第一人称</option><option>第三人称</option></select></label></div><label>文风<select name="style">'+[...storyStyles,'自定义'].map(style=>'<option>'+esc(style)+'</option>').join('')+'</select></label><label>自定义文风（选填）<input name="custom" maxlength="500" placeholder="例如：温柔日常，少用比喻"></label>'+
+  dialog('<div class="eyebrow">TEA INTERLUDE</div><h2>'+teaTitle({bonus})+'</h2><p class="muted">'+(bonus?'独立剧情 · 不计入角色记忆':'暂歇来信，写一段与你和角色同场的故事。')+'</p><form id="teaSettings" data-bonus="'+bonus+'" data-owner="'+esc(id)+'" data-mode="'+esc(mode)+'"><div class="fields"><label>每次续写目标字数<input name="words" type="number" min="300" value="1200" required></label><label>叙事视角<select name="pov"><option>第一人称</option><option>第三人称</option></select></label></div><label>文风<select name="style">'+[...storyStyles,'自定义'].map(style=>'<option>'+esc(style)+'</option>').join('')+'</select></label><label>自定义文风（选填）<input name="custom" maxlength="500" placeholder="例如：温柔日常，少用比喻"></label>'+
     (bonus?'<label class="world-scope-choice"><input type="checkbox" name="includeUser" checked>我参与剧情</label>':'')+
     (mode==='group'?'<h3>参与角色</h3><p class="muted">可多选。使用所选角色中第一位可用的模型预设。</p>'+cast.map(c=>'<label class="world-scope-choice"><input name="cast" type="checkbox" value="'+esc(c.id)+'" checked>'+esc(displayName(c))+'</label>').join(''):'')+
     '<div class="row"><button class="primary">入席</button><button type="button" data-tea-back="'+esc(id)+'" data-tea-mode="'+esc(mode)+'">返回</button></div></form>');
