@@ -266,7 +266,7 @@ body.full-chat{overflow:hidden}
 .story-orb-status{display:grid;gap:2px;line-height:1.2;font-size:12px}
 .story-orb-status small{font-size:11px;color:var(--muted)}
 #storyOrbJump{width:36px;height:42px;font-size:20px;border-radius:8px}
-#teaOrbJobs{display:grid;gap:3px;padding:3px;max-height:28dvh;overflow:auto;touch-action:pan-y}
+#teaOrbJobs:not([hidden]){display:grid;gap:3px;padding:3px;max-height:28dvh;overflow:auto;touch-action:pan-y}
 #teaOrbJobs button{display:flex;align-items:center;gap:8px;text-align:left;padding:4px 6px;color:inherit}
 #teaOrbJobs [aria-hidden]{font-size:16px}
 
