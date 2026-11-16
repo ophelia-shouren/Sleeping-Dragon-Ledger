@@ -192,64 +192,101 @@
   mask: var(--baker-lens) center / contain no-repeat;
 }
 
-/* The directory uses the same cover photograph and ruled edges as the ledger. */
 [data-skin="baker-street"] .contact-list {
-  --dossier-rule: #685357;
-  padding: clamp(12px, 2.5vw, 24px);
-  background: linear-gradient(145deg, #201e21, var(--panel) 65%);
+  --dossier-rule: #625357;
+  padding: clamp(9px, 2vw, 18px);
+  border: 3px double var(--dossier-rule);
+  background: #19181a;
 }
 [data-skin="baker-street"] .contact-list > .contact-list-top {
-  flex-wrap: wrap;
-  gap: 12px 18px;
-  margin: 0 0 20px;
-  padding: clamp(12px, 2.4vw, 22px);
-  border: 1px solid var(--dossier-rule);
-  border-top: 3px solid var(--accent-border);
-  background: linear-gradient(90deg, #1a181bf5 36%, #1a181b78),
-    var(--baker-art) right 45% / cover;
-}
-[data-skin="baker-street"] .contact-list-top .contact-list-user {
-  flex-basis: min(100%, 110px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0 0 16px;
+  padding: clamp(7px, 2vw, 16px);
+  border-bottom: 2px solid var(--accent-border);
+  background: linear-gradient(90deg, #181719 30%, #181719b8), var(--baker-art) right 49% / cover;
 }
 [data-skin="baker-street"] .contact-list-top .contact-list-actions {
-  flex-wrap: wrap;
-  max-width: 100%;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+[data-skin="baker-street"] .contact-list-actions .story-sun {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  flex: none;
+  border: 1px solid var(--dossier-rule);
+  background: var(--field);
+  color: var(--ink);
+  opacity: 1;
+}
+[data-skin="baker-street"] .contact-list-actions [data-action="newContact"] {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: .78rem;
+  white-space: nowrap;
 }
 [data-skin="baker-street"] .contact-list > .row.between:not(.contact-list-top) {
-  margin: 0 0 8px;
-  padding: 6px 10px;
-  border-bottom: 3px double var(--dossier-rule);
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--dossier-rule);
+  border-inline-start: 3px solid var(--accent-border);
+  background: #302226;
 }
 [data-skin="baker-street"] .contact-list > .row.between h3 {
   margin: 0;
-  color: var(--gold);
+  color: var(--ink);
+  font-size: .88rem;
+  letter-spacing: .12em;
 }
-[data-skin="baker-street"] .contact-list .directory-item,
-[data-skin="baker-street"] .contact-list .contact-row {
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-inline-start: 2px solid var(--dossier-rule);
+[data-skin="baker-street"] .contact-list :is(.directory-item, .contact-row) {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--dossier-rule);
+  border-top: 0;
+  border-radius: 0;
   background: var(--field);
 }
-[data-skin="baker-street"] .contact-list .contact-row {
-  margin-block: 6px;
+[data-skin="baker-street"] .contact-list .contact-row:not(.contact-row + .contact-row),
+[data-skin="baker-street"] .contact-list > .empty {
+  margin-top: 16px;
+  border: 1px solid var(--dossier-rule);
+  border-radius: 0;
+  background: var(--field);
 }
-[data-skin="baker-street"] .contact-list .contact-row:not(.contact-row + .contact-row) {
-  margin-top: 22px;
-  border-top: 3px double var(--dossier-rule);
+[data-skin="baker-street"] .contact-list .contact-row:not(.contact-row + .contact-row)::before,
+[data-skin="baker-street"] .contact-list > .empty::before {
+  content: "私聊";
+  display: block;
+  grid-column: 1 / -1;
+  padding: 7px 11px;
+  margin: -8px -12px 0;
+  border-inline-start: 2px solid var(--accent-border);
+  border-bottom: 1px solid var(--dossier-rule);
+  background: #302226;
+  color: var(--ink);
+  font-size: .88rem;
+  letter-spacing: .12em;
 }
+[data-skin="baker-street"] .contact-list > .empty::before { margin: 0 0 10px; }
 [data-skin="baker-street"] .contact-list :is(.directory-item:hover, .contact-row:hover, .contact-row:focus-within) {
   background: var(--panel-hi);
-  border-inline-start-color: var(--gold);
 }
-[data-skin="baker-street"] .contact-list :is(.directory-item, .contact-row) .avatar {
-  border-radius: 4px;
-}
+[data-skin="baker-street"] .contact-list :is(.directory-item, .contact-row) .avatar { border-radius: 2px; }
 [data-skin="baker-street"] .contact-list :is(.contact-link, .directory-item) strong {
   color: var(--ink);
-  font-size: 1rem;
+  font-size: .96rem;
 }
 [data-skin="baker-street"] .contact-list :is(.contact-link span, .directory-item small) {
   margin-top: 2px;
   font-size: .8rem;
+}
+@media (max-width: 420px) {
+  [data-skin="baker-street"] .contact-list-top .contact-list-user { gap: 4px; }
+  [data-skin="baker-street"] .contact-list-top .avatar { --size: 29px; }
+  [data-skin="baker-street"] .contact-list-top .avatar-button { padding: 2px; }
+  [data-skin="baker-street"] .contact-list-user .muted { display: none; }
+  [data-skin="baker-street"] .contact-list-actions .story-sun { width: 34px; min-width: 34px; }
 }
