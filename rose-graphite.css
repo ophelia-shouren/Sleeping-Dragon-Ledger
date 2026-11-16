@@ -1,0 +1,315 @@
+.swatch.rose-graphite {
+  --swatch: linear-gradient(135deg, #201212 25%, #41414b 25% 50%, #ce9c9f 50% 75%, #6f3241 75%);
+}
+
+:root[data-skin="rose-graphite"] {
+  color-scheme: dark;
+  --bg: #201212;
+  --glow: #29191e;
+  --ink: #f7e9ea;
+  --muted: #d5b9bd;
+  --gold: #ce9c9f;
+  --line: #75565f;
+  --panel: #33242a;
+  --panel-hi: #413039;
+  --sidebar: #27191e;
+  --field: #281b20;
+  --control: #41414b;
+  --label: #f2dbdd;
+  --accent-border: #a77780;
+  --selected: #6f3241;
+  --selected-ink: #fff0f1;
+  --hover-ink: #fff0f1;
+  --hero-light: #ce9c9f;
+  --hero-dark: #ce9c9f;
+  --hero-end: #ce9c9f;
+  --hero-copy: #392024;
+  --ornament: #75565f;
+  --button-hi: #ce9c9f;
+  --button-lo: #bd898f;
+  --button-border: #ce9c9f;
+  --button-ink: #201212;
+  --badge: #51404a;
+  --track: #594450;
+  --bar-low: #a77780;
+  --notice: #51404a;
+  --green: #e5c4d4;
+  --expense: #ffb8c6;
+  --chat-char-paper: #41414b;
+  --chat-char-ink: #f7e9ea;
+  --chat-user-paper: #6f3241;
+  --chat-user-ink: #fff0f1;
+}
+
+[data-skin="rose-graphite"] body { background: var(--bg); }
+[data-skin="rose-graphite"] :is(.panel, .card, .metric, .messages) {
+  border-radius: 18px;
+  box-shadow: none;
+}
+[data-skin="rose-graphite"] button { border-radius: 10px; }
+[data-skin="rose-graphite"] nav button { border-radius: 10px; }
+[data-skin="rose-graphite"] nav button.active { background: var(--selected); color: var(--selected-ink); }
+[data-skin="rose-graphite"] .hero {
+  background: #ce9c9f;
+  color: #201212;
+  border: 0;
+  border-radius: clamp(18px, 4vw, 32px);
+  box-shadow: none;
+  padding: clamp(20px, 4vw, 44px);
+}
+[data-skin="rose-graphite"] .hero::before { content: none; }
+[data-skin="rose-graphite"] .hero .eyebrow { color: #522632; letter-spacing: .13em; }
+[data-skin="rose-graphite"] .hero h1 { color: #201212; letter-spacing: -.025em; }
+[data-skin="rose-graphite"] .hero button {
+  background: #41414b;
+  border-color: #41414b;
+  color: #fff0f1;
+}
+[data-skin="rose-graphite"] .hero button.primary { background: #6f3241; border-color: #6f3241; }
+[data-skin="rose-graphite"] .hero button:hover { background: #201212; border-color: #201212; }
+[data-skin="rose-graphite"] .chat-top { border-bottom-color: var(--line); }
+[data-skin="rose-graphite"] .message-row .bubble { border-radius: 15px; }
+[data-skin="rose-graphite"] .message-row.assistant .bubble:not(.message-picked) {
+  background: var(--chat-char-paper);
+  color: var(--chat-char-ink);
+}
+[data-skin="rose-graphite"] .message-row.user .bubble:not(.message-picked) {
+  background: var(--chat-user-paper);
+  color: var(--chat-user-ink);
+}
+[data-skin="rose-graphite"] :is(.story-paper, .story-reader-bar, .group-settings-card) { border-radius: 14px; }
+[data-skin="rose-graphite"] .story-paper { background: #31242a; color: var(--ink); }
+[data-skin="rose-graphite"] .story-scrubber { background: var(--field); }
+[data-skin="rose-graphite"] dialog::backdrop { background: #201212bd; }
+
+[data-skin="rose-graphite"] #view {
+  width: min(100%, 1240px);
+  margin-inline: auto;
+}
+[data-skin="rose-graphite"] .rose-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  gap: clamp(12px, 2vw, 22px);
+}
+[data-skin="rose-graphite"] .rose-dashboard > * { margin: 0; min-width: 0; }
+[data-skin="rose-graphite"] .hero.rose-cover {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(16px, 4vw, 52px);
+}
+.rose-intro { align-self: center; min-width: 0; }
+[data-skin="rose-graphite"] .rose-intro > button {
+  background: transparent;
+  border-color: #8c5964;
+  color: #44242b;
+}
+[data-skin="rose-graphite"] .rose-intro > button:hover { color: #fff0f1; }
+.rose-balance {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: clamp(18px, 3vw, 32px);
+  min-width: 0;
+  background: #6f3241;
+  color: #fff0f1;
+  border: 1px solid #986071;
+  border-radius: 18px;
+}
+.rose-balance > span { color: #f0cbd2; }
+.rose-balance > strong {
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 400;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+[data-skin="rose-graphite"] .rose-balance button.primary {
+  background: #ce9c9f;
+  border-color: #ce9c9f;
+  color: #201212;
+}
+.rose-month { grid-column: 1 / -1; }
+[data-skin="rose-graphite"] .rose-month .grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--line);
+}
+[data-skin="rose-graphite"] .rose-month .card {
+  border: 0;
+  border-radius: 0;
+  background: var(--sidebar);
+}
+[data-skin="rose-graphite"] .rose-month .grid > .card {
+  grid-column: auto;
+  min-width: 0;
+}
+[data-skin="rose-graphite"] .rose-month .card .number {
+  font-size: clamp(18px, 4.5vw, 32px);
+  overflow-wrap: anywhere;
+}
+.rose-recent { grid-column: 1; grid-row: 3; }
+.rose-distribution { grid-column: 2; grid-row: 3; }
+[data-skin="rose-graphite"] .rose-mail {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--control);
+}
+[data-skin="rose-graphite"] .rose-mail h2 { margin: 0; }
+[data-skin="rose-graphite"] .pagehead {
+  margin-block: 10px 20px;
+  padding: clamp(16px, 3vw, 34px);
+  border-radius: 20px;
+  background: var(--selected);
+}
+[data-skin="rose-graphite"] .pagehead h1 { margin-block: 2px 5px; }
+[data-skin="rose-graphite"] .pagehead p { margin: 0; }
+.rose-directory {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.rose-directory > section {
+  min-width: 0;
+  padding: 15px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+[data-skin="rose-graphite"] :is(.chat-thread, .group-room) :is(.chat-top, form:has(.composer-send)) {
+  padding: 10px 14px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+[data-skin="rose-graphite"] :is(.chat-thread, .group-room) .messages { background: var(--bg); }
+[data-skin="rose-graphite"] #dialog.story-studio > .story-header {
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--selected);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+[data-skin="rose-graphite"] .story-studio .story-reader {
+  width: min(100%, 760px);
+  margin-inline: auto;
+  padding: clamp(17px, 5vw, 48px);
+}
+[data-skin="rose-graphite"] .story-studio .story-reader-bar { background: var(--control); }
+
+@media (min-width: 851px) and (hover: hover) and (pointer: fine) {
+  [data-skin="rose-graphite"] body:not(.full-chat) { display: block; }
+  [data-skin="rose-graphite"] body:not(.full-chat) > aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 24px;
+    height: auto;
+    padding: 12px clamp(18px, 3vw, 48px);
+    border: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  [data-skin="rose-graphite"] body:not(.full-chat) > aside .brand { margin: 0; }
+  [data-skin="rose-graphite"] #siteMenu:not([hidden]) { display: contents; }
+  [data-skin="rose-graphite"] #siteMenu :is(.navtitle, footer) { display: none; }
+  [data-skin="rose-graphite"] #siteMenu nav,
+  [data-skin="rose-graphite"] #siteMenu[hidden] ~ .desktop-menu-rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+  [data-skin="rose-graphite"] #siteMenu nav button { width: auto; }
+  [data-skin="rose-graphite"] #siteMenu .site-menu-info {
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+  }
+  [data-skin="rose-graphite"] #siteMenu .site-menu-info > span { display: none; }
+  [data-skin="rose-graphite"] #siteMenu .header-actions { flex-wrap: wrap; }
+  [data-skin="rose-graphite"] #view:is([data-page="api"], [data-page="backup"]) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 14px;
+  }
+  [data-skin="rose-graphite"] #view:is([data-page="api"], [data-page="backup"]) > :is(.pagehead, .notice) {
+    grid-column: 1 / -1;
+  }
+  [data-skin="rose-graphite"] #view[data-page="api"] > .panel:has(.skin-grid) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+@media (max-width: 640px) {
+  [data-skin="rose-graphite"] .rose-dashboard,
+  [data-skin="rose-graphite"] .hero.rose-cover { grid-template-columns: minmax(0, 1fr); }
+  .rose-recent, .rose-distribution { grid-column: auto; grid-row: auto; }
+  [data-skin="rose-graphite"] #dialog.story-studio > .story-header { align-items: stretch; }
+}
+
+[data-skin="rose-graphite"] {
+  --rose-art: url("./rose-graphite-art.webp");
+}
+[data-skin="rose-graphite"] .hero.rose-cover {
+  background: linear-gradient(116deg, #d4aaad, #ce9c9f 60%, #b48189);
+  border: 1px solid #e4bcbf;
+}
+.rose-intro h1 { font-size: clamp(2.15rem, 5.2vw, 4.75rem); }
+.rose-intro .eyebrow {
+  width: fit-content;
+  padding-block-end: 7px;
+  border-bottom: 1px solid #8e5663;
+}
+.rose-feature {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid #774858;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #6f3241;
+  box-shadow: 0 14px 34px #3c182c45;
+}
+.rose-art {
+  min-height: clamp(104px, 15vw, 174px);
+  background: #503440 var(--rose-art) center 53% / cover no-repeat;
+  border-bottom: 1px solid #c08c9b;
+}
+.rose-feature .rose-balance {
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(115deg, #6f3241, #532937);
+}
+[data-skin="rose-graphite"] .pagehead {
+  background: linear-gradient(90deg, #592c3a 0%, #592c3a 48%, #592c3a80 100%),
+    var(--rose-art) right 46% / min(64%, 650px) auto no-repeat, #592c3a;
+}
+[data-skin="rose-graphite"] .pagehead p { color: #f2dadd; }
+[data-skin="rose-graphite"] .rose-month .card {
+  padding: clamp(12px, 2.5vw, 24px);
+}
+[data-skin="rose-graphite"] .rose-dashboard > .panel {
+  border-color: #795561;
+  padding: clamp(15px, 2.2vw, 24px);
+}
+@media (max-width: 640px) {
+  .rose-feature { border-radius: 16px; }
+  .rose-art { min-height: 112px; }
+  [data-skin="rose-graphite"] .pagehead {
+    background-size: auto, cover, auto;
+  }
+}

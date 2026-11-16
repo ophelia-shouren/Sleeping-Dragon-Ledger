@@ -585,7 +585,7 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #ledgerReleaseNotice .release-notice-setting{border:1px solid var(--line);border-radius:14px;background:var(--field);padding:clamp(12px,3vw,18px)}
 #ledgerReleaseNotice footer{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted)}
 #ledgerReleaseNotice button{min-height:44px;min-width:96px}
-</style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"></head>
+</style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button></div><div id="toast" role="status"></div><dialog id="orbQuickDialog"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
@@ -1841,10 +1841,12 @@ function chat(){
       const last=localSession(x).messages.findLast(m=>!replyPending(m));
       return '<div class="contact-row">'+avatarButton(x.id,x)+'<button class="contact-link" data-chat="'+esc(x.id)+'"><strong>'+esc(displayName(x))+'</strong><span>'+esc(last?(last.role==='user'?'你：':'')+(last.content||'[图片]'):'还没有对话')+'</span></button><span class="muted">›</span></div>';
     }).join('');
+    const splitDirectory=state.skin==='rose-graphite';
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
       '<section class="panel contact-list"><div class="row contact-list-top"><div class="row contact-list-user">'+avatarButton('user',user)+'<div class="contact-list-name"><strong title="'+esc(user.name)+'">'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row contact-list-actions">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
-      groupDirectory()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
+      (splitDirectory?'<div class="rose-directory"><section>'+groupDirectory()+'</section><section><h3>私聊</h3>'+ (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'</section></div>':
+        groupDirectory()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>'))+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
   const lock=teaLock([c.id]);
   const chatUser={...user,name:'你',nickname:''};
@@ -4440,7 +4442,7 @@ const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const fontOptions={source:'思源宋体',mincho:'明朝'};
 const activeLedgerFont=(skin,preferences)=>preferences[skin]||(skin==='mist'?'mincho':'source');
-const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航','dawn-frost':'晨曦与霜','obsidian-duet':'落爪无声'};
+const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航','dawn-frost':'晨曦与霜','obsidian-duet':'落爪无声','rose-graphite':'暮色玫瑰'};
 const skinUnlockIds={'dawn-frost':'skin-dawn-frost','obsidian-duet':'skin-obsidian-duet'};
 function skinAvailable(id,archive){
   return Object.hasOwn(skins,id)&&(!Object.hasOwn(skinUnlockIds,id)||archive.mysteryActive.includes(skinUnlockIds[id]));
@@ -4679,6 +4681,7 @@ function breakdown(bills,expandable=false){
 }
 const recordButtons='<button class="primary" data-action="new">＋ 记一笔</button><button data-action="parse">✦ 识别账单</button>';
 function heroCrest(skin){
+  if(skin==='rose-graphite')return '';
   if(skin==='obsidian-duet'){
     return '<img class="obsidian-watermark" src="./obsidian/dragon-and-dog.svg?v=5" alt="" aria-hidden="true">';
   }
@@ -4699,6 +4702,7 @@ function heroCrest(skin){
 }
 function home(){
   const all=total(state.bills),m=summary('month',dateString());
+  if(state.skin==='rose-graphite')return roseHome(all,m);
   const dawnFrost=state.skin==='dawn-frost';
   const title=dawnFrost&&state.heroTitle==='格兰芬多账本'?'晨曦酒庄账本':state.heroTitle;
   const subtitle=dawnFrost&&state.heroSubtitle==='壁炉旁留着一卷羊皮纸，等你记下今天的收支。'
@@ -4711,6 +4715,16 @@ function home(){
     metrics([['当前结余',state.opening+all.income-all.expense],['本月收入',m.income,'in'],['本月支出',m.expense,'out']])+
     '<div class="columns"><section class="panel"><div class="row between"><h2>近期账目</h2><button data-page="ledger">查看明细 ↗</button></div>'+table(state.bills,6)+'</section><section class="panel"><h2>本月支出分布</h2>'+breakdown(m.bills)+'</section></div>'+
     '<section class="panel quick"><div class="eyebrow">MAGICAL CORRESPONDENCE</div><h2>魔法通信</h2><p class="muted">把今日、本周或本月账目整理成信，发给你设定的角色。</p><button data-page="chat">进入魔法通信 →</button></section>';
+}
+function roseHome(all,month){
+  const balance=state.opening+all.income-all.expense;
+  return '<div class="rose-dashboard">'+
+    '<section class="hero rose-cover"><div class="rose-intro"><div class="eyebrow">暮色玫瑰</div><h1>'+esc(state.heroTitle)+'</h1><p>'+esc(state.heroSubtitle)+'</p><button data-action="hero">编辑首页文字</button></div>'+
+    '<div class="rose-feature"><div class="rose-art" aria-hidden="true"></div><div class="rose-balance"><span>当前结余</span><strong>'+money(balance)+'</strong><div class="row">'+recordButtons+'</div></div></div></section>'+
+    '<div class="rose-month">'+metrics([['本月收入',month.income,'in'],['本月支出',month.expense,'out']])+'</div>'+
+    '<section class="panel rose-distribution"><h2>本月支出分布</h2>'+breakdown(month.bills)+'</section>'+
+    '<section class="panel rose-recent"><div class="row between"><h2>近期账目</h2><button data-page="ledger">查看明细 ↗</button></div>'+table(state.bills,6)+'</section>'+
+    '<section class="panel rose-mail"><h2>魔法通信</h2><button data-page="chat">打开通讯录</button></section></div>';
 }
 function report(){
   const s=summary(period);
@@ -4870,6 +4884,7 @@ function render(){
   $('date').textContent=new Intl.DateTimeFormat('zh-CN',{dateStyle:'long'}).format(new Date());
   document.querySelectorAll('nav button').forEach(x=>{x.classList.toggle('active',x.dataset.page===page);x.setAttribute('aria-current',x.dataset.page===page?'page':'false');});
   const screens={home,report,cards,api,chat,backup,ledger:ledgerDetails};
+  $('view').dataset.page=page;
   $('view').innerHTML=(storageError?'<div class="notice">'+esc(storageError)+'</div>':'')+screens[page]();
   if(page==='backup'&&typeof updateArchiveVersion==='function')updateArchiveVersion();
   if($('messages')) $('messages').scrollTop=$('messages').scrollHeight;
