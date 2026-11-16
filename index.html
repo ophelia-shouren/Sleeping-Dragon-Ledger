@@ -4449,8 +4449,16 @@ function skinAvailable(id,archive){
 }
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
 const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
+const chatDraftKey=key+'-chat-drafts';
+const pendingChatDrafts=new Map();
 let state = initial(), storageError = '';
 try {const saved = localStorage.getItem(key); if(saved) state = validate(JSON.parse(saved));} catch(e){storageError = '本机存档读取失败。可在存档管理中导入备份。';}
+try{
+  const savedDrafts=JSON.parse(localStorage.getItem(chatDraftKey)||'[]');
+  for(const entry of Array.isArray(savedDrafts)?savedDrafts:[]){
+    if(applyChatDraft(state,entry))pendingChatDrafts.set(imageKey(entry.id,entry.mode),entry);
+  }
+}catch{/* Ignore a malformed draft without affecting the archive. */}
 let page='home', period='week', anchor='', toastTimer;
 const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money = cents => '¥'+(cents/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4522,16 +4530,40 @@ function validate(data){
   return result;
 }
 let archiveResetting=false, draftSaveTimer;
+function applyChatDraft(archive,entry){
+  if(!entry||typeof entry.id!=='string'||typeof entry.draft!=='string'||!Object.hasOwn(chatModeLabels,entry.mode))return false;
+  const person=archive.contacts.find(c=>c.id===entry.id);
+  const session=entry.mode==='ai'?person:person?.chatModes?.[entry.mode];
+  if(!session)return false;
+  session.draft=entry.draft;
+  return true;
+}
+function scheduleChatDraftSave(){
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer=setTimeout(flushChatDraft,900);
+}
 function flushChatDraft(){
-  if(draftSaveTimer===undefined)return;
   clearTimeout(draftSaveTimer);
   draftSaveTimer=undefined;
-  if(!archiveResetting)commit(state);
+  if(archiveResetting||!pendingChatDrafts.size)return;
+  try{localStorage.setItem(chatDraftKey,JSON.stringify([...pendingChatDrafts.values()]));}
+  catch{toast('草稿暂未保存，请检查浏览器存储空间或权限。');}
 }
 function commit(next){
   if(archiveResetting)return false;
-  try{if(next.bills!==state.bills)next=withBillReplies(next);localStorage.setItem(key,JSON.stringify(next));state=next;storageError='';clearTimeout(draftSaveTimer);draftSaveTimer=undefined;return true;}
-  catch{toast('存档写入失败，请检查浏览器存储空间或权限。');return false;}
+  try{
+    if(next.bills!==state.bills)next=withBillReplies(next);
+    localStorage.setItem(key,JSON.stringify(next));
+  }catch{toast('存档写入失败，请检查浏览器存储空间或权限。');return false;}
+  state=next;
+  storageError='';
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer=undefined;
+  if(pendingChatDrafts.size){
+    pendingChatDrafts.clear();
+    localStorage.removeItem(chatDraftKey);
+  }
+  return true;
 }
 function showChatSettingsSaved(){
   $('chatSettingsSaved')?.remove();
@@ -4878,6 +4910,7 @@ function formatArchive(){
     localStorage.removeItem(nativeStoryKey);
     localStorage.removeItem(nativeStoryKey+'-last');
     localStorage.removeItem(nativeStoryKey+'-failure');
+    localStorage.removeItem(chatDraftKey);
     localStorage.removeItem(key);
   }
   catch{archiveResetting=false;toast('清除存档失败，请检查存储权限。');return;}
@@ -5296,6 +5329,9 @@ document.addEventListener('click',e=>{
 });
 window.addEventListener('pagehide',flushChatDraft);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)flushChatDraft();});
+document.addEventListener('compositionend',e=>{
+  if(e.target.dataset.draft&&pendingChatDrafts.size)scheduleChatDraftSave();
+});
 document.addEventListener('input',e=>{
   if(e.target.matches('#groupChatForm textarea[name=message]'))groupDrafts.set(e.target.form.dataset.id,e.target.value);
   const t=e.target;
@@ -5305,8 +5341,11 @@ document.addEventListener('input',e=>{
       const session=localSession(c);
       if(session.draft!==t.value){
         session.draft=t.value;
+        const mode=localConfig(c).mode;
+        pendingChatDrafts.set(imageKey(c.id,mode),{id:c.id,mode,draft:t.value});
         clearTimeout(draftSaveTimer);
-        draftSaveTimer=setTimeout(flushChatDraft,900);
+        draftSaveTimer=undefined;
+        if(!e.isComposing)scheduleChatDraftSave();
       }
       resetIdleTimer();
     }
@@ -5489,6 +5528,9 @@ window.addEventListener('storage',e=>{
   if(e.key!==key||!e.newValue)return;
   try{
     const next=validate(JSON.parse(e.newValue));
+    for(const [draftId,entry] of pendingChatDrafts){
+      if(!applyChatDraft(next,entry))pendingChatDrafts.delete(draftId);
+    }
     state=next;
     if(!document.activeElement?.matches('input,textarea,select')&&!$('dialog').open)render();
   }catch{toast('另一个标签页的存档无法读取。');}
