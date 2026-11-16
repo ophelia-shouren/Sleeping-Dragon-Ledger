@@ -46,6 +46,7 @@
   background: radial-gradient(ellipse at 84% 0, #282629, transparent 54%), var(--bg);
 }
 [data-skin="baker-street"] :is(button, input, select, textarea, .panel, .card, .messages) { border-radius: 3px; }
+[data-skin="baker-street"] .home-orb .home-orb-owl { border-radius: 50%; }
 [data-skin="baker-street"] :is(.card, .panel) { box-shadow: none; }
 [data-skin="baker-street"] #view { width: min(100%, 1230px); margin-inline: auto; }
 [data-skin="baker-street"] :is(.pagehead, .brand) {
