@@ -694,9 +694,37 @@ function safePicture(src){
   try{const u=new URL(src);if(u.protocol==='https:'&&!u.username&&!u.password)return u.href;}catch{}
   return '';
 }
+const avatarUrls=new Map();
+let avatarCleanupTimer;
+function releaseUnusedAvatarUrls(){
+  if(avatarCleanupTimer||!avatarUrls.size)return;
+  avatarCleanupTimer=setTimeout(()=>{
+    avatarCleanupTimer=undefined;
+    const mountedUrls=new Set(Array.from(document.querySelectorAll('.avatar img[src^="blob:"]'),img=>img.src));
+    for(const [source,url] of avatarUrls){
+      if(mountedUrls.has(url))continue;
+      URL.revokeObjectURL(url);
+      avatarUrls.delete(source);
+    }
+  },0);
+}
+function avatarImageSource(source){
+  const cached=avatarUrls.get(source);
+  if(cached)return cached;
+  const src=safePicture(source);
+  if(!src.toLowerCase().startsWith('data:'))return src;
+  const comma=src.indexOf(',');
+  try{
+    const bytes=Uint8Array.from(atob(src.slice(comma+1)),char=>char.charCodeAt(0));
+    const url=URL.createObjectURL(new Blob([bytes],{type:src.slice(5,src.indexOf(";"))}));
+    avatarUrls.set(source,url);
+    releaseUnusedAvatarUrls();
+    return url;
+  }catch{return src;}
+}
 function avatarMarkup(person,cls=''){
-  const a=safePicture(person.avatar),f=person.frame,frame=safePicture(f.src);
-  return '<span class="avatar '+cls+(f.ring?' ring':'')+'" aria-hidden="true"><span class="avatar-face">'+(a?'<img src="'+esc(a)+'" alt="" referrerpolicy="no-referrer">':esc((person.nickname||person.name||'✦').slice(0,1)))+'</span>'+(frame?'<img class="avatar-overlay" src="'+esc(frame)+'" alt="" referrerpolicy="no-referrer" style="--scale:'+f.scale+';--dx:'+f.x+'%;--dy:'+f.y+'%">':'')+'</span>';
+  const a=avatarImageSource(person.avatar),f=person.frame,frame=avatarImageSource(f.src);
+  return '<span class="avatar '+cls+(f.ring?' ring':'')+'" aria-hidden="true"><span class="avatar-face">'+(a?'<img src="'+esc(a)+'" alt="" decoding="async" referrerpolicy="no-referrer">':esc((person.nickname||person.name||'✦').slice(0,1)))+'</span>'+(frame?'<img class="avatar-overlay" src="'+esc(frame)+'" alt="" decoding="async" referrerpolicy="no-referrer" style="--scale:'+f.scale+';--dx:'+f.x+'%;--dy:'+f.y+'%">':'')+'</span>';
 }
 function avatarButton(id,person,cls=''){
   return '<button type="button" class="avatar-button '+cls+'" data-look="'+esc(id)+'" aria-label="编辑'+esc(person.nickname||person.name||'角色')+'的头像与头像框">'+avatarMarkup(person)+'</button>';
@@ -2031,7 +2059,7 @@ function openThread(id){
   activeContact=id;
   if(localConfig(c).mode==='keyword')refreshBillReplies(id);
   go('chat');
-  if(!memoryErrors.has(id))summarizeMemories(id);
+  setTimeout(()=>{if(!memoryErrors.has(id))summarizeMemories(id);},0);
 }
 function requestsChatCard(content){
   if(/^\s*\/(?:卡片|card)(?:\s|[:：]|$)/i.test(content))return true;
@@ -3818,17 +3846,17 @@ function saveChatDisplay(form){
     renderMessageTools();showChatSettingsSaved();
   }
 }
+const chatSentenceSegmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter('zh',{granularity:'sentence'}):null;
 function chatBubbleParts(message,prefs){
   const content=message.content;
   if(message.storyForward||message.role==='assistant'&&!prefs.split)return [content];
   const lines=content.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(message.role==='user')return lines.length?lines:[''];
-  const segmenter=typeof Intl.Segmenter==='function'?new Intl.Segmenter('zh',{granularity:'sentence'}):null;
   const titleDot=/\b(?:Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Rev|Sr|Jr|St)\.(?=[ \t]*\p{L})/giu;
   const placeholder='\uE000';
   const parts=lines.flatMap(line=>{
     const protectedLine=line.replace(titleDot,title=>title.slice(0,-1)+placeholder);
-    const segments=segmenter?Array.from(segmenter.segment(protectedLine),x=>x.segment.trim()):
+    const segments=chatSentenceSegmenter?Array.from(chatSentenceSegmenter.segment(protectedLine),x=>x.segment.trim()):
       (protectedLine.match(/[^。！？!?]+[。！？!?]*|[。！？!?]+/g)||[protectedLine]);
     return segments.map(segment=>segment.replace(/\b(Mr|Mrs|Ms|Miss|Mx|Dr|Prof|Rev|Sr|Jr|St)\uE000/gi,'$1.'));
   });
@@ -4936,6 +4964,7 @@ function render(){
   document.querySelectorAll('nav button').forEach(x=>{x.classList.toggle('active',x.dataset.page===page);x.setAttribute('aria-current',x.dataset.page===page?'page':'false');});
   const screens={home,report,cards,api,chat,backup,ledger:ledgerDetails};
   $('view').dataset.page=page;
+  releaseUnusedAvatarUrls();
   $('view').innerHTML=(storageError?'<div class="notice">'+esc(storageError)+'</div>':'')+screens[page]();
   if(page==='backup'&&typeof updateArchiveVersion==='function')updateArchiveVersion();
   if($('messages')) $('messages').scrollTop=$('messages').scrollHeight;
@@ -4950,6 +4979,7 @@ function dialog(html,full=false){
   panel.classList.remove('story-studio');
   delete panel.dataset.storyOrbPage;
   panel.innerHTML=html;
+  releaseUnusedAvatarUrls();
   if(full)panel.append(orb);
   panel.scrollTop=0;
   if(!panel.open)panel.showModal();
