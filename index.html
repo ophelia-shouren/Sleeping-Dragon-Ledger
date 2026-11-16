@@ -1262,6 +1262,20 @@ async function requestNativeStory(id,p,body,onDelta,signal){
     try{return JSON.parse(raw);}catch{ return raw; }
   }finally{signal.removeEventListener('abort',cancel);}
 }
+function storyResponseText(value,depth=0){
+  if(depth>8)return '';
+  if(typeof value==='string'){
+    return value.replace(/<(think|analysis|reasoning)\b[^>]*>[\s\S]*?(?:<\/\1>|$)/gi,'').trim();
+  }
+  if(Array.isArray(value))return value.map(part=>storyResponseText(part,depth+1)).filter(Boolean).join('\n');
+  if(!value||typeof value!=='object'||(value.role&&value.role!=='assistant')||
+    (value.type&&!['text','output_text','message'].includes(value.type)))return '';
+  for(const field of ['content','text','output_text','message']){
+    const text=storyResponseText(value[field],depth+1);
+    if(text)return text;
+  }
+  return '';
+}
 async function runStory(article,{firstTitle,stream,html=false,model,native=false,p,body,options,recovering=false}){
   if(native&&!recovering){
     localStorage.setItem(nativeStoryKey,JSON.stringify({article,firstTitle,stream,model,options}));
@@ -1306,11 +1320,18 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     };
     const response=native
       ?await requestNativeStory(article.id,p,body,onDelta,controller.signal)
-      :await request(p,'chat/completions',body,onDelta,controller.signal,{htmlStream:html});
+      :await request(p,'chat/completions',body,onDelta,controller.signal,{htmlStream:html,reportApiError:true});
     if(controller.signal.aborted)throw controller.signal.reason;
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
-    if(!save(html?htmlCardResponse(response):dialogueReply(response),!html&&partial))throw Error('模型返回了空正文。');
+    const text=html?htmlCardResponse(response):dialogueReply(response,storyResponseText);
+    if(!save(text,!html&&partial)){
+      const choice=response?.choices?.[0];
+      if(reason==='content_filter'||choice?.message?.refusal)throw Error('模型拒绝生成正文。');
+      if(reason==='length')throw Error('模型达到生成长度上限时仍未输出正文。');
+      if(response?.streamInterrupted)throw Error('生成连接提前结束，尚未收到正文。');
+      throw Error('模型返回了空正文。可以关闭流式显示后重试。');
+    }
     if(response?.streamInterrupted===true&&!html)throw Error('生成连接提前结束。');
     if(native)localStorage.setItem(nativeStoryKey+'-last',article.id);
     job.preview=article.body;
@@ -3310,7 +3331,7 @@ async function describeChatImage(image){
 }
 async function readChatStream(response,onDelta,htmlStream=false){
   const reader=response.body.getReader(),decoder=new TextDecoder();
-  let buffer='',message='',done=false,finishReason=null;
+  let buffer='',message='',done=false,finishReason=null,refusal=false;
   function line(value){
     if(!value.startsWith('data:'))return;
     const data=value.slice(5).trim();
@@ -3318,9 +3339,13 @@ async function readChatStream(response,onDelta,htmlStream=false){
     if(!data)return;
     const event=JSON.parse(data);
     if(event.error)dialogueReply(event);
-    const choice=event.choices?.[0],part=choice?.delta?.content??choice?.text;
+    const choice=event.choices?.[0];
+    const part=choice?.delta?.content??choice?.text;
+    const finalContent=!message&&part==null?choice?.message?.content:undefined;
     if(choice?.finish_reason)finishReason=choice.finish_reason;
-    const delta=typeof part==='string'?part:Array.isArray(part)?part.filter(x=>x?.type==='text'&&typeof x.text==='string').map(x=>x.text).join(''):'';
+    if(choice?.delta?.refusal||choice?.message?.refusal)refusal=true;
+    const content=part??finalContent;
+    const delta=typeof content==='string'?content:Array.isArray(content)?content.filter(x=>['text','output_text'].includes(x?.type)&&typeof x.text==='string').map(x=>x.text).join(''):'';
     if(delta){message+=delta;onDelta?.(delta);}
   }
   try{
@@ -3337,7 +3362,7 @@ async function readChatStream(response,onDelta,htmlStream=false){
     if(!htmlStream)await cancelled;
     reader.releaseLock();
   }
-  return {choices:[{message:{content:message},finish_reason:finishReason}],streamInterrupted:!done&&!finishReason};
+  return {choices:[{message:{content:message,refusal},finish_reason:finishReason}],streamInterrupted:!done&&!finishReason};
 }
 function validateChatModes(cfg){
   const strings=x=>Array.isArray(x)&&x.every(y=>typeof y==='string'&&y.trim());
@@ -5100,7 +5125,7 @@ function apiEndpoint(base,route){
 function requestChatReply(profile,body){
   return request(profile,'chat/completions',body,undefined,undefined,{timeout:false});
 }
-async function request(p,route,body,onDelta,cancelSignal,{timeout=true,htmlStream=false}={}){
+async function request(p,route,body,onDelta,cancelSignal,{timeout=true,htmlStream=false,reportApiError=false}={}){
   const headers={};if(p.key)headers.Authorization='Bearer '+p.key;
   if(body)headers['Content-Type']='application/json';
   const timeoutController=timeout&&!cancelSignal?new AbortController():null;
@@ -5109,7 +5134,16 @@ async function request(p,route,body,onDelta,cancelSignal,{timeout=true,htmlStrea
   try{
   let response;try{response=await fetch(apiEndpoint(p.url,route),{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,redirect:'error',signal});}
   catch(e){if(e instanceof TypeError)throw Error('连接失败。请检查 API 地址、中转站的跨域设置与网络。');throw e;}
-  if(!response.ok)throw Error('API 返回 HTTP '+response.status+'。请核对地址、模型、密钥和配额。');
+  if(!response.ok){
+    let detail='';
+    if(reportApiError){
+      const payload=await response.json().catch(()=>null);
+      const error=payload?.error;
+      const message=typeof error==='string'?error:error?.message;
+      if(typeof message==='string')detail=(p.key?message.replaceAll(p.key,'[已隐藏]'):message).trim().slice(0,500);
+    }
+    throw Error('API 返回 HTTP '+response.status+'。'+(detail||'请核对地址、模型、密钥和配额。'));
+  }
   if(body?.stream&&response.body&&/text\/event-stream/i.test(response.headers.get('content-type')||''))return await readChatStream(response,onDelta,htmlStream);
   if(route!=='chat/completions')return await response.json();
   const bodyText=await response.text();
