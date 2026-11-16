@@ -738,7 +738,7 @@ const storySafety='保持角色设定一致。内容不能含性暗示，不得�
 let storyJob=null, storyOrbResult='';
 const storyFailures=new Map();
 const storyRetryButton=html=>storyButton('retryGeneration','重试',String(html));
-const storyWebRetryButton=()=>storyButton('retryStoryOnWeb','网页模式重试（非流式）');
+const storyWebRetryButton=()=>storyButton('retryStoryOnWeb','网页模式重试（流式）');
 function retryStoryGeneration(html,webOnly=false){
   if(storyJob)throw Error('已有生成任务正在运行。');
   const retry=storyFailures.get(html)?.options;
@@ -746,7 +746,7 @@ function retryStoryGeneration(html,webOnly=false){
   const {parentId,...options}=retry;
   const parent=parentId?state.stories.find(x=>x.id===parentId):undefined;
   if(parentId&&!parent)throw Error('原来的前文已删除，无法按原选项重试。');
-  return generateStory({...options,parent,...(webOnly?{webOnly:true,stream:false}:{})});
+  return generateStory({...options,parent,stream:true,webOnly:webOnly||options.webOnly});
 }
 function refreshStoryOrb(){
   const orb=$('homeOrb'),panel=$('dialog');
@@ -877,7 +877,7 @@ function storyMemoryField(){
   return storyToggle('readMemory','读取角色记忆',false,'带入每位登场角色最近 10 条 AI 私聊和记忆同心圆内容');
 }
 function storyStreamField(){
-  return storyToggle('stream','流式显示',state.streamReplies);
+  return storyToggle('stream','流式显示',true);
 }
 function storyCount(value){return Array.from(value.replace(/\s/g,'')).length.toLocaleString('zh-CN');}
 function storyStyleChip(id,name,custom=false){
@@ -1462,7 +1462,7 @@ async function storyAction(d){
       break;
     }
     case 'continue':
-      if(x)await generateStory({parent:x,cast:x.cast,guide:storySequelRequest,stream:state.streamReplies,target:22000});
+      if(x)await generateStory({parent:x,cast:x.cast,guide:storySequelRequest,stream:true,target:22000});
       break;
     case 'custom':
       if(x)storyDialog('自定义续写','<form id="storyContinue" data-id="'+esc(x.id)+'" class="fields"><label>续写指令<textarea name="guide" rows="5" required></textarea></label>'+storyMemoryField()+storyStreamField()+'<button class="primary">开始续写</button></form>','compose');
