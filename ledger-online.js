@@ -93,20 +93,30 @@ const ledgerOnline = (() => {
     return {...frameDefaults(),ring:false,...(value||{})};
   }
   const personAvatar=(name,src,frame)=>avatarMarkup({name,avatar:src||'',frame:storedFrame(frame)});
+  function fitText(value,limit){
+    return String(value??'').trim().slice(0,limit).replace(/[\uD800-\uDBFF]$/u,'');
+  }
   async function compactFrame(frame){
-    const src=safePicture(frame?.src||'');
-    if(!src||!src.startsWith('data:')||src.length<=120000)return {...storedFrame(frame),src};
-    const resized=await renderLook(src);
-    return {...storedFrame(frame),src:resized};
+    const layout=storedFrame(frame);
+    const src=safePicture(layout.src||'');
+    if(src.length<=120000)return {...layout,src};
+    if(!src.startsWith('data:'))return {...layout,src:''};
+    try{return {...layout,src:await renderLook(src)};}
+    catch{return {...layout,src:''};}
   }
   async function renderLook(src){
     const img=new Image();img.src=src;await img.decode();
     const canvas=document.createElement('canvas');
-    const scale=Math.min(1,256/Math.max(img.naturalWidth,img.naturalHeight));
-    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
-    canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
-    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
-    return canvas.toDataURL('image/webp',0.78);
+    const context=canvas.getContext('2d');
+    for(const max of [256,192,144,96]){
+      const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+      canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      context.drawImage(img,0,0,canvas.width,canvas.height);
+      const encoded=canvas.toDataURL('image/webp',0.78);
+      if(encoded.length<=120000 && /^data:image\/(webp|png);base64,/.test(encoded))return encoded;
+    }
+    throw Error('这张图片无法缩小到在线聊天支持的大小。');
   }
   async function readLookFile(file){
     if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type))throw Error('请选择有效图片。');
@@ -132,8 +142,13 @@ const ledgerOnline = (() => {
         try{
           const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;
           const size=Math.min(image.naturalWidth,image.naturalHeight);
-          canvas.getContext('2d').drawImage(image,(image.naturalWidth-size)/2,(image.naturalHeight-size)/2,size,size,0,0,96,96);
-          resolve(canvas.toDataURL('image/jpeg',0.72));
+          for(const pixels of [96,72,48]){
+            canvas.width=canvas.height=pixels;
+            canvas.getContext('2d').drawImage(image,(image.naturalWidth-size)/2,(image.naturalHeight-size)/2,size,size,0,0,pixels,pixels);
+            const encoded=canvas.toDataURL('image/jpeg',0.72);
+            if(encoded.length<=24000&&/^data:image\/(jpeg|png);base64,/.test(encoded)){resolve(encoded);return;}
+          }
+          resolve('');
         }catch{resolve('');}
       };
       image.onerror=()=>{clearTimeout(timer);resolve('');};
@@ -156,7 +171,7 @@ const ledgerOnline = (() => {
   async function activate(){
     const token=identity();
     const look=appearance('user');
-    const snapshot={name:(look.name||'你').slice(0,30),persona:userPersona(),avatar:look.avatar,frame:look.frame};
+    const snapshot={name:fitText(look.name,30)||'你',persona:fitText(userPersona(),18000),avatar:look.avatar,frame:look.frame};
     if(onlineIdentity!==token){
       onlineIdentity=token;me=null;syncedProfile=null;knownRooms=null;views.clear();pictures.clear();
     }
@@ -173,7 +188,13 @@ const ledgerOnline = (() => {
       }
       if(!active(serial))return;
       if(invite)join(invite);else if(!el('onlineList'))rooms();
-    }catch(error){if(active(serial))status(error.message);}
+    }catch(error){
+      if(!active(serial))return;
+      if(el('onlineList')){status('在线资料同步失败。'+error.message);return;}
+      screen('在线聊天','<p role="alert" id="onlineConnectError"></p><button type="button" class="primary" id="onlineRetryConnect">重试</button>'+end);
+      el('onlineConnectError').textContent='连接未完成。'+error.message;
+      el('onlineRetryConnect').onclick=activate;
+    }
   }
   function open(){
     if(localStorage.getItem(key))return activate();
