@@ -893,6 +893,55 @@ const ledgerOnline = (() => {
       }catch(error){if(active(serial)){status(error.message);button.disabled=false;}}
     };
   }
+  function roleModelTools(){
+    return '<button type="button" data-online-load-models>读取模型</button> '+
+      '<select data-online-model-choices aria-label="选择已读取的模型" hidden></select>'+
+      '<p class="muted" data-online-model-status role="status"></p>';
+  }
+  function bindRoleModelTools(node,profiles){
+    const {profile,endpoint,key,model}=node.elements;
+    const load=node.querySelector('[data-online-load-models]');
+    const choices=node.querySelector('[data-online-model-choices]');
+    const status=node.querySelector('[data-online-model-status]');
+    let version=0;
+    function reset(){
+      version++;
+      load.disabled=false;
+      choices.hidden=true;
+      choices.replaceChildren();
+      status.textContent='';
+    }
+    function applyPreset(){
+      const preset=profiles.find(item=>item.id===profile.value);
+      if(preset){endpoint.value=preset.url;key.value=preset.key;model.value=preset.model||'';}
+      reset();
+    }
+    profile.onchange=applyPreset;
+    endpoint.oninput=key.oninput=reset;
+    choices.onchange=()=>{if(choices.value)model.value=choices.value;};
+    load.onclick=async()=>{
+      const url=endpoint.value.trim(), secret=key.value.trim();
+      if(!url||!secret){status.textContent='请先选择预设，或填写 API 地址和 Key。';return;}
+      const token=++version;
+      const current=()=>node.isConnected&&el('dialog').open&&token===version;
+      load.disabled=true;
+      status.textContent='正在读取模型…';
+      try{
+        const ids=await fetchModelIds({url,key:secret});
+        if(!current())return;
+        if(!ids.length)throw Error('接口未返回可选模型，可以手动填写模型 ID。');
+        choices.replaceChildren(new Option('选择模型',''),...ids.map(id=>new Option(id,id)));
+        choices.value=ids.includes(model.value)?model.value:'';
+        choices.hidden=false;
+        status.textContent='已读取 '+ids.length+' 个模型。选择后保存即可。';
+      }catch(error){
+        if(current())status.textContent=(error.message||'读取模型失败。').replaceAll(secret,'[已隐藏]');
+      }finally{
+        if(current())load.disabled=false;
+      }
+    };
+    return applyPreset;
+  }
   async function editOnlineCharApi(current,char){
     const serial=screen('角色 API','<p class="muted">正在读取配置…</p>'+end,()=>members(current));
     try{
@@ -900,18 +949,12 @@ const ledgerOnline = (() => {
       if(!active(serial))return;
       const profiles=state.profiles.filter(x=>x.url&&x.model&&x.key);
       const formSerial=screen('角色 API','<section class="group-settings-card group-settings-block"><h3>'+esc(char.name)+'</h3><form id="onlineCharApiForm">'+
-        '<label>调用预设<select id="onlineCharApiPreset"><option value="">手动填写</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model)+'</option>').join('')+'</select></label>'+
+        '<label>调用预设<select name="profile"><option value="">手动填写</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model)+'</option>').join('')+'</select></label>'+
         '<label>OpenAI 兼容 API 地址<input name="endpoint" type="url" required maxlength="400" value="'+esc(config.endpoint)+'"></label>'+
         '<label>模型名称<input name="model" required maxlength="120" value="'+esc(config.model)+'"></label>'+
         '<label>API Key<input name="key" type="password" autocomplete="off" maxlength="2000" placeholder="地址不变时，留空沿用当前 Key"></label>'+
-        '<button type="submit" class="primary">保存角色 API</button></form></section>'+end,()=>members(current));
-      const fields=el('onlineCharApiForm').elements;
-      const select=el('onlineCharApiPreset');
-      select.onchange=()=>{
-        const profile=profiles.find(p=>p.id===select.value);
-        if(!profile)return;
-        fields.endpoint.value=profile.url;fields.model.value=profile.model;fields.key.value=profile.key;
-      };
+        roleModelTools()+'<button type="submit" class="primary">保存角色 API</button></form></section>'+end,()=>members(current));
+      bindRoleModelTools(el('onlineCharApiForm'),profiles);
       form('onlineCharApiForm',async data=>{
         await request('update-char-api',{room:current.id,id:char.id,...data});
         viewFor(current.id).detail=null;
@@ -982,18 +1025,25 @@ const ledgerOnline = (() => {
     }catch(error){if(active(serial))status(error.message);}
   }
   function inviteCard(current){
-    const profiles=state.profiles.filter(p=>p.url&&p.model&&p.key);
-    screen('邀请已有角色','<p class="muted">受邀角色会读取你已启用且适用于它的世界书。群成员 @ 角色时，近期群聊和相关人设会发给你选用的 API，费用由你的 API 账户承担。</p><form id="onlineCard"><label>已有角色卡<select name="card" required><option value="">请选择角色</option>'+state.contacts.map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><label>使用我的 API 预设<select name="profile" required><option value="">请选择 API 预设</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model)+'</option>').join('')+'</select></label>'+(!profiles.length?'<p class="muted">请先在「API 连接」中保存含 Key 的文本预设。</p>':'')+'<button type="submit" class="primary">邀请角色</button></form>'+end,()=>members(current));
-    el('onlineCard').elements.card.onchange=()=>{
-      const card=contact(el('onlineCard').elements.card.value);
+    const profiles=state.profiles.filter(p=>p.url&&p.key);
+    screen('邀请已有角色','<p class="muted">受邀角色会读取你已启用且适用于它的世界书。群成员 @ 角色时，近期群聊和相关人设会发给你选用的 API，费用由你的 API 账户承担。</p><form id="onlineCard"><label>已有角色卡<select name="card" required><option value="">请选择角色</option>'+state.contacts.map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><label>调用预设<select name="profile"><option value="">手动填写</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model||p.url)+'</option>').join('')+'</select></label>'+
+      '<label>OpenAI 兼容 API 地址<input name="endpoint" type="url" required maxlength="400"></label><label>API Key<input name="key" type="password" autocomplete="off" required maxlength="2000"></label><label>模型名称<input name="model" required maxlength="120"></label>'+
+      roleModelTools()+'<button type="submit" class="primary">邀请角色</button></form>'+end,()=>members(current));
+    const node=el('onlineCard');
+    const applyPreset=bindRoleModelTools(node,profiles);
+    node.elements.card.onchange=()=>{
+      const card=contact(node.elements.card.value);
       const preferred=card&&profileFor(card);
-      if(preferred&&profiles.some(p=>p.id===preferred.id))el('onlineCard').elements.profile.value=preferred.id;
+      if(preferred&&profiles.some(p=>p.id===preferred.id)){
+        node.elements.profile.value=preferred.id;
+        applyPreset();
+      }
     };
     form('onlineCard',async(data,serial)=>{
-      const card=contact(data.card),profile=profiles.find(p=>p.id===data.profile);
-      if(!card||!profile)throw Error('请选择已有角色和 API 预设。');
+      const card=contact(data.card);
+      if(!card)throw Error('请选择已有角色。');
       const context=cardContext(card);
-      const {id}=await request('chars',{room:current.id,name:displayName(card).replace(/[\s@＠]+/gu,'').slice(0,24),avatar:'✦',...context,endpoint:profile.url,model:profile.model,key:profile.key});
+      const {id}=await request('chars',{room:current.id,name:displayName(card).replace(/[\s@＠]+/gu,'').slice(0,24),avatar:'✦',...context,endpoint:data.endpoint,model:data.model,key:data.key});
       const map=mapping();map[id]={card:card.id,signature:await contextSignature(context)};
       localStorage.setItem(mappingKey,JSON.stringify(map));
       viewFor(current.id).detail=null;
