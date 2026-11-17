@@ -14,8 +14,11 @@ const ledgerOnline = (() => {
     if(value!==undefined)localStorage.setItem(storageKey,value?'1':'0');
     return localStorage.getItem(storageKey)==='1';
   }
+  function canShowNotice(message){
+    return !groupMuted(message.room)&&!(scope()&&room?.id===message.room&&el('onlineMessages'));
+  }
   function showNotice(message){
-    if(groupMuted(message.room)||typeof deviceLocked!=='undefined'&&deviceLocked)return;
+    if(!canShowNotice(message)||typeof deviceLocked!=='undefined'&&deviceLocked)return;
     if(document.hidden){queuedNotice=message;return;}
     let banner=el('onlineNotice');
     const sheet=Array.from(document.querySelectorAll('dialog[open]')).at(-1);
@@ -48,7 +51,7 @@ const ledgerOnline = (() => {
       if(noticeSession!==session)return;
       session.cursor=feed.cursor;
       session.failures=0;
-      const latest=feed.rows.findLast(message=>!groupMuted(message.room));
+      const latest=feed.rows.findLast(canShowNotice);
       if(latest)showNotice(latest);
     }catch{
       session.failures++;
@@ -615,6 +618,8 @@ const ledgerOnline = (() => {
   }
   function chatRoom(current){
     if(!current)return rooms();
+    if(el('onlineNotice')?.dataset.room===current.id)el('onlineNotice').remove();
+    if(queuedNotice?.room===current.id)queuedNotice=null;
     if(room?.id)rememberChat(room.id);
     const view=viewFor(current.id);
     room=current;messages=view.messages;older=view.older;detail=view.detail||null;typingCharacters=view.typing;
@@ -855,11 +860,12 @@ const ledgerOnline = (() => {
         const id=button.dataset.onlineManage, char=info.chars.find(x=>x.id===id), user=info.members.find(x=>x.id===id);
         const panel=el('onlineManage');
         panel.innerHTML=char?
-          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button> <button id="onlineEditCharApi" type="button">更换角色 API</button> <button id="onlinePersonalContext" type="button">个人记忆与私聊'+(char.personal_enabled?'（已开启）':'')+'</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
+          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button> <button id="onlineEditCharApi" type="button">更换角色 API</button> ' +(group?'<button id="onlineAlive" type="button">AI 活人感</button> ':'')+' <button id="onlinePersonalContext" type="button">个人记忆与私聊'+(char.personal_enabled?'（已开启）':'')+'</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
           '<button id="onlineRemoveMember" type="button">移除角色</button>':
           '<button id="onlineRemoveMember" type="button">移出 '+esc(user?.name)+'</button>';
         if(el('onlineEditLook'))el('onlineEditLook').onclick=()=>editCharLook(current,char);
         if(el('onlinePersonalContext'))el('onlinePersonalContext').onclick=()=>editPersonalContext(current,char);
+        if(el('onlineAlive'))el('onlineAlive').onclick=()=>editOnlineAlive(current,char);
         if(el('onlineEditCharApi'))el('onlineEditCharApi').onclick=()=>editOnlineCharApi(current,char);
         if(el('onlineRename'))el('onlineRename').onclick=event=>{
           const input=el('onlineCharName');
@@ -1026,6 +1032,23 @@ const ledgerOnline = (() => {
       }
     };
     return applyPreset;
+  }
+  async function editOnlineAlive(current,char){
+    const back=()=>members(current);
+    const serial=screen('AI 活人感','<p class="muted">正在读取设置…</p>'+end,back);
+    try{
+      const config=await request('char-autopost?room='+current.id+'&id='+char.id);
+      if(!active(serial))return;
+      const formSerial=screen('AI 活人感','<section class="group-settings-card group-settings-block"><h3>'+esc(char.name)+'</h3><form id="onlineAliveForm">'+
+        '<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="enabled" '+(config.minutes?'checked':'')+'><span aria-hidden="true"></span>定时主动发言</label>'+
+        '<label>发言间隔（分钟）<input type="number" name="minutes" min="1" max="1440" step="1" required value="'+(config.minutes||15)+'"></label>'+
+        '<p class="muted">开启后，角色按设定间隔读取最近 10 条文字消息，并使用你为该角色配置的 API 主动发一条群消息。离线时也会运行。</p>'+
+        '<button type="submit" class="primary">保存设置</button></form></section>'+end,back);
+      form('onlineAliveForm',async data=>{
+        await request('char-autopost',{room:current.id,id:char.id,minutes:data.enabled?Number(data.minutes):0});
+        if(active(formSerial)){await members(current);status('AI 活人感设置已保存。');}
+      });
+    }catch(error){if(active(serial))status(error.message);}
   }
   async function editOnlineCharApi(current,char){
     const serial=screen('角色 API','<p class="muted">正在读取配置…</p>'+end,()=>members(current));
