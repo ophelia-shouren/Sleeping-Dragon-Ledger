@@ -214,6 +214,22 @@ async function summarizeRoom(env, roomId) {
   }
 }
 
+const inviteAlphabet='0123456789abcdefghijklmnopqrstuvwxyz';
+function randomInviteCode(){
+  let code;
+  do {
+    code='';
+    while(code.length<6){
+      const bytes=crypto.getRandomValues(new Uint8Array(8));
+      for(const byte of bytes){
+        if(byte<252)code+=inviteAlphabet[byte%36];
+        if(code.length===6)break;
+      }
+    }
+  }while(!/[a-z]/.test(code)||!/[0-9]/.test(code));
+  return code;
+}
+
 async function api(req, env, url, ledger, ctx) {
   const uid = ledger ? await ledgerIdentity(req) : req.headers.get('oai-authenticated-user-id');
   if (!uid) throw fail('请先登录。',401);
@@ -246,6 +262,16 @@ async function api(req, env, url, ledger, ctx) {
   }
   if (req.method === 'GET' && path === 'me') return json({me});
   if (!me) throw fail('请先设置昵称。',403);
+  async function groupInviteCode(room){
+    for(let attempt=0;attempt<8;attempt++){
+      const existing=await one('SELECT code FROM ledger_invite_codes WHERE room=?',room);
+      if(existing)return existing.code;
+      const code=randomInviteCode();
+      const created=await run('INSERT OR IGNORE INTO ledger_invite_codes (room,code) VALUES (?,?)',room,code);
+      if(created.meta.changes)return code;
+    }
+    throw fail('暂时无法生成邀请码，请重试。',503);
+  }
   if (req.method === 'GET' && path === 'rooms') {
     return json(await all(`SELECT r.id,r.kind,r.owner,
       CASE WHEN r.kind='dm' THEN COALESCE((SELECT p.name FROM members m2 JOIN profiles p ON p.id=m2.uid WHERE m2.room=r.id AND p.id<>? LIMIT 1),r.name) ELSE r.name END name,
@@ -257,11 +283,22 @@ async function api(req, env, url, ledger, ctx) {
     const kind = data.kind === 'dm' ? 'dm' : 'group';
     const id = uuid();
     const name = kind === 'dm' ? '好友私聊' : field(data,'name',40);
-    await db.batch([stmt('INSERT INTO rooms VALUES (?,?,?,?,?)',id,name,kind,uid,uuid()),stmt('INSERT INTO members VALUES (?,?)',id,uid)]);
+    const rows=[stmt('INSERT INTO rooms VALUES (?,?,?,?,?)',id,name,kind,uid,uuid()),stmt('INSERT INTO members VALUES (?,?)',id,uid)];
+    if(ledger&&kind==='group')rows.push(stmt('INSERT OR IGNORE INTO ledger_invite_codes (room,code) VALUES (?,?)',id,randomInviteCode()));
+    await db.batch(rows);
     return json({id});
   }
   if (req.method === 'POST' && path === 'join') {
     const invite = field(data,'invite',80);
+    const byCode=ledger&&/^[a-z0-9]{6}$/.test(invite);
+    if(byCode){
+      const joined=await one(`INSERT INTO members (room,uid)
+        SELECT r.id,? FROM ledger_invite_codes c JOIN rooms r ON r.id=c.room
+        WHERE c.code=? AND r.kind='group' AND r.owner GLOB 'ledger:*'
+        ON CONFLICT(room,uid) DO UPDATE SET uid=excluded.uid RETURNING room`,uid,invite);
+      if(!joined)throw fail('邀请码无效或已换发。',404);
+      return json({id:joined.room});
+    }
     const room = await one('SELECT id,kind,owner FROM rooms WHERE invite=?',invite);
     if (!room || isLedgerId(room.owner)!==ledger) throw fail('邀请码无效。',404);
     await run(`INSERT OR IGNORE INTO members SELECT id,? FROM rooms WHERE id=? AND invite=? AND (kind='group' OR (SELECT COUNT(*) FROM members WHERE room=?) < 2)`,uid,room.id,invite,room.id);
@@ -280,9 +317,10 @@ async function api(req, env, url, ledger, ctx) {
     const results = await db.batch([
       stmt("UPDATE chars SET active=0,secret='' WHERE room=? AND owner=? AND active=1",room.id,member),
       stmt('UPDATE rooms SET invite=? WHERE id=? AND EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)',uuid(),room.id,room.id,member),
+      stmt('DELETE FROM ledger_invite_codes WHERE room=? AND EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)',room.id,room.id,member),
       stmt('DELETE FROM members WHERE room=? AND uid=?',room.id,member)
     ]);
-    if (!results[2].meta.changes) throw fail('此成员已离开群聊。',404);
+    if (!results[3].meta.changes) throw fail('此成员已离开群聊。',404);
     return json({ok:true});
   }
   if (req.method === 'GET' && path === 'detail') {
@@ -290,7 +328,8 @@ async function api(req, env, url, ledger, ctx) {
       all('SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
       all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',room.id)
     ]);
-    return json({members,chars,owner:room.owner,invite:room.owner===uid ? room.invite : null});
+    const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
+    return json({members,chars,owner:room.owner,invite:room.owner===uid ? room.invite : null,inviteCode});
   }
   if (req.method === 'GET' && path === 'messages') {
     const cursor = Number(url.searchParams.get('after') || url.searchParams.get('before')) || 0;
@@ -503,11 +542,11 @@ export default {
     if (request.method==='GET' && ['/', '/health'].includes(url.pathname)) {
       try {
         if (!env.DB) return json({service:'sleeping-dragon-ledger',status:'missing_database'},503);
-        await env.DB.prepare('SELECT frame FROM ledger_person_look LIMIT 0').all();
+        await env.DB.prepare('SELECT code FROM ledger_invite_codes LIMIT 0').all();
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-looks-typing-3'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-invite-code-4'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
