@@ -164,7 +164,21 @@ const ledgerOnline = (() => {
   }
   function status(message){
     const node=el('onlineStatus');
-    if(scope()&&node)node.textContent=message;
+    if(!scope()||!node)return;
+    node.textContent=message;
+    if(!/请稍后再\s*@/u.test(message))return;
+    const close=document.createElement('button');
+    close.type='button';
+    close.textContent='×';
+    close.setAttribute('aria-label','关闭提示');
+    close.style.cssText='margin-inline-start:auto;flex:none;min-width:36px;min-height:36px;padding:0 8px;font-size:20px;line-height:1';
+    const text=document.createElement('span');
+    text.textContent=message;
+    const row=document.createElement('span');
+    row.style.cssText='display:flex;align-items:center;gap:8px;width:100%';
+    row.append(text,close);
+    node.replaceChildren(row);
+    close.onclick=()=>{node.replaceChildren();};
   }
   function screen(title,body,back,headerAction='',headerAvatar=''){
     clearTimeout(pollTimer);
