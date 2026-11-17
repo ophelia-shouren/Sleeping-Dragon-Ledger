@@ -467,6 +467,20 @@ const ledgerOnline = (() => {
     },{root:box,rootMargin:'180px 0px'});
     images.forEach(image=>imageObserver.observe(image));
   }
+  const humanMessageFrame='<style>'+
+    '#ledgerOnline .bubble.online-human-only{outline:var(--human-frame-width,1px) var(--human-frame-style,solid) var(--human-frame-color,var(--gold));outline-offset:var(--human-frame-offset,-3px)}'+
+    '[data-skin="day"] #ledgerOnline{--human-frame-color:#667683;--human-frame-style:dashed}'+
+    '[data-skin="night"] #ledgerOnline{--human-frame-color:#bda7eb;--human-frame-style:dotted;--human-frame-width:2px}'+
+    '[data-skin="gryffindor"] #ledgerOnline{--human-frame-color:#e0b76a;--human-frame-style:double;--human-frame-width:3px}'+
+    '[data-skin="slytherin"] #ledgerOnline{--human-frame-color:#a4cfbc;--human-frame-width:2px}'+
+    '[data-skin="hufflepuff"] #ledgerOnline{--human-frame-color:#e9c988;--human-frame-style:dashed;--human-frame-offset:-4px}'+
+    '[data-skin="ravenclaw"] #ledgerOnline{--human-frame-color:#99bce8;--human-frame-style:double;--human-frame-width:3px}'+
+    '[data-skin="mist"] #ledgerOnline{--human-frame-color:#8ca9cf;--human-frame-offset:-3px}'+
+    '[data-skin="dawn-frost"] #ledgerOnline .bubble.online-human-only{outline-color:#a35469;box-shadow:inset 0 0 0 1px #789db7}'+
+    '[data-skin="obsidian-duet"] #ledgerOnline{--human-frame-color:#bca06a;--human-frame-style:double;--human-frame-width:3px;--human-frame-offset:-4px}'+
+    '[data-skin="rose-graphite"] #ledgerOnline{--human-frame-color:#b57284;--human-frame-style:double;--human-frame-width:3px}'+
+    '[data-skin="baker-street"] #ledgerOnline{--human-frame-color:#ac8660;--human-frame-style:dotted;--human-frame-width:2px;--human-frame-offset:-4px}'+
+    '</style>';
   function drawMessages(mode,added=null){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
     const people=new Map((detail?.members||[]).map(x=>[x.id,x]));
@@ -479,6 +493,7 @@ const ledgerOnline = (() => {
         }
         const mine=!m.char_id&&m.sender===me.id;
         const role=mine?'user':'assistant';
+        const frame=['human-only','mention-all'].includes(m.kind)?' online-human-only':'';
         const look=m.char_id?cast.get(m.char_id):people.get(m.sender);
         const face=personAvatar(m.name,m.char_id?look?.avatar_image:look?.avatar,look?.frame);
         const avatar=room.kind==='group'&&!mine
@@ -500,7 +515,7 @@ const ledgerOnline = (() => {
           }
           // Mist uses the metadata sibling to theme the bubble. Keep it without a layout box.
           const leading=first?layout.before:state.skin==='mist'?'<div class="mist-chat-meta" hidden style="display:none"></div>':'<span class="avatar-button" aria-hidden="true" style="visibility:hidden;flex:none">'+personAvatar(m.name)+'</span>';
-          return '<div class="message-row '+role+'">'+leading+'<article class="bubble '+role+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
+          return '<div class="message-row '+role+'">'+leading+'<article class="bubble '+role+frame+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
         }).join('');
       }).join('');
     if(added){
@@ -508,7 +523,7 @@ const ledgerOnline = (() => {
     }else{
       box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
       (markup||(!(pendingMessage?.room===room.id)?'<div class="empty">还没有消息，打声招呼吧。</div>':'')) +
-      (pendingMessage?.room===room.id?'<div class="message-row user"><span class="avatar-button">'+personAvatar(me.name,people.get(me.id)?.avatar,people.get(me.id)?.frame)+'</span><article class="bubble user"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(pendingMessage.body)+'</p><small class="muted">'+(pendingMessage.saved?'已发送':'发送中…')+'</small></article></div>':'')+
+      (pendingMessage?.room===room.id?'<div class="message-row user"><span class="avatar-button">'+personAvatar(me.name,people.get(me.id)?.avatar,people.get(me.id)?.frame)+'</span><article class="bubble user'+(pendingMessage.humanOnly?' online-human-only':'')+'"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(pendingMessage.body)+'</p><small class="muted">'+(pendingMessage.saved?'已发送':'发送中…')+'</small></article></div>':'')+
       '<div id="onlineTyping"></div>';
     }
     drawTyping();
@@ -692,7 +707,7 @@ const ledgerOnline = (() => {
     const bulbIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4m-6-7a6 6 0 1 1 8 0c-.8.7-1 1.3-1 2H9c0-.7-.2-1.3-1-2Z"/></svg>';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
-    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
+    const serial=screen(current.name,humanMessageFrame+end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及成员" aria-controls="onlineChoices" aria-expanded="false">@ 成员</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
@@ -837,7 +852,7 @@ const ledgerOnline = (() => {
       const charId=humanOnly||mentionAll?null:mentions.target(body);
       const path=mentionAll?'send-mention-all':humanOnly?'send-human-only':'send';
       input.value='';
-      const pending={room:current.id,body};
+      const pending={room:current.id,body,humanOnly:humanOnly||mentionAll};
       pendingMessage=pending;
       drawMessages('bottom');
       let result;
