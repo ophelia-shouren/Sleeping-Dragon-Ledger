@@ -1,5 +1,5 @@
 const ledgerOnline = (() => {
-  const base='https://tongpin-chat.yearnwingwings.chatgpt.site/ledger-api/';
+  const base='https://sleeping-dragon-ledger.yearnwingwings.workers.dev/ledger-api/';
   const key='sleeping-dragon-online-identity';
   const displayKey='sleeping-dragon-online-display';
   const pictures=new Map();
