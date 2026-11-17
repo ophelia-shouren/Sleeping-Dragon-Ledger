@@ -1693,7 +1693,7 @@ function groupAvatar(g){
   return avatarMarkup({name:g?.name||'群',avatar:typeof g?.avatar==='string'?g.avatar:'',frame:{src:'',ring:false}},'group-avatar');
 }
 function groupDirectory(){
-  return '<div class="row between"><h3>群聊</h3><button type="button" data-group-edit="">＋ 新建群聊</button></div>'+
+  return '<div class="row between"><div class="row"><h3>群聊</h3><button type="button" class="story-sun" data-tea-library aria-label="茶叙收藏馆" title="茶叙收藏馆"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h13v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Zm13 1h2a2 2 0 0 1 0 4h-2M3 21h18M8 6c-2-2 2-3 0-5m5 5c-2-2 2-3 0-5"/></svg></button></div><button type="button" data-group-edit="">＋ 新建群聊</button></div>'+
     state.groups.map(g=>'<button class="directory-item" data-group-open="'+esc(g.id)+'">'+groupAvatar(g)+'<span><strong>'+esc(g.name)+'</strong><small>'+g.members.filter(id=>contact(id)).length+' 位角色 · '+(g.shared?'记忆互通':'独立记忆')+'</small></span><b>›</b></button>').join('');
 }
 function renderGroupSettingsMembers(form){
@@ -3128,6 +3128,82 @@ function teaCard(x,index,selected,id,mode){
   const key=' data-message-index="'+index+'" tabindex="0"'+(selected?' role="checkbox" aria-checked="'+selected.indices.has(index)+'"':'');
   const actions=' data-tea-mode="'+esc(mode)+'" data-tea-index="'+index+'"';
   return '<article class="tea-card'+(x.bonus?' bonus-tea':'')+(selected?.indices.has(index)?' message-picked':'')+'"'+key+'><strong>'+teaEmblem()+' '+teaTitle(x)+'</strong><small>'+esc(x.pov+' · '+x.turns.length+' 段')+'</small>'+(selected?'':'<div class="row"><button type="button" data-tea-read="'+esc(id)+'"'+actions+'>打开</button><button type="button" data-tea-export="'+esc(id)+'"'+actions+'>导出全文</button></div>')+'</article>';
+}
+// A live index of existing chat cards; folders never duplicate or alter chat history.
+function collectedTeaCards(){
+  const cards=new Map();
+  const collect=(messages,source)=>{for(const message of messages||[]){
+    const tea=message.tea;
+    if(validTeaSession(tea)&&!cards.has(tea.id))cards.set(tea.id,{tea,source});
+  }};
+  for(const c of state.contacts){
+    collect(c.messages,'私聊 · '+displayName(c));
+    for(const mode of ['keyword','cards'])collect(localConfig(c)[mode]?.messages,'私聊 · '+displayName(c)+' · '+chatModeLabels[mode]);
+  }
+  for(const g of state.groups)collect(g.messages,'群聊 · '+g.name);
+  return [...cards.values()].sort((a,b)=>(b.tea.sentAt||0)-(a.tea.sentAt||0));
+}
+function teaLibraryFolder(tea){
+  const kind=tea.bonus?'bonus':'regular',folder=state.teaLibraryPlaces[tea.id]||'';
+  return state.teaLibraryFolders[kind].includes(folder)?folder:'';
+}
+function teaLibraryDialog(title,body,back){
+  storyDialog(title,body,'reader',back);
+  const button=$('dialog').querySelector('.story-header-exit');
+  button.removeAttribute('data-action');
+  button.setAttribute('aria-label',back?'返回上一级':'关闭');
+  button.title=back?'返回上一级':'关闭';
+  button.onclick=()=>back?back():$('dialog').close();
+}
+function teaLibrary(kind=null,folder=null){
+  const all=collectedTeaCards();
+  const folderIcon='<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+  if(!['regular','bonus'].includes(kind)){
+    teaLibraryDialog('茶叙收藏馆','<div class="story-shelf-summary"><span>已收纳 <strong>'+all.length+'</strong> 张卡片</span></div><div class="story-books">'+['regular','bonus'].map(type=>'<button type="button" class="story-folder-card" data-tea-kind="'+type+'">'+teaEmblem()+'<strong>'+(type==='bonus'?'番外茶叙':'茶叙')+'</strong><small>'+all.filter(({tea})=>(tea.bonus===true)===(type==='bonus')).length+' 张卡片</small></button>').join('')+'</div>',null);
+    for(const b of $('dialog').querySelectorAll('[data-tea-kind]'))b.onclick=()=>teaLibrary(b.dataset.teaKind);
+    return;
+  }
+  const cards=all.filter(({tea})=>(tea.bonus===true)===(kind==='bonus'));
+  const folders=['',...state.teaLibraryFolders[kind]],label=kind==='bonus'?'番外茶叙':'茶叙';
+  if(folder!==null&&!folders.includes(folder))folder=null;
+  if(folder===null){
+    teaLibraryDialog(label,'<div class="story-shelf-summary"><span>'+cards.length+' 张卡片</span><span>'+folders.length+' 个文件夹</span></div>'+
+      '<div class="story-folder-tools"><details class="story-panel"><summary>＋ 新建文件夹</summary><form id="teaLibraryAdd" class="fields"><label>文件夹名称<input name="folder" maxlength="80" required></label><button class="primary">新建文件夹</button></form></details>'+
+      (folders.length>1?'<details class="story-panel"><summary>− 删除文件夹</summary><form id="teaLibraryDelete" class="fields"><label>选择文件夹<select name="folder">'+folders.slice(1).map(name=>'<option>'+esc(name)+'</option>').join('')+'</select></label><button class="archive-danger">删除文件夹</button></form></details>':'')+'</div>'+
+      '<div class="story-books">'+folders.map(name=>'<button type="button" class="story-folder-card" data-tea-folder="'+esc(name)+'">'+folderIcon+'<strong>'+esc(name||'未分类')+'</strong><small>'+cards.filter(({tea})=>teaLibraryFolder(tea)===name).length+' 张卡片</small></button>').join('')+'</div>',()=>teaLibrary());
+    for(const b of $('dialog').querySelectorAll('[data-tea-folder]'))b.onclick=()=>teaLibrary(kind,b.dataset.teaFolder);
+    $('teaLibraryAdd').onsubmit=e=>{
+      e.preventDefault();const name=e.currentTarget.elements.folder.value.trim();
+      if(!name||name==='未分类'||folders.includes(name)){toast('请填写一个尚未使用的文件夹名称。');return;}
+      if(commit({...state,teaLibraryFolders:{...state.teaLibraryFolders,[kind]:[...state.teaLibraryFolders[kind],name]}}))teaLibrary(kind);
+    };
+    if($('teaLibraryDelete'))$('teaLibraryDelete').onsubmit=e=>{
+      e.preventDefault();const name=e.currentTarget.elements.folder.value;
+      if(!confirm('删除“'+name+'”文件夹？其中的卡片会移回未分类，聊天记录保留。'))return;
+      const teaLibraryPlaces={...state.teaLibraryPlaces};
+      for(const {tea} of cards)if(teaLibraryPlaces[tea.id]===name)delete teaLibraryPlaces[tea.id];
+      if(commit({...state,teaLibraryPlaces,teaLibraryFolders:{...state.teaLibraryFolders,[kind]:state.teaLibraryFolders[kind].filter(x=>x!==name)}}))teaLibrary(kind);
+    };
+    return;
+  }
+  const visible=cards.filter(({tea})=>teaLibraryFolder(tea)===folder);
+  teaLibraryDialog(label+' · '+(folder||'未分类'),'<div class="story-shelf-summary"><span>'+visible.length+' 张卡片</span></div>'+
+    '<form id="teaLibraryMove" class="fields"><div class="story-panel">'+selectionTools()+'<label>移入文件夹<select name="folder">'+folders.map(name=>'<option value="'+esc(name)+'"'+(name===folder?' selected':'')+'>'+esc(name||'未分类')+'</option>').join('')+'</select></label><button class="primary" data-needs-selection>移动所选卡片</button></div>'+
+    '<div class="story-books">'+(visible.map(({tea,source})=>'<div class="story-entry"><input type="checkbox" class="bulk-check" name="picked" value="'+esc(tea.id)+'" aria-label="选择 '+esc(source)+' 的'+label+'"><button type="button" data-tea-library-read="'+esc(tea.id)+'"><strong>'+esc(source)+'</strong><span>'+esc(tea.cast.map(id=>{const c=contact(id);return c?displayName(c):'已移除角色';}).join('、'))+'</span><span>'+esc(tea.pov+' · '+tea.style)+'</span><small>'+tea.turns.length+' 段 · '+storyCount(tea.turns.map(t=>t.output).join('\n'))+' 字'+(tea.sentAt?' · '+esc(new Date(tea.sentAt).toLocaleDateString('zh-CN')):'')+'</small></button></div>').join('')||'<p class="story-panel muted">这个文件夹还没有卡片。结束并收纳茶叙后，卡片会自动出现在这里。</p>')+'</div></form>',()=>teaLibrary(kind));
+  const form=$('teaLibraryMove');syncFormSelection(form);
+  form.onsubmit=e=>{
+    e.preventDefault();const data=new FormData(form),ids=new Set(data.getAll('picked')),destination=data.get('folder');
+    if(!ids.size){toast('请先选择卡片。');return;}
+    const teaLibraryPlaces={...state.teaLibraryPlaces};
+    for(const {tea} of visible)if(ids.has(tea.id))teaLibraryPlaces[tea.id]=destination;
+    if(commit({...state,teaLibraryPlaces}))teaLibrary(kind,folder);
+  };
+  for(const b of form.querySelectorAll('[data-tea-library-read]'))b.onclick=()=>{
+    const entry=collectedTeaCards().find(({tea})=>tea.id===b.dataset.teaLibraryRead);if(!entry)return;
+    const x=entry.tea;
+    teaLibraryDialog(label+' · '+entry.source,'<div class="tea-room'+(x.bonus?' bonus-tea':'')+'" style="--tea-font-size:'+state.teaFont+'px">'+teaMeta(x,false)+'<div class="row"><button type="button" id="teaLibraryExport">分享或导出全文</button></div><div class="tea-scroll">'+teaNarrative(x)+'</div></div>',()=>teaLibrary(kind,folder));
+    $('teaLibraryExport').onclick=()=>openTeaExport(x);
+  };
 }
 function findTeaCard(id,mode,index){
   const c=contact(id);
@@ -4808,7 +4884,7 @@ function skinAvailable(id,archive){
   return Object.hasOwn(skins,id)&&(!Object.hasOwn(skinUnlockIds,id)||archive.mysteryActive.includes(skinUnlockIds[id]));
 }
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
 const chatDraftKey=key+'-chat-drafts';
 const pendingChatDrafts=new Map();
 let state = initial(), storageError = '';
@@ -4841,6 +4917,8 @@ function validate(data){
   if(!Array.isArray(result.mysteryActive)||!result.mysteryActive.every(id=>typeof id==='string'&&/^[a-z0-9-]+$/.test(id)))throw Error('神秘小入口存档无效。');
   if(!Array.isArray(result.scenePresets)||!result.scenePresets.every(p=>p&&string(p.id)&&p.id&&string(p.name)&&p.name.trim()&&string(p.scene)&&p.scene.trim()&&p.scene.length<=4000)||!unique(result.scenePresets))throw Error('场景预设存档无效');
   if(!Array.isArray(result.teaSessions)||!result.teaSessions.every(validTeaSession)||!unique(result.teaSessions))throw Error('茶叙存档无效');
+  result.teaLibraryFolders=Object.fromEntries(['regular','bonus'].map(kind=>[kind,Array.isArray(result.teaLibraryFolders?.[kind])?[...new Set(result.teaLibraryFolders[kind].filter(name=>typeof name==='string').map(name=>name.trim()).filter(name=>name&&name!=='未分类'&&name.length<=80))]:[]]));
+  result.teaLibraryPlaces=Object.fromEntries(Object.entries(result.teaLibraryPlaces&&typeof result.teaLibraryPlaces==='object'&&!Array.isArray(result.teaLibraryPlaces)?result.teaLibraryPlaces:{}).filter(([id,folder])=>id&&typeof folder==='string'&&folder.length<=80));
   if(!Array.isArray(result.groups)||!result.groups.every(g=>g&&string(g.id)&&string(g.name)&&typeof g.shared==='boolean'&&Array.isArray(g.members)&&g.members.every(string)&&Array.isArray(g.pending)&&g.pending.every(string)&&Array.isArray(g.messages)&&g.messages.every(m=>m&&string(m.speaker)&&string(m.content)&&string(m.roleId)&&(m.audience===undefined||(Array.isArray(m.audience)&&m.audience.every(string)))))||!unique(result.groups))throw Error('群聊存档无效');
   if(!Array.isArray(result.customStoryStyles)||!result.customStoryStyles.every(x=>x&&['id','name','content'].every(k=>typeof x[k]==='string'&&x[k].trim()))||!unique(result.customStoryStyles))throw Error('文风存档无效');
   if(!Number.isInteger(result.storyFont)||result.storyFont<14||result.storyFont>32)result.storyFont=18;
@@ -5517,6 +5595,7 @@ document.addEventListener('click',e=>{
   }
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
+  if(b.hasAttribute('data-tea-library')){teaLibrary();return;}
   if(d.clearKeep){
     const form=b.form;
     form.elements.keep.value=d.clearKeep;
@@ -6107,5 +6186,6 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
