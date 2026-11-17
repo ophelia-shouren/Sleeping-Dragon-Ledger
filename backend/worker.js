@@ -130,6 +130,7 @@ async function requestModel(env, char, messages, maxTokens = 800, timeout = 5500
   }
 }
 
+const mentionsEveryone=/[@＠]全体成员(?=$|[\s，。！？、；：,.!?;:])/u;
 const ledgerOrigins = new Set(['https://ophelia-shouren.github.io','https://appassets.androidplatform.net']);
 const isLedgerId = value => value.startsWith('ledger:');
 async function ledgerIdentity(req) {
@@ -653,9 +654,13 @@ async function api(req, env, url, ledger, ctx) {
   const summarize=()=>{
     if(ledger && room.kind==='group')ctx?.waitUntil(summarizeRoom(env,room.id).catch(error=>console.error('Room memory could not run',error.name)));
   };
-  if (ledger && req.method==='POST' && path==='send-human-only' && room.kind==='group') {
+  if (ledger && req.method==='POST' && room.kind==='group' && (['send-human-only','send-mention-all'].includes(path)||(path==='send'&&typeof data.body==='string'&&mentionsEveryone.test(data.body)))) {
     const body=field(data,'body',4000);
-    const sent=await run("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'human-only' WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))",room.id,uid,body,room.id,uid);
+    const mentionAll=mentionsEveryone.test(body);
+    if(path==='send-mention-all'&&!mentionAll)throw fail('请输入 @全体成员。',400);
+    if(mentionAll&&room.owner!==uid)throw fail('只有群主可以 @全体成员。',403);
+    const kind=mentionAll?'mention-all':'human-only';
+    const sent=await run("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))",room.id,uid,body,kind,room.id,uid);
     if(!sent.meta.changes)throw fail('你已离开此会话。',404);
     return json({ok:true,message:sent.meta.last_row_id});
   }
@@ -712,7 +717,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-human-only-messages-14'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-mention-all-15'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
