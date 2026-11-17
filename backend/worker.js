@@ -289,21 +289,21 @@ async function api(req, env, url, ledger, ctx) {
     return json({id});
   }
   if (req.method === 'POST' && path === 'join') {
-    const invite = field(data,'invite',80);
+    const invite=field(data,'invite',80);
     const byCode=ledger&&/^[a-z0-9]{6}$/.test(invite);
-    if(byCode){
-      const joined=await one(`INSERT INTO members (room,uid)
-        SELECT r.id,? FROM ledger_invite_codes c JOIN rooms r ON r.id=c.room
-        WHERE c.code=? AND r.kind='group' AND r.owner GLOB 'ledger:*' AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)
-        ON CONFLICT(room,uid) DO UPDATE SET uid=excluded.uid RETURNING room`,uid,invite);
-      if(!joined)throw fail('邀请码无效或已换发。',404);
-      return json({id:joined.room});
-    }
-    const room = await one('SELECT id,kind,owner FROM rooms WHERE invite=? AND id NOT IN (SELECT room FROM ledger_dissolved_groups)',invite);
-    if (!room || isLedgerId(room.owner)!==ledger) throw fail('邀请码无效。',404);
-    await run(`INSERT OR IGNORE INTO members SELECT id,? FROM rooms WHERE id=? AND invite=? AND id NOT IN (SELECT room FROM ledger_dissolved_groups) AND (kind='group' OR (SELECT COUNT(*) FROM members WHERE room=?) < 2)`,uid,room.id,invite,room.id);
-    await requireRoom(room.id).catch(() => {throw fail('这个私聊已经有两位成员。',409);});
-    return json({id:room.id});
+    const match=byCode
+      ? "r.kind='group' AND EXISTS (SELECT 1 FROM ledger_invite_codes c WHERE c.room=r.id AND c.code=?)"
+      : 'r.invite=?';
+    const available=' AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)';
+    const group=await one('SELECT r.id,r.kind,r.owner FROM rooms r WHERE '+match+available,invite);
+    if(!group||isLedgerId(group.owner)!==ledger)throw fail('邀请链接或邀请码无效。',404);
+    const insert=stmt("INSERT OR IGNORE INTO members (room,uid) SELECT r.id,? FROM rooms r WHERE r.id=? AND "+match+available+
+      " AND (r.kind='group' OR (SELECT COUNT(*) FROM members WHERE room=r.id)<2)",uid,group.id,invite);
+    if(ledger&&group.kind==='group'){
+      await db.batch([insert,stmt("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'member-joined' WHERE changes()=1",group.id,uid,me.name+' 加入了群聊')]);
+    }else await insert.run();
+    await requireRoom(group.id).catch(()=>{throw fail(group.kind==='dm'?'这个私聊已经有两位成员。':'此邀请已失效。',group.kind==='dm'?409:404);});
+    return json({id:group.id});
   }
   const room = await requireRoom(req.method === 'POST' ? field(data,'room',36) : url.searchParams.get('room') || '');
   if (ledger && req.method === 'GET' && path === 'quota' && room.kind === 'group') {
@@ -575,7 +575,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-appearance-6'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-events-7'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
