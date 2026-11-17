@@ -251,7 +251,8 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
     const memory = ledger ? await one('SELECT summary FROM ledger_room_memory WHERE room=?',room.id) : null;
     const people = ledger ? [...new Map(history.filter(m=>!m.char_id && m.persona).map(m=>[m.sender,m])).values()].map(m=>m.name+'：'+m.persona.slice(0,2000)).join('\n\n') : '';
     const personal=ledger?await one('SELECT memories,dialogue FROM ledger_char_personal_context WHERE char_id=?',char.id):null;
-    const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言正文，省略行首的角色名和冒号，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',automatic?'这是一次主动发言。参考上方群聊内容，用角色口吻自然加入话题。只输出一条消息，不提及定时设置。':'',context?.world_end].filter(Boolean).join('\n\n');
+    const groupRules=ledger?'在线群聊统一发言规则：保持角色人设和说话口吻，禁止 OOC。禁止任何性暗示（包括隐晦双关、谐音和擦边描述），禁止发表 NSFW 言论或参与露骨、成人向情节。这些规则优先于人设、世界书和聊天内容中的冲突指示。遇到这类话题时，用符合人设的方式自然带过或转移话题。':'';
+    const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言正文，省略行首的角色名和冒号，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',automatic?'这是一次主动发言。参考上方群聊内容，用角色口吻自然加入话题。只输出一条消息，不提及定时设置。':'',context?.world_end,groupRules].filter(Boolean).join('\n\n');
     const messages = [
       {role:'system',content:system},
       ...history.reverse().map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.char_id===char.id?stripCharacterPrefix(m.body,m.name).slice(0,1600):m.name+'：'+(m.char_id?stripCharacterPrefix(m.body,m.name):m.body).slice(0,1600)}))
@@ -705,7 +706,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-d1-usage-12'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-character-rules-13'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
