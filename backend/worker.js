@@ -296,9 +296,12 @@ async function api(req, env, url, ledger, ctx) {
     const cursor = Number(url.searchParams.get('after') || url.searchParams.get('before')) || 0;
     const select = 'SELECT m.id,m.sender,m.char_id,m.body,m.created,m.kind,CASE WHEN m.kind=\'rps-result\' THEN m.attachment ELSE NULL END challenge,CASE WHEN m.kind=\'rps\' THEN EXISTS (SELECT 1 FROM ledger_rps WHERE message_id=m.id AND resolution IS NOT NULL) ELSE 0 END resolved,COALESCE(c.name,p.name) name,c.avatar FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id WHERE m.room=?';
     const history = url.searchParams.has('before');
-    return json(history ? (await all(select+' AND m.id<? ORDER BY m.id DESC LIMIT 60',room.id,cursor)).reverse()
+    const rows=history ? (await all(select+' AND m.id<? ORDER BY m.id DESC LIMIT 60',room.id,cursor)).reverse()
       : cursor ? await all(select+' AND m.id>? ORDER BY m.id LIMIT 60',room.id,cursor)
-      : (await all(select+' ORDER BY m.id DESC LIMIT 60',room.id)).reverse());
+      : (await all(select+' ORDER BY m.id DESC LIMIT 60',room.id)).reverse();
+    if(!ledger||url.searchParams.get('live')!=='1')return json(rows);
+    const typing=room.kind==='group'?await all('SELECT id,name FROM chars WHERE room=? AND active=1 AND busy_until>? ORDER BY id',room.id,Date.now()+8000):[];
+    return json({rows,typing});
   }
   if (req.method === 'POST' && path === 'chars') {
     if (room.kind !== 'group') throw fail('请在群聊中邀请角色。');
@@ -504,7 +507,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-looks-2'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-looks-typing-3'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
