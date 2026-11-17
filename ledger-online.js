@@ -191,7 +191,7 @@ const ledgerOnline = (() => {
   }
   function rooms(){
     room=null;
-    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button><button id="onlineJoin">加入会话</button></div>'+end+'<div class="messages" id="onlineList"></div>');
+    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button></div>'+end+'<div class="messages" id="onlineList"></div>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
     el('onlineNew').onclick=create;
     el('onlineJoin').onclick=()=>join('');
     let previous;
@@ -231,10 +231,12 @@ const ledgerOnline = (() => {
     });
   }
   function join(code){
-    screen('加入会话','<form id="onlineJoinForm"><label>邀请链接或邀请码<input name="invite" required value="'+esc(code)+'"></label><button type="submit" class="primary">加入</button></form>'+end,rooms);
+    screen('加入群聊','<form id="onlineJoinForm"><label>六位邀请码或邀请链接<input name="invite" autocomplete="off" autocapitalize="none" spellcheck="false" required value="'+esc(code)+'" placeholder="例如 a7k2m9"></label><button type="submit" class="primary">加入</button></form>'+end,rooms);
     form('onlineJoinForm',async(data,serial)=>{
       let invite=data.invite.trim();
       try{invite=new URL(invite).searchParams.get('onlineInvite')||'';}catch{}
+      if(/^[A-Za-z0-9]{6}$/.test(invite))invite=invite.toLowerCase();
+      else if(!/^[a-f0-9-]{36}$/i.test(invite))throw Error('请输入六位邀请码或有效的邀请链接。');
       const {id}=await request('join',{invite});
       if(!active(serial))return;
       const url=new URL(location.href);url.searchParams.delete('onlineInvite');history.replaceState(null,'',url);
@@ -668,7 +670,9 @@ const ledgerOnline = (() => {
         info.chars.map(x=>person(x.id,x.name,x.avatar_image,' · AI',owner||x.owner===me.id,x.frame)).join('')+
         (group?'<button type="button" class="group-settings-person" id="onlineAddChar"><b aria-hidden="true">＋</b><span>邀请角色</span></button>':'')+
         '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
-        (info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请链接</h3><label><input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
+        (info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3>'+
+          (info.inviteCode?'<label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode)+'"></label><button id="onlineCopyCode" type="button">复制邀请码</button>':'')+
+          '<label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
         (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><p class="muted">当前可读取在线消息数。Cloudflare 账户剩余额度需要账户级统计授权。</p></section>':'');
       el('onlineMemberList').querySelectorAll('[data-online-display]').forEach(input=>input.onchange=()=>{
@@ -678,6 +682,10 @@ const ledgerOnline = (() => {
           localStorage.setItem(displayKey,JSON.stringify(settings));
         }catch(error){input.checked=!input.checked;status('显示设置未能保存。');}
       });
+      if(el('onlineCopyCode'))el('onlineCopyCode').onclick=async()=>{
+        try{await navigator.clipboard.writeText(info.inviteCode);status('已复制邀请码。');}
+        catch{el('onlineInviteCode').select();status('已选中邀请码，可以手动复制。');}
+      };
       if(el('onlineCopy'))el('onlineCopy').onclick=async()=>{
         try{await navigator.clipboard.writeText(link.href);status('已复制邀请链接。');}
         catch{el('onlineLink').select();status('已选中邀请链接，可以手动复制。');}
@@ -708,7 +716,7 @@ const ledgerOnline = (() => {
           if(input.reportValidity())managed('rename-char',{id,name:input.value.trim()},event.currentTarget);
         };
         el('onlineRemoveMember').onclick=event=>{
-          const prompt=char?'移除此角色？它将停止在群里回复。':'将 '+user.name+' 移出群聊？其邀请的角色也会退出，旧邀请链接将失效。';
+          const prompt=char?'移除此角色？它将停止在群里回复。':'将 '+user.name+' 移出群聊？其邀请的角色也会退出，旧邀请链接和邀请码将失效。';
           if(confirm(prompt))managed(char?'remove-char':'kick-member',{id},event.currentTarget);
         };
         panel.scrollIntoView({block:'nearest'});
