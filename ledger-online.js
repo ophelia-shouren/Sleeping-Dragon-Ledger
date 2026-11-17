@@ -19,6 +19,7 @@ const ledgerOnline = (() => {
     const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     return body.replace(new RegExp('^[^\\S\\r\\n]*'+escaped+'[^\\S\\r\\n]*[:：][^\\S\\r\\n]*','gm'),'').trim();
   }
+  const mentionsEveryone=/[@＠]全体成员(?=$|[\s，。！？、；：,.!?;:])/u;
   function canShowNotice(message){
     return !groupMuted(message.room)&&!(scope()&&room?.id===message.room&&el('onlineMessages'));
   }
@@ -56,7 +57,7 @@ const ledgerOnline = (() => {
       if(noticeSession!==session)return;
       session.cursor=feed.cursor;
       session.failures=0;
-      const latest=feed.rows.findLast(canShowNotice);
+      const latest=feed.rows.findLast(message=>message.kind==='mention-all'&&canShowNotice(message))||feed.rows.findLast(canShowNotice);
       if(latest)showNotice(latest);
     }catch{
       session.failures++;
@@ -594,6 +595,7 @@ const ledgerOnline = (() => {
     }
     function show(range, query=''){
       const choices=[
+        ...(group&&detail?.owner===me.id?[{name:'全体成员'}]:[]),
         ...(detail?.chars||[]).map(char=>({name:char.name,charId:char.id})),
         ...(detail?.members||[]).filter(member=>member.id!==me.id).map(member=>({name:member.name}))
       ].filter(person=>person.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
@@ -831,13 +833,15 @@ const ledgerOnline = (() => {
       if(!body)return;
       lastActivity=Date.now();
       const humanOnly=group&&view.humanOnly===true;
-      const charId=humanOnly?null:mentions.target(body);
+      const mentionAll=group&&mentionsEveryone.test(body);
+      const charId=humanOnly||mentionAll?null:mentions.target(body);
+      const path=mentionAll?'send-mention-all':humanOnly?'send-human-only':'send';
       input.value='';
       const pending={room:current.id,body};
       pendingMessage=pending;
       drawMessages('bottom');
       let result;
-      try{result=humanOnly?await request('send-human-only',{room:current.id,body}):await request('send',{room:current.id,body,charId,deferReply:true});}
+      try{result=await request(path,{room:current.id,body,charId,deferReply:true});}
       catch(error){
         if(pendingMessage===pending)pendingMessage=null;
         if(active(requestSerial)){if(!input.value)input.value=body;drawMessages('bottom');}
