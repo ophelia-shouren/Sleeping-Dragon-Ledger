@@ -699,19 +699,7 @@ const ledgerOnline = (() => {
       if(group){
         el('onlineMemberList').insertAdjacentHTML('beforeend',
           '<div class="clear-chat-row"><button type="button" class="archive-danger" id="onlineQuitGroup">'+(owner?'解散群聊':'退出群聊')+'</button></div>');
-        el('onlineQuitGroup').onclick=async event=>{
-          const button=event.currentTarget;
-          const notice=owner?'解散「'+current.name+'」后，所有成员都将失去访问权限，旧邀请链接和邀请码会失效。确定解散？':
-            '退出「'+current.name+'」后，你邀请的 AI 角色也会一起退出。确定退出？';
-          if(!confirm(notice))return;
-          button.disabled=true;
-          try{
-            await request(owner?'dissolve-group':'leave-group',{room:current.id});
-            views.delete(current.id);
-            if(knownRooms)knownRooms=knownRooms.filter(item=>item.id!==current.id);
-            if(active(serial)){rooms();status(owner?'群聊已解散。':'已退出群聊。');}
-          }catch(error){if(active(serial)){status(error.message);button.disabled=false;}}
-        };
+        el('onlineQuitGroup').onclick=()=>confirmGroupExit(current,owner);
       }
       el('onlineMemberList').querySelectorAll('[data-online-display]').forEach(input=>input.onchange=()=>{
         try{
@@ -796,6 +784,28 @@ const ledgerOnline = (() => {
         status(error.message);
       }
     }
+  }
+  function confirmGroupExit(current,owner){
+    const action=owner?'解散群聊':'退出群聊';
+    const consequence=owner?'解散后，所有成员都将失去访问权限，邀请链接和邀请码会失效。':
+      '退出后，你邀请的 AI 角色也会一起移出群聊。';
+    const back=()=>members(current);
+    const serial=screen(action,'<section class="group-settings-card group-settings-block"><h3>'+esc(current.name)+'</h3><p>'+consequence+'</p><div class="row"><button type="button" id="onlineExitCancel">取消</button><button type="button" class="archive-danger" id="onlineExitNext">继续'+action.slice(0,2)+'</button></div></section>'+end,back);
+    el('onlineExitCancel').onclick=back;
+    el('onlineExitNext').onclick=async event=>{
+      if(!confirm('最终确认：要'+action.slice(0,2)+'「'+current.name+'」吗？'))return;
+      const button=event.currentTarget;
+      button.disabled=true;
+      el('onlineExitCancel').disabled=true;
+      try{
+        await request(owner?'dissolve-group':'leave-group',{room:current.id});
+        views.delete(current.id);
+        if(knownRooms)knownRooms=knownRooms.filter(item=>item.id!==current.id);
+        if(active(serial)){rooms();status(owner?'群聊已解散。':'已退出群聊。');}
+      }catch(error){
+        if(active(serial)){status(error.message);button.disabled=false;el('onlineExitCancel').disabled=false;}
+      }
+    };
   }
   function editCharLook(current,char){
     const frame=storedFrame(char.frame);
