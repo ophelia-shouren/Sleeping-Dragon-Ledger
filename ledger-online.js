@@ -462,8 +462,7 @@ const ledgerOnline = (() => {
       rememberChat(current.id);
       const back=()=>chatRoom(current);
       const body=card.type==='moon'
-        ? storyHtmlPreview(card.body,card.title).replace('sandbox="allow-scripts"','sandbox=""')+
-          '<details class="story-panel"><summary>查看 HTML 代码</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(card.body)+'</pre></details>'
+        ? storyHtmlPreview(card.body,card.title).replace('sandbox="allow-scripts"','sandbox=""')
         : '<article class="story-paper story-reader" style="font-size:'+state.storyFont+'px">'+esc(card.body)+'</article>';
       storyDialog(card.title,body+'<footer class="story-reader-exit"><button type="button" data-action="storyBack">返回聊天</button></footer>','reader',back);
       const exit=el('dialog').querySelector('.story-header-exit');
