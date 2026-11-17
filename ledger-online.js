@@ -30,10 +30,10 @@ const ledgerOnline = (() => {
     const node=el('onlineStatus');
     if(scope()&&node)node.textContent=message;
   }
-  function screen(title,body,back){
+  function screen(title,body,back,headerAction=''){
     clearTimeout(pollTimer);
     const serial=++generation;
-    dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button><div class="chat-name"><h2>'+esc(title)+'</h2></div></div>'+body+'</section>',true);
+    dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button><div class="chat-name"><h2>'+esc(title)+'</h2></div>'+headerAction+'</div>'+body+'</section>',true);
     el('onlineBack').onclick=back||(()=>el('dialog').close());
     return serial;
   }
@@ -153,7 +153,7 @@ const ledgerOnline = (() => {
         const mine=!m.char_id&&m.sender===me.id;
         const text=esc(m.body);
         const role=mine?'user':'assistant';
-        const avatar='<span class="avatar-button">'+personAvatar(m.name,m.char_id?'':people.get(m.sender)?.avatar)+'</span>';
+        const avatar='<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+personAvatar(m.name,m.char_id?'':people.get(m.sender)?.avatar)+'</button>';
         const name=mine?'':'<small>'+esc(m.name)+(m.char_id?' · AI':'')+'</small>';
         const layout=chatMessageLayout(avatar,name,'');
         return '<div class="message-row '+role+'">'+layout.before+'<article class="bubble '+role+'">'+layout.name+'<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+text+'</p></article></div>';
@@ -197,26 +197,108 @@ const ledgerOnline = (() => {
     const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(context)));
     return Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');
   }
+  function setupMentions(input, group){
+    const picker=el('onlineChoices'), toggle=el('onlineMention'), feed=el('onlineMessages');
+    const selected=new Map();
+    let press, position, composing=false;
+    function close(){
+      picker.hidden=true;picker.style.display='none';
+      toggle?.setAttribute('aria-expanded','false');
+    }
+    function insert(person, range){
+      const start=range?.start??input.selectionStart, end=range?.end??input.selectionEnd;
+      const left=input.value.slice(0,start);
+      const token=(left&&!/\s$/u.test(left)?' ':'')+'@'+person.name+' ';
+      if(input.value.length-(end-start)+token.length>input.maxLength){status('消息已达到长度上限。');return;}
+      input.setRangeText(token,start,end,'end');
+      selected.set(person.name,person.charId || null);
+      close();
+      input.focus();
+    }
+    function show(range, query=''){
+      const choices=(detail?.chars||[]).filter(c=>c.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+      picker.replaceChildren();
+      if(!choices.length){
+        const empty=document.createElement('span');
+        empty.className='muted';empty.textContent=query?'没有匹配的角色。':'还没有可提及的角色。';
+        picker.append(empty);
+      }
+      for(const char of choices){
+        const button=document.createElement('button');
+        button.type='button';button.textContent='@'+char.name;
+        button.onclick=()=>insert({name:char.name,charId:char.id},range);
+        picker.append(button);
+      }
+      picker.hidden=false;picker.style.display='';
+      toggle?.setAttribute('aria-expanded','true');
+    }
+    function suggest(){
+      if(!group||composing)return;
+      const match=input.value.slice(0,input.selectionStart).match(/[@＠]([^\s@＠]*)$/u);
+      if(!match){close();return;}
+      show({start:input.selectionStart-match[0].length,end:input.selectionEnd},match[1]);
+    }
+    if(toggle)toggle.onclick=()=>picker.hidden
+      ? show({start:input.selectionStart,end:input.selectionEnd}) : close();
+    input.addEventListener('input',suggest);
+    input.addEventListener('click',suggest);
+    input.addEventListener('compositionstart',()=>{composing=true;});
+    input.addEventListener('compositionend',()=>{composing=false;suggest();});
+    input.addEventListener('keydown',event=>{if(event.key==='Escape'&&!picker.hidden){event.preventDefault();event.stopPropagation();close();}});
+    function cancelPress(){clearTimeout(press);press=null;}
+    function mentionAvatar(avatar){
+      const message=messages.find(m=>String(m.id)===avatar.dataset.onlineAvatar);
+      if(!message)return;
+      if(message.char_id&&!detail?.chars.some(x=>x.id===message.char_id)){status('此角色已离开群聊。');return;}
+      insert({name:message.name,charId:message.char_id});
+    }
+    feed.addEventListener('pointerdown',event=>{
+      const avatar=event.target.closest('[data-online-avatar]');
+      if(!avatar||event.button!==0)return;
+      cancelPress();
+      position=[event.clientX,event.clientY];
+      press=setTimeout(()=>{press=null;if(avatar.isConnected)mentionAvatar(avatar);},500);
+    });
+    feed.addEventListener('pointermove',event=>{
+      if(press && Math.hypot(event.clientX-position[0],event.clientY-position[1])>10)cancelPress();
+    });
+    for(const event of ['pointerup','pointercancel','pointerleave','scroll'])feed.addEventListener(event,cancelPress);
+    feed.addEventListener('contextmenu',event=>{
+      const avatar=event.target.closest('[data-online-avatar]');
+      if(avatar)event.preventDefault();
+    });
+    feed.addEventListener('click',event=>{
+      const avatar=event.target.closest('[data-online-avatar]');
+      if(avatar&&event.detail===0)mentionAvatar(avatar);
+    });
+    return {
+      target(body){
+        for(const match of body.matchAll(/[@＠]([^\s@＠]+)/gu)){
+          const exact=match[1], clean=exact.replace(/[，。！？、；：,.!?;:]+$/u,'');
+          if(selected.has(exact)||selected.has(clean)){
+            const target=selected.has(exact)?selected.get(exact):selected.get(clean);
+            if(target)return target;
+            continue;
+          }
+          const charId=detail?.chars.find(c=>c.name===exact || c.name===clean)?.id;
+          if(charId)return charId;
+        }
+        return null;
+      },
+      clear(){selected.clear();close();}
+    };
+  }
   function chatRoom(current){
     if(!current)return rooms();
     room=current;messages=[];older=false;detail=null;
-    const serial=screen(current.name,'<div class="row"><button type="button" id="onlineMembers">'+(current.kind==='group'?'群聊设置':'成员与邀请')+'</button>'+(current.kind==='group'?'<button type="button" id="onlineMention">@ 角色</button>':'')+'</div>'+end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose" class="row"><textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="primary composer-send">发送</button></form>',rooms);
+    const group=current.kind==='group';
+    const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
+    const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
+    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div><form id="onlineCompose" class="row">'+
+      (group?'<button type="button" class="composer-tool composer-icon" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@</button>':'')+
+      '<textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></form>',rooms,header);
     el('onlineMembers').onclick=()=>members(current);
-    if(el('onlineMention'))el('onlineMention').onclick=()=>{
-      const chars=detail?.chars||[];
-      if(!chars.length)return status('还没有角色加入。');
-      const choices=el('onlineChoices');
-      if(choices){choices.remove();return;}
-      const box=document.createElement('div');
-      box.id='onlineChoices';box.className='row';
-      for(const char of chars){
-        const button=document.createElement('button');
-        button.type='button';button.textContent='@'+char.name;
-        button.onclick=()=>{const input=el('onlineCompose').elements.body;input.value='@'+char.name+' '+input.value;input.focus();box.remove();};
-        box.append(button);
-      }
-      el('onlineCompose').before(box);
-    };
+    const mentions=setupMentions(el('onlineCompose').elements.body,group);
     let refreshing=false, ticks=0;
     async function refresh(){
       if(refreshing)return;
@@ -241,11 +323,13 @@ const ledgerOnline = (() => {
       const input=el('onlineCompose').elements.body;
       const body=data.body.trim();
       if(!body)return;
+      const charId=mentions.target(body);
       input.value='';
       let result;
-      try{result=await request('send',{room:current.id,body});}
+      try{result=await request('send',{room:current.id,body,charId});}
       catch(error){if(active(requestSerial)&&!input.value)input.value=body;throw error;}
       if(!active(requestSerial))return;
+      if(!input.value)mentions.clear();
       if(result.notice)status(result.notice);
       await refresh();
     });
@@ -265,7 +349,7 @@ const ledgerOnline = (() => {
         (owner&&x.id!==me.id?'<button type="button" data-online-kick="'+esc(x.id)+'">移出群聊</button>':'')+'</div>').join('')+
         info.chars.map(x=>'<div class="row"><span>'+esc(x.name)+' · AI</span>'+((owner||x.owner===me.id)?'<button type="button" data-online-remove="'+esc(x.id)+'">移除</button>':'')+'</div>').join('')+
         (info.invite?'<label>邀请链接<input id="onlineLink" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button>':'')+
-        (group?'<button type="button" class="primary" id="onlineAddChar">邀请已有角色</button><section class="panel"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取额度…</p><p class="muted">真人消息与 AI 回复各计一条。D1 免费档上限为每天读 500 万行、写 10 万行。平台未提供本账户的剩余额度。</p></section>':'');
+        (group?'<button type="button" class="primary" id="onlineAddChar">邀请已有角色</button><section class="panel"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取额度…</p><p class="muted">真人消息与 AI 回复各计一条。D1 免费档上限为每天读 500 万行、写 10 万行。当前托管站点只有数据库访问权限，未连接 Cloudflare 账户级用量统计，因此无法显示账户的精确剩余额度。</p></section>':'');
       if(group){
         async function refreshQuota(){
           const quota=await request('quota?room='+current.id);
