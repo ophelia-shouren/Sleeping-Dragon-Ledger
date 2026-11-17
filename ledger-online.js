@@ -471,6 +471,37 @@ const ledgerOnline = (() => {
       });
     }catch(error){if(active(serial))status(error.message);}
   }
+  const packetLabels={normal:'普通红包',lucky:'拼手气红包',exclusive:'专属红包'};
+  const packetStyle=`<style>
+    #ledgerOnline .packet-page{width:min(100%,28rem);margin:0 auto;min-height:0;overflow:auto;padding:2px 2px 16px;box-sizing:border-box;display:grid;align-content:start;gap:14px;color:var(--ink)}
+    #ledgerOnline .packet-page [hidden]{display:none!important}
+    #ledgerOnline .packet-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:4px}
+    #ledgerOnline .packet-mode{position:relative;display:block;margin:0;text-align:center}
+    #ledgerOnline .packet-mode input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+    #ledgerOnline .packet-mode span{display:grid;place-items:center;min-height:44px;padding:0 2px;border-radius:8px;font-size:.9em}
+    #ledgerOnline .packet-mode input:checked+span{background:var(--button-hi,var(--gold));color:var(--button-ink,var(--field));font-weight:700}
+    #ledgerOnline .packet-mode input:focus-visible+span{outline:2px solid var(--ink);outline-offset:-3px}
+    #ledgerOnline .packet-panel{border:1px solid var(--line);background:var(--panel);border-radius:14px;overflow:hidden}
+    #ledgerOnline .packet-field{display:grid;gap:10px;padding:13px 14px;margin:0}
+    #ledgerOnline .packet-field+.packet-field{border-top:1px solid var(--line)}
+    #ledgerOnline .packet-field-inline{grid-template-columns:auto minmax(0,1fr);align-items:center}
+    #ledgerOnline .packet-units{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    #ledgerOnline .packet-units label{display:grid;gap:4px;margin:0;min-width:0;font-size:.86em;color:var(--muted);overflow-wrap:anywhere}
+    #ledgerOnline .packet-field input,#ledgerOnline .packet-field select{box-sizing:border-box;min-width:0;width:100%;margin:0;min-height:44px;padding:7px 9px}
+    #ledgerOnline .packet-field [name=count]{width:min(100%,7rem);justify-self:end;text-align:right}
+    #ledgerOnline .packet-field small{grid-column:1/-1;text-align:right;color:var(--muted)}
+    #ledgerOnline .packet-total{text-align:center;padding:14px 10px 9px;overflow-wrap:anywhere}
+    #ledgerOnline .packet-total strong{display:block;font-size:clamp(1.8rem,8vw,2.6rem);line-height:1.15;font-variant-numeric:tabular-nums}
+    #ledgerOnline .packet-total small{display:block;margin-top:6px;color:var(--muted)}
+    #ledgerOnline .packet-send{min-height:46px;width:100%}
+    #ledgerOnline .packet-envelope{text-align:center;padding:24px 16px 20px;color:var(--ink);border:1px solid var(--line);border-radius:16px;background:var(--panel);background:linear-gradient(165deg,color-mix(in srgb,var(--panel) 78%,var(--gold)),var(--panel) 75%);overflow-wrap:anywhere}
+    #ledgerOnline .packet-envelope h3,#ledgerOnline .packet-envelope p{margin:6px 0}
+    #ledgerOnline .packet-claim{border-radius:50%;width:70px;height:70px;margin:12px auto 0;padding:0;display:grid;place-items:center;font-size:1.45rem;font-weight:700}
+    #ledgerOnline .packet-claims{padding:3px 14px;margin:0;list-style:none}
+    #ledgerOnline .packet-claims li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;overflow-wrap:anywhere}
+    #ledgerOnline .packet-claims li+li{border-top:1px solid var(--line)}
+    #ledgerOnline .packet-claims strong{text-align:right}
+  </style>`;
   async function composePacket(current){
     const back=()=>chatRoom(current);
     const serial=screen('发红包','<p class="muted">正在读取群聊货币…</p>'+end,back);
@@ -478,19 +509,30 @@ const ledgerOnline = (() => {
       const {currency,people}=await request('red-packet-options?room='+current.id);
       if(!active(serial))return;
       const maxCount=Math.min(100,people.length);
-      const amount=['main','middle','small'].map((name,i)=>'<label>'+esc(currency.units[i])+'<input type="number" name="'+name+'" min="0" step="'+(i?'1':'0.01')+'" placeholder="0"></label>').join('');
-      screen('发红包','<form id="onlinePacket" class="group-settings-card group-settings-block"><label>发送方式<select name="mode"><option value="normal">普通红包</option><option value="lucky">拼手气红包</option><option value="exclusive">专属红包</option></select></label>'+
-        '<div class="fields">'+amount+'</div><p class="muted" id="onlinePacketAmount"></p>'+
-        '<label id="onlinePacketCount">红包数量（最多 '+maxCount+' 份）<input name="count" type="number" min="1" max="'+maxCount+'" required value="1"></label>'+
-        '<label id="onlinePacketTarget" hidden>专属收件人<select name="target"><option value="">请选择</option>'+people.filter(person=>person.id!=='user:'+me.id).map(person=>'<option value="'+esc(person.id)+'">'+esc(person.name)+(person.id.startsWith('char:')?' · Char':'')+'</option>').join('')+'</select></label>'+
-        '<button type="submit" class="primary">发送红包</button></form>'+end,back);
+      const modes=Object.entries(packetLabels).map(([mode,label])=>`<label class="packet-mode"><input type="radio" name="mode" value="${mode}" ${mode==='normal'?'checked':''}><span>${label}</span></label>`).join('');
+      const amount=['main','middle','small'].map((name,i)=>`<label>${esc(currency.units[i])}<input type="number" name="${name}" min="0" step="${i?'1':'0.01'}" inputmode="${i?'numeric':'decimal'}" placeholder="0"></label>`).join('');
+      const targets=people.filter(person=>person.id!=='user:'+me.id).map(person=>`<option value="${esc(person.id)}">${esc(person.name)}${person.id.startsWith('char:')?' · Char':''}</option>`).join('');
+      screen('发红包',packetStyle+`<form id="onlinePacket" class="packet-page">
+        <div class="packet-modes" role="group" aria-label="红包类型">${modes}</div>
+        <div class="packet-panel">
+          <div class="packet-field"><span>总金额</span><div class="packet-units">${amount}</div></div>
+          <div class="packet-field packet-field-inline" id="onlinePacketCount">
+            <label for="onlinePacketCountInput">红包个数</label>
+            <input id="onlinePacketCountInput" name="count" type="number" inputmode="numeric" min="1" max="${maxCount}" required value="1" aria-describedby="onlinePacketCountHint">
+            <small id="onlinePacketCountHint">最多 ${maxCount} 份</small>
+          </div>
+          <label class="packet-field packet-field-inline" id="onlinePacketTarget" hidden>发给<select name="target"><option value="">选择群成员</option>${targets}</select></label>
+        </div>
+        <div class="packet-total"><strong id="onlinePacketAmount"></strong><small>${esc(currency.units[0])} · 虚拟货币</small></div>
+        <button type="submit" class="primary packet-send">发红包</button>
+      </form>`+end,back);
       const node=el('onlinePacket');
       const update=()=>{
         const {mode,count,target,main,middle,small}=node.elements, exclusive=mode.value==='exclusive';
         el('onlinePacketCount').hidden=exclusive;count.disabled=exclusive;
         el('onlinePacketTarget').hidden=!exclusive;target.required=exclusive;target.disabled=!exclusive;
         const total=Number(main.value)+Number(middle.value)/currency.rates[0]+Number(small.value)/(currency.rates[0]*currency.rates[1]);
-        el('onlinePacketAmount').textContent='合计 '+(Number.isFinite(total)?total.toFixed(2):'—')+' '+currency.units[0]+' · 虚拟货币';
+        el('onlinePacketAmount').textContent=Number.isFinite(total)?total.toFixed(2):'—';
       };
       node.addEventListener('input',update);update();
       form('onlinePacket',async(data,requestSerial)=>{
@@ -500,7 +542,13 @@ const ledgerOnline = (() => {
     }catch(error){if(active(serial))status(error.message);}
   }
   function openPacket(current,id){
-    const serial=screen('群聊红包','<section class="group-settings-card group-settings-block" id="onlinePacketDetails"></section><button id="onlineClaimPacket" type="button" class="primary" hidden>领取红包</button>'+end,()=>chatRoom(current));
+    const serial=screen('群聊红包',packetStyle+`<div class="packet-page">
+      <section class="packet-envelope">
+        <div id="onlinePacketDetails"><p class="muted">正在读取红包…</p></div>
+        <button id="onlineClaimPacket" type="button" class="primary packet-claim" aria-label="拆开红包" hidden>开</button>
+      </section>
+      <ul class="packet-panel packet-claims" id="onlinePacketClaims" aria-label="领取明细" hidden></ul>
+    </div>`+end,()=>chatRoom(current));
     const button=el('onlineClaimPacket');
     let previous, claiming=false;
     async function refresh(){
@@ -510,11 +558,18 @@ const ledgerOnline = (() => {
       const signature=JSON.stringify(packet);
       if(previous===signature)return;
       previous=signature;
-      const labels={normal:'普通红包',lucky:'拼手气红包',exclusive:'专属红包'};
-      const amount=cents=>esc((cents/100).toFixed(2)+' '+packet.unit);
-      el('onlinePacketDetails').innerHTML='<h3>'+esc(labels[packet.mode])+'</h3><p>'+amount(packet.total)+'</p><p class="muted">'+(packet.targetName?'专属给 '+esc(packet.targetName)+' · ':'')+
-        (packet.declined?esc(packet.declined)+' 已拒收':'已领取 '+packet.claims.length+' / '+packet.count)+'</p>'+
-        packet.claims.map(claim=>'<div class="row between"><span>'+esc(claim.name)+'</span><strong>'+amount(claim.cents)+'</strong></div>').join('');
+      const own=packet.claims.find(claim=>claim.id==='user:'+me.id);
+      const amount=cents=>esc((cents/100).toFixed(2));
+      const unit=esc(packet.unit);
+      const progress=packet.declined?esc(packet.declined)+' 已拒收':
+        (packet.remaining===0?'已领完 · ':'')+'已领取 '+packet.claims.length+' / '+packet.count;
+      el('onlinePacketDetails').innerHTML=`<h3>${esc(packetLabels[packet.mode])}</h3>
+        ${packet.targetName?'<p>专属给 '+esc(packet.targetName)+'</p>':''}
+        ${own||!packet.canClaim?`<div class="packet-total"><strong>${amount(own?own.cents:packet.total)}</strong><small>${own?'你领取了':'红包总额'} · ${unit}</small></div>`:''}
+        <p class="muted">${progress}</p>`;
+      const claims=el('onlinePacketClaims');
+      claims.hidden=!packet.claims.length;
+      claims.innerHTML=packet.claims.map(claim=>`<li><span>${esc(claim.name)}</span><strong>${amount(claim.cents)} ${unit}</strong></li>`).join('');
     }
     button.onclick=async()=>{
       if(claiming)return;
