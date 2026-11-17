@@ -352,6 +352,9 @@ const ledgerOnline = (() => {
     const resolved=new Set(messages.filter(m=>m.challenge).map(m=>Number(m.challenge)));
     box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
       (messages.map(m=>{
+        if(m.kind==='member-joined'){
+          return '<div class="muted" style="text-align:center;margin:10px 0"><small style="display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--field);overflow-wrap:anywhere">'+esc(m.body)+'</small></div>';
+        }
         const mine=!m.char_id&&m.sender===me.id;
         const role=mine?'user':'assistant';
         const look=m.char_id?cast.get(m.char_id):people.get(m.sender);
@@ -760,10 +763,11 @@ const ledgerOnline = (() => {
         const id=button.dataset.onlineManage, char=info.chars.find(x=>x.id===id), user=info.members.find(x=>x.id===id);
         const panel=el('onlineManage');
         panel.innerHTML=char?
-          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
+          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button> <button id="onlineEditCharApi" type="button">更换角色 API</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
           '<button id="onlineRemoveMember" type="button">移除角色</button>':
           '<button id="onlineRemoveMember" type="button">移出 '+esc(user?.name)+'</button>';
         if(el('onlineEditLook'))el('onlineEditLook').onclick=()=>editCharLook(current,char);
+        if(el('onlineEditCharApi'))el('onlineEditCharApi').onclick=()=>editOnlineCharApi(current,char);
         if(el('onlineRename'))el('onlineRename').onclick=event=>{
           const input=el('onlineCharName');
           if(input.reportValidity())managed('rename-char',{id,name:input.value.trim()},event.currentTarget);
@@ -861,6 +865,32 @@ const ledgerOnline = (() => {
         if(active(serial)){status(error.message);button.disabled=false;el('onlineExitCancel').disabled=false;}
       }
     };
+  }
+  async function editOnlineCharApi(current,char){
+    const serial=screen('角色 API','<p class="muted">正在读取配置…</p>'+end,()=>members(current));
+    try{
+      const config=await request('char-api?room='+encodeURIComponent(current.id)+'&id='+encodeURIComponent(char.id));
+      if(!active(serial))return;
+      const profiles=state.profiles.filter(x=>x.url&&x.model&&x.key);
+      const formSerial=screen('角色 API','<section class="group-settings-card group-settings-block"><h3>'+esc(char.name)+'</h3><form id="onlineCharApiForm">'+
+        '<label>调用预设<select id="onlineCharApiPreset"><option value="">手动填写</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model)+'</option>').join('')+'</select></label>'+
+        '<label>OpenAI 兼容 API 地址<input name="endpoint" type="url" required maxlength="400" value="'+esc(config.endpoint)+'"></label>'+
+        '<label>模型名称<input name="model" required maxlength="120" value="'+esc(config.model)+'"></label>'+
+        '<label>API Key<input name="key" type="password" autocomplete="off" maxlength="2000" placeholder="地址不变时，留空沿用当前 Key"></label>'+
+        '<button type="submit" class="primary">保存角色 API</button></form></section>'+end,()=>members(current));
+      const fields=el('onlineCharApiForm').elements;
+      const select=el('onlineCharApiPreset');
+      select.onchange=()=>{
+        const profile=profiles.find(p=>p.id===select.value);
+        if(!profile)return;
+        fields.endpoint.value=profile.url;fields.model.value=profile.model;fields.key.value=profile.key;
+      };
+      form('onlineCharApiForm',async data=>{
+        await request('update-char-api',{room:current.id,id:char.id,...data});
+        viewFor(current.id).detail=null;
+        if(active(formSerial)){await members(current);status('角色 API 已保存。');}
+      });
+    }catch(error){if(active(serial))status(error.message);}
   }
   function editCharLook(current,char){
     const frame=storedFrame(char.frame);
