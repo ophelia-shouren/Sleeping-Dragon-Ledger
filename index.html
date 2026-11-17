@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
-<script src="./ledger-online.js?v=82367a23"></script>
+<script src="./ledger-online.js?v=c1536263"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -4145,6 +4145,39 @@ function messageActionBar(selected){
   const all=n===selected.selectableCount;
   return '<div class="message-selection bulk-tools"><button type="button" data-action="toggleMessageSelection" aria-pressed="'+all+'">'+(all?'取消全选':'全选')+'</button><strong aria-live="polite">已选 '+n+' 条</strong><div class="row"><button type="button" data-action="exportMessages"'+disabled+'>导出 TXT</button><button type="button" data-action="screenshotMessages"'+disabled+'>截图</button><button type="button" class="message-danger" data-action="deleteMessages"'+disabled+'>删除所选</button><button type="button" data-action="exitMessages">完成</button></div></div>';
 }
+
+function openChatPicture(source){
+  const src=safePicture(source);if(!src)return;
+  document.getElementById('chatPictureViewer')?.close();
+  const viewer=document.createElement('dialog');viewer.id='chatPictureViewer';
+  viewer.style.cssText='position:fixed;inset:0;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:var(--bg);color:var(--ink);overflow:auto;z-index:2147483646';
+  viewer.innerHTML='<button type="button" aria-label="关闭图片" style="position:fixed;top:max(14px,env(safe-area-inset-top));left:14px;z-index:2;min-width:44px;min-height:44px">×</button><div style="display:grid;place-items:center;min-height:100%;padding:64px 12px;box-sizing:border-box"><img alt="图片全屏预览" style="display:block;max-width:100%;max-height:calc(100dvh - 128px);object-fit:contain"></div><button type="button" data-save-picture style="position:fixed;bottom:max(16px,env(safe-area-inset-bottom));right:16px;z-index:2;min-height:44px">保存图片</button>';
+  document.body.append(viewer);viewer.querySelector('img').src=src;
+  viewer.querySelector('button').onclick=()=>viewer.close();
+  viewer.addEventListener('close',()=>viewer.remove(),{once:true});
+  viewer.querySelector('[data-save-picture]').onclick=async event=>{
+    const button=event.currentTarget;button.disabled=true;
+    try{
+      const blob=await (await fetch(src)).blob();
+      const type=blob.type.split('/')[1]?.replace('jpeg','jpg')||'png',name='眠龙图片-'+Date.now()+'.'+type;
+      const file=new File([blob],name,{type:blob.type});
+      if(navigator.canShare?.({files:[file]}))await navigator.share({files:[file]});
+      else{
+        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),15000);
+      }
+    }catch(error){if(error.name!=='AbortError')toast('保存失败，请重试或长按图片保存。');}
+    finally{button.disabled=false;}
+  };
+  viewer.showModal();
+}
+document.addEventListener('click',event=>{
+  const image=event.target.closest?.('img.message-image');
+  if(!image||!image.src||!image.closest('#onlineMessages,#groupMessages,#messages'))return;
+  if(image.closest('#onlineMessages')&&document.querySelector('#onlineSelectionBar .message-selection'))return;
+  if(!image.closest('#onlineMessages')&&typeof selection!=='undefined'&&selection)return;
+  event.preventDefault();event.stopImmediatePropagation();openChatPicture(image.src);
+},true);
+
 function openMessageMenu(index){
   const scope=messageScope(),m=scope?.messages[index];
   if(!m||replyPending(m))return;
@@ -4153,6 +4186,7 @@ function openMessageMenu(index){
   const actions=[
     ...(m.content.trim()?[['copy','⧉','复制','复制这条消息的文字']]:[]),
     ['quote','❝','引用回复','附在下一条消息里'],
+    ...(typeof ledgerOnline!=='undefined'?[['onlineForward','↗','转发到在线群聊','须开启涉及角色的个人记忆与私聊读取']]:[]),
     ['select','☷','多选消息','批量导出为 TXT 或删除'],
     ...(canReroll?[['reroll','↻','重新生成','只替换这条回复']]:[]),
     ...(canReroll&&ai?[['guide','✦','带提示重新生成','告诉角色这次怎么回复']]:[]),
@@ -4187,6 +4221,7 @@ async function messageCommand(command){
     if(copied&&$('messageMenu')===menu)closeMessageTools(scope);
     toast(copied?'已复制消息。':'复制失败，请重试。');return;
   }
+  if(command==='onlineForward'){await ledgerOnline.forwardExternal(scope,scope.messages[index]);return;}
   if(command==='quote'){
     const m=scope.messages[index],speaker=m.speaker||(m.role==='system'?'系统':m.role==='user'?state.userName||'你':displayName(scope.c));
     const text=m.content.trim(),content=(text.length>300?text.slice(0,300)+'…':text)||(m.image?'[图片]':'[消息]');
@@ -4286,11 +4321,11 @@ function screenshotImage(src){
     image.src=src;
   });
 }
-async function screenshotSelectedMessages(button){
-  const scope=messageScope();
-  if(!sameMessageScope(selection,scope)||!selection.indices.size)return;
+async function screenshotSelectedMessages(button,onlineScope=null){
+  const scope=onlineScope||messageScope();
+  if(!onlineScope&&(!sameMessageScope(selection,scope)||!selection.indices.size))return;
   const {c,group,messages}=scope;
-  const selected=messages.filter((_,index)=>selection.indices.has(index));
+  const selected=messages.filter((_,index)=>(onlineScope?.indices||selection.indices).has(index));
   const title=group?group.name:displayName(c);
   const user=appearance('user');
   const prefs=chatDisplay(c);
@@ -4314,7 +4349,7 @@ async function screenshotSelectedMessages(button){
   const entries=selected.flatMap(message=>{
     const system=message.role==='system'||!!message.tea;
     const mine=!system&&(group?!message.roleId:message.role==='user');
-    const person=system?null:mine?user:group?(contact(message.roleId)||{name:message.speaker}):c;
+    const person=system?null:message.onlinePerson|| (mine?user:group?(contact(message.roleId)||{name:message.speaker}):c);
     const name=message.tea?teaTitle(message.tea):system?'系统提示':group&&!mine?message.speaker||displayName(person):displayName(person);
     const card=displayedChatCard(message);
     const text=message.tea?message.tea.pov+' · '+message.tea.turns.length+' 段':card?'':message.content;
@@ -4550,7 +4585,7 @@ function initMessageTools(){
   let press=null,timer,suppressUntil=0;
   const teaPassage=e=>e.target.closest?.('[data-tea-turn]');
   const bubble=e=>e.target.closest?.('button')?null:e.target.closest?.('[data-message-index]');
-  const available=node=>!$('dialog').open||!!node.closest('[data-group-room]');
+  const available=node=>!document.getElementById('chatPictureViewer')&&(!$('dialog').open||!!node.closest('[data-group-room]'));
   const cancel=()=>{clearTimeout(timer);press=null;};
   document.addEventListener('pointerdown',e=>{
     const passage=teaPassage(e),node=passage||bubble(e);
@@ -6072,3 +6107,4 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
