@@ -21,7 +21,7 @@ const ledgerOnline = (() => {
   }
   const mentionsEveryone=/[@＠]全体成员(?=$|[\s，。！？、；：,.!?;:])/u;
   function canShowNotice(message){
-    return !groupMuted(message.room)&&!(scope()&&room?.id===message.room&&el('onlineMessages'));
+    return !['deleted','message-deleted'].includes(message.kind)&&!groupMuted(message.room)&&!(scope()&&room?.id===message.room&&el('onlineMessages'));
   }
   function showNotice(message){
     if(!canShowNotice(message)||typeof deviceLocked!=='undefined'&&deviceLocked)return;
@@ -674,7 +674,9 @@ const ledgerOnline = (() => {
     const display=displayFor(room.id);
     const cast=new Map((detail?.chars||[]).map(x=>[x.id,x]));
     const resolved=new Set(messages.filter(m=>m.challenge).map(m=>Number(m.challenge)));
+    const removed=new Set(messages.filter(m=>m.kind==='message-deleted').map(m=>Number(m.body)));
     const markup=(added||messages).map(m=>{
+        if(['deleted','message-deleted'].includes(m.kind)||removed.has(m.id))return '';
         if(m.kind==='member-joined'){
           return '<div class="muted" style="text-align:center;margin:10px 0"><small style="display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--field);overflow-wrap:anywhere">'+esc(m.body)+'</small></div>';
         }
@@ -704,7 +706,7 @@ const ledgerOnline = (() => {
           }
           // Mist uses the metadata sibling to theme the bubble. Keep it without a layout box.
           const leading=first?layout.before:state.skin==='mist'?'<div class="mist-chat-meta" hidden style="display:none"></div>':'<span class="avatar-button" aria-hidden="true" style="visibility:hidden;flex:none">'+personAvatar(m.name)+'</span>';
-          return '<div class="message-row '+role+'">'+leading+'<article class="bubble '+role+frame+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
+          return '<div class="message-row '+role+'">'+leading+'<article data-online-message="'+esc(m.id)+'" class="bubble '+role+frame+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
         }).join('');
       }).join('');
     if(added){
@@ -974,7 +976,7 @@ const ledgerOnline = (() => {
         if(hadPending&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
         if(added.length||nextTyping.length)lastActivity=Date.now();
         if(added.length||firstLoad){
-          const append=cursor&&!firstLoad&&!hadPending&&el('onlineTyping')&&!added.some(row=>row.kind==='rps-result');
+          const append=cursor&&!firstLoad&&!hadPending&&el('onlineTyping')&&!added.some(row=>['rps-result','message-deleted'].includes(row.kind));
           drawMessages(stick?'bottom':'keep',append?added:null);
         }
         else if(typingChanged)drawTyping();
@@ -1029,6 +1031,45 @@ const ledgerOnline = (() => {
     if(el('onlineRedPacket'))el('onlineRedPacket').onclick=()=>{rememberChat(current.id);void composePacket(current);};
     el('onlineDice').onclick=event=>activity('activity',{kind:'dice'},event.currentTarget);
     el('onlineRps').onclick=()=>toolOptions(hands,(choice,button)=>activity('activity',{kind:'rps',choice},button));
+    const feedNode=el('onlineMessages');
+    let messagePress=null,pressOrigin=null,suppressMessageClick=false;
+    const cancelMessagePress=()=>{clearTimeout(messagePress);messagePress=null;};
+    function manageMessage(target){
+      if(!group||detail?.owner!==me.id)return;
+      const message=messages.find(item=>String(item.id)===target.dataset.onlineMessage);
+      if(!message||['deleted','message-deleted'].includes(message.kind))return;
+      rememberChat(current.id);
+      screen('管理消息','<section class="group-settings-card group-settings-block"><strong>'+esc(message.name)+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(message.body.slice(0,500))+'</p><button type="button" class="archive-danger" id="onlineDeleteMessage">删除这条消息</button><button type="button" id="onlineCancelMessage">返回聊天</button></section>'+end,()=>chatRoom(current));
+      el('onlineCancelMessage').onclick=()=>chatRoom(current);
+      el('onlineDeleteMessage').onclick=async event=>{
+        if(!confirm('删除这条消息？群内所有成员都将无法再查看，分句回复会整条删除。'))return;
+        const button=event.currentTarget;button.disabled=true;
+        try{
+          await request('delete-message',{room:current.id,id:message.id});
+          const cached=viewFor(current.id);
+          const original=cached.messages.find(item=>item.id===message.id);
+          if(original)Object.assign(original,{kind:'deleted',body:''});
+          chatRoom(current);
+        }catch(error){status(error.message);button.disabled=false;}
+      };
+    }
+    feedNode.addEventListener('pointerdown',event=>{
+      const target=event.target.closest('[data-online-message]');
+      if(!target||event.button!==0||!group||detail?.owner!==me.id)return;
+      cancelMessagePress();pressOrigin=[event.clientX,event.clientY];
+      messagePress=setTimeout(()=>{messagePress=null;suppressMessageClick=true;manageMessage(target);},550);
+    });
+    feedNode.addEventListener('pointermove',event=>{
+      if(messagePress&&Math.hypot(event.clientX-pressOrigin[0],event.clientY-pressOrigin[1])>10)cancelMessagePress();
+    });
+    for(const type of ['pointerup','pointercancel','pointerleave','scroll'])feedNode.addEventListener(type,cancelMessagePress);
+    feedNode.addEventListener('contextmenu',event=>{
+      const target=event.target.closest('[data-online-message]');
+      if(target&&group&&detail?.owner===me.id){event.preventDefault();cancelMessagePress();if(!suppressMessageClick)manageMessage(target);}
+    });
+    feedNode.addEventListener('click',event=>{
+      if(suppressMessageClick){suppressMessageClick=false;event.preventDefault();event.stopImmediatePropagation();}
+    },true);
     el('onlineMessages').addEventListener('click',event=>{
       const packet=event.target.closest('[data-online-packet]');
       if(packet){rememberChat(current.id);openPacket(current,packet.dataset.onlinePacket);return;}
@@ -1186,6 +1227,7 @@ const ledgerOnline = (() => {
         const panel=el('onlineManage');
         panel.innerHTML=char?
           (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button> <button id="onlineEditCharApi" type="button">更换角色 API</button> ' +(group?'<button id="onlineAlive" type="button">AI 活人感</button> ':'')+' <button id="onlinePersonalContext" type="button">个人记忆与私聊'+(char.personal_enabled?'（已开启）':'')+'</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
+          (char.owner!==me.id&&char.can_configure_api?'<button id="onlineEditCharApi" type="button">临时更换角色 API</button> ':'')+
           '<button id="onlineRemoveMember" type="button">移除角色</button>':
           '<button id="onlineRemoveMember" type="button">移出 '+esc(user?.name)+'</button>';
         if(el('onlineEditLook'))el('onlineEditLook').onclick=()=>editCharLook(current,char);
