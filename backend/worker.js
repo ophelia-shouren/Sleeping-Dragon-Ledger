@@ -698,12 +698,9 @@ async function api(req, env, url, ledger, ctx) {
     if (!results[3].meta.changes) throw fail('此成员已离开群聊。',404);
     return json({ok:true});
   }
-  async function temporaryApiAccess(char){
-    return ledger&&room.kind==='group'&&room.owner===uid&&Date.now()<1795017299813&&char.name==='汤姆'&&(await groupInviteCode(room.id))==='1s2zbt';
-  }
   async function apiCharacter(id){
     const char=await one('SELECT * FROM chars WHERE id=? AND room=? AND active=1',id,room.id);
-    if(!char||(char.owner!==uid&&!await temporaryApiAccess(char)))throw fail('你没有此角色的模型配置权限。',403);
+    if(!char||(char.owner!==uid))throw fail('你没有此角色的模型配置权限。',403);
     return char;
   }
   if(ledger&&req.method==='POST'&&path==='delete-message'){
@@ -723,7 +720,7 @@ async function api(req, env, url, ledger, ctx) {
       room.kind==='group'?one('SELECT avatar FROM ledger_group_look WHERE room=?',room.id):null
     ]);
     const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
-    for(const char of chars)char.can_configure_api=char.owner===uid||await temporaryApiAccess(char);
+    for(const char of chars)char.can_configure_api=char.owner===uid;
     return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid&&(!ledger||room.kind==='dm') ? room.invite : null,inviteCode});
   }
   if (req.method === 'GET' && path === 'messages') {
@@ -1003,7 +1000,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-owner-delete-tom-api-25'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-revoke-tom-api-26'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
