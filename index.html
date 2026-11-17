@@ -1823,6 +1823,9 @@ async function groupReply(g,c,guide=''){
   if(!reply.trim()||(!action&&/低吼|骨血里/.test(reply)))throw Error(displayName(c)+'的回复格式有误，请继续回复以重试。');
   return gameResult?gameResult+'\n'+reply:reply;
 }
+function groupSpeakerLimit(roles){
+  return Math.max(1,Math.min(2,roles.length-1));
+}
 function parseGroupRound(value,roles,action){
   if(Array.isArray(value))value=value.map(part=>typeof part==='string'?part:part?.text||'').join('');
   if(typeof value==='string'){
@@ -1838,7 +1841,7 @@ function parseGroupRound(value,roles,action){
     if(!text||(!action&&/低吼|骨血里/.test(text)))return null;
     replies.set(item.roleId,text);
   }
-  return [...replies].map(([roleId,dialogue])=>({roleId,dialogue}));
+  return [...replies].slice(0,groupSpeakerLimit(roles)).map(([roleId,dialogue])=>({roleId,dialogue}));
 }
 async function groupRoundReply(g,roles){
   const p=groupModelProfile();
@@ -1857,6 +1860,7 @@ async function groupRoundReply(g,roles){
     g.continueContext===true?'用户按了发送键让角色继续聊天，本轮没有新增用户消息。承接聊天记录里最后的发言或话题，自然接着聊，避免重复已有的回答。':'',
     '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
     '本轮可发言的候选角色：'+JSON.stringify(people),
+    '本轮最多 '+groupSpeakerLimit(roles)+' 位角色发言。',
     g.scene?'【当前场景】\n'+g.scene:'',
     gameResult?'本轮小游戏结果由网页确定：'+JSON.stringify(gameResult)+'。据此点评，别重新抽取或重复报出结果。':'',
     action?'可加入简短动作描写。':'只写简短自然的角色台词，禁止动作、旁白及「低吼」「骨血里」。',
