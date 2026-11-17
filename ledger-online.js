@@ -290,6 +290,20 @@ const ledgerOnline = (() => {
       finally{button.disabled=false;}
     };
   }
+  let visionSync=Promise.resolve(), syncedVision;
+  function syncVision(){
+    if(localStorage.getItem(profileReadyKey)!=='1')return Promise.resolve();
+    const token=identity(), {url,model,key:apiKey}=state.imageApi;
+    const config=url&&model&&apiKey?{endpoint:url,model,key:apiKey}:{enabled:false};
+    const signature=JSON.stringify([token,config]);
+    const work=visionSync.catch(()=>{}).then(async()=>{
+      if(localStorage.getItem(key)!==token||syncedVision===signature)return;
+      await request('vision-api',config,AbortSignal.timeout(10000));
+      syncedVision=signature;
+    });
+    visionSync=work;
+    return work;
+  }
   async function activate(){
     const token=identity();
     const look=appearance('user');
@@ -317,6 +331,7 @@ const ledgerOnline = (() => {
       }
       if(!active(serial))return;
       startNotices();
+      void syncVision().catch(()=>{if(active(serial))status('在线识图配置同步失败，请检查图片 API 设置。');});
       if(invite)join(invite);else if(!el('onlineList'))rooms();
     }catch(error){
       if(!active(serial))return;
@@ -536,7 +551,7 @@ const ledgerOnline = (() => {
         }
         const mine=!m.char_id&&m.sender===me.id;
         const role=mine?'user':'assistant';
-        const frame=['human-only','mention-all'].includes(m.kind)?' online-human-only':'';
+        const frame=['human-only','human-image','mention-all'].includes(m.kind)?' online-human-only':'';
         const look=m.char_id?cast.get(m.char_id):people.get(m.sender);
         const face=personAvatar(m.name,m.char_id?look?.avatar_image:look?.avatar,look?.frame);
         const avatar=room.kind==='group'&&!mine
@@ -550,7 +565,7 @@ const ledgerOnline = (() => {
         return parts.map((part,index)=>{
           const first=index===0;
           let content='<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
-          if(m.kind==='image')content=imageInOnlineMessage(m.id);
+          if(m.kind==='image'||m.kind==='human-image')content=imageInOnlineMessage(m.id);
           if(m.kind==='archive-card')content='<button type="button" class="forwarded-story-card" data-online-archive="'+esc(m.id)+'" style="display:grid;text-align:start;max-width:100%;overflow-wrap:anywhere"><small>✦ 群聊分享</small><strong>'+esc(m.body)+'</strong><span>点开阅读 ›</span></button>';
           if(m.kind==='rps'){
             const closed=m.resolved||resolved.has(m.id);
@@ -869,10 +884,11 @@ const ledgerOnline = (() => {
     file.onchange=async()=>{
       const selected=file.files[0];file.value='';
       if(!selected)return;
+      const humanOnly=group&&view.humanOnly===true;
       status('正在处理图片…');
       try{
         const image=await prepareImage(selected);
-        if(active(serial)){status('');await activity('activity',{kind:'image',image},el('onlinePickImage'));}
+        if(active(serial)){status('');await activity('activity',{kind:'image',image,humanOnly},el('onlinePickImage'));}
       }catch(error){if(active(serial))status(error.message);}
     };
     el('onlineEmoji').onclick=()=>toolOptions(['😊','😂','❤️','👍','✨','😭','🐉','🦉'].map(x=>[x,x]),emoji=>{
@@ -1370,5 +1386,5 @@ const ledgerOnline = (() => {
       if(active(serial))members(current);
     });
   }
-  return {directory,open,inviteFromUrl,shareArchive};
+  return {directory,open,inviteFromUrl,shareArchive,syncVision};
 })();
