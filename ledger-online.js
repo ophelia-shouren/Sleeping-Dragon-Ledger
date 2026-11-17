@@ -1,6 +1,9 @@
 const ledgerOnline = (() => {
   const base='https://tongpin-chat.yearnwingwings.chatgpt.site/ledger-api/';
   const key='sleeping-dragon-online-identity';
+  const displayKey='sleeping-dragon-online-display';
+  const pictures=new Map();
+  const hands=[['rock','✊ 石头'],['paper','✋ 布'],['scissors','✌️ 剪刀']];
   const mappingKey='sleeping-dragon-online-cards';
   let room=null, me=null, messages=[], detail=null, pollTimer, generation=0, older=false;
   const el=id=>document.getElementById(id);
@@ -145,20 +148,82 @@ const ledgerOnline = (() => {
       if(active(serial))chatRoom(list.find(x=>x.id===id));
     });
   }
+  function displayFor(id){
+    try{return JSON.parse(localStorage.getItem(displayKey)||'{}')[id]||{};}
+    catch{return {};}
+  }
+  async function prepareImage(file){
+    if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type))throw Error('请选择 JPG、PNG、WebP 或 GIF。');
+    if(file.size>12000000)throw Error('请选择小于 12 MB 的图片。');
+    if(file.size<=178000)return new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>reject(Error('图片读取失败。'));
+      reader.readAsDataURL(file);
+    });
+    if(file.type==='image/gif')throw Error('为保留动画，请选择小于 178 KB 的 GIF 表情包。');
+    const url=URL.createObjectURL(file);
+    try{
+      const image=new Image();image.src=url;await image.decode();
+      const canvas=document.createElement('canvas');
+      for(const max of [960,720,480,320]){
+        const scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
+        canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+        canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+        canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+        const data=canvas.toDataURL('image/webp',0.75);
+        if(data.length<=240000)return data;
+      }
+      throw Error('图片过大，压缩后仍无法发送。');
+    }finally{URL.revokeObjectURL(url);}
+  }
+  function imageInOnlineMessage(id){
+    return '<img data-online-image="'+id+'" alt="聊天图片" style="display:block;max-width:min(68vw,400px);max-height:55vh;object-fit:contain;border-radius:6px">';
+  }
+  function loadPictures(box){
+    const serial=generation, currentRoom=room.id;
+    for(const image of box.querySelectorAll('[data-online-image]')){
+      const id=image.dataset.onlineImage, key=currentRoom+':'+id;
+      if(!pictures.has(key)){
+        if(pictures.size>=30)pictures.delete(pictures.keys().next().value);
+        const loading=request('image?room='+currentRoom+'&id='+id).then(result=>safePicture(result.image));
+        pictures.set(key,loading);
+        loading.catch(()=>{if(pictures.get(key)===loading)pictures.delete(key);});
+      }
+      pictures.get(key).then(src=>{
+        if(src&&active(serial)&&image.isConnected)image.src=src;
+      }).catch(()=>{if(active(serial)&&image.isConnected)image.alt='图片加载失败';});
+    }
+  }
   function drawMessages(mode){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
     const people=new Map((detail?.members||[]).map(x=>[x.id,x]));
+    const display=displayFor(room.id);
+    const resolved=new Set(messages.filter(m=>m.challenge).map(m=>Number(m.challenge)));
     box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
       (messages.map(m=>{
         const mine=!m.char_id&&m.sender===me.id;
-        const text=esc(m.body);
         const role=mine?'user':'assistant';
         const avatar='<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+personAvatar(m.name,m.char_id?'':people.get(m.sender)?.avatar)+'</button>';
-        const name=mine?'':'<small>'+esc(m.name)+(m.char_id?' · AI':'')+'</small>';
-        const layout=chatMessageLayout(avatar,name,'');
-        return '<div class="message-row '+role+'">'+layout.before+'<article class="bubble '+role+'">'+layout.name+'<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+text+'</p></article></div>';
+        const name=mine||display.showName===false?'':'<small>'+esc(m.name)+(m.char_id?' · AI':'')+'</small>';
+        const date=new Date(m.created.replace(' ','T')+'Z');
+        const time=display.showTime===false||Number.isNaN(date.getTime())?'':'<small class="muted">'+date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})+'</small>';
+        const layout=chatMessageLayout(avatar,name,time);
+        const parts=m.char_id?chatBubbleParts({role:'assistant',content:m.body},{split:display.split!==false,limit:30}):[m.body];
+        return parts.map((part,index)=>{
+          const first=index===0;
+          let content='<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
+          if(m.kind==='image')content=imageInOnlineMessage(m.id);
+          if(m.kind==='rps'){
+            const closed=m.resolved||resolved.has(m.id);
+            content+=closed?'<small class="muted">已结束</small>':mine?'<small class="muted">等待另一位真人出拳</small>':
+              '<div class="row">'+hands.map(([value,label])=>'<button type="button" data-rps-id="'+m.id+'" data-rps-choice="'+value+'">'+label+'</button>').join('')+'</div>';
+          }
+          return '<div class="message-row '+role+'">'+(first?layout.before:'')+'<article class="bubble '+role+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
+        }).join('');
       }).join('')||'<div class="empty">还没有消息，打声招呼吧。</div>');
     box.scrollTop=mode==='bottom'?box.scrollHeight:mode==='prepend'?oldTop+box.scrollHeight-oldHeight:oldTop;
+    loadPictures(box);
     if(el('onlineOlder'))el('onlineOlder').onclick=loadOlder;
   }
   async function loadOlder(){
@@ -217,6 +282,8 @@ const ledgerOnline = (() => {
     }
     function show(range, query=''){
       const choices=(detail?.chars||[]).filter(c=>c.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+      el('onlineComposerMenu').hidden=true;
+      el('onlineMore').setAttribute('aria-expanded','false');
       picker.replaceChildren();
       if(!choices.length){
         const empty=document.createElement('span');
@@ -238,8 +305,11 @@ const ledgerOnline = (() => {
       if(!match){close();return;}
       show({start:input.selectionStart-match[0].length,end:input.selectionEnd},match[1]);
     }
-    if(toggle)toggle.onclick=()=>picker.hidden
-      ? show({start:input.selectionStart,end:input.selectionEnd}) : close();
+    if(toggle)toggle.onclick=()=>{
+      el('onlineComposerMenu').hidden=true;
+      el('onlineMore').setAttribute('aria-expanded','false');
+      show({start:input.selectionStart,end:input.selectionEnd});
+    };
     input.addEventListener('input',suggest);
     input.addEventListener('click',suggest);
     input.addEventListener('compositionstart',()=>{composing=true;});
@@ -294,8 +364,10 @@ const ledgerOnline = (() => {
     const group=current.kind==='group';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
-    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div><form id="onlineCompose" class="row">'+
-      (group?'<button type="button" class="composer-tool composer-icon" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@</button>':'')+
+    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
+      '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@ 角色</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
+      '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
+      '<form id="onlineCompose" class="row"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false">＋</button>'+
       '<textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></form>',rooms,header);
     el('onlineMembers').onclick=()=>members(current);
     const mentions=setupMentions(el('onlineCompose').elements.body,group);
@@ -319,6 +391,54 @@ const ledgerOnline = (() => {
         if(info)await syncCards(serial,current,info);
       }finally{refreshing=false;}
     }
+    const menu=el('onlineComposerMenu'), more=el('onlineMore'), extra=el('onlineExtra'), file=el('onlineImageFile');
+    function closeTools(){menu.hidden=true;more.setAttribute('aria-expanded','false');extra.replaceChildren();}
+    let activityBusy=false;
+    async function activity(path,data,button){
+      if(activityBusy)return;
+      activityBusy=true;button.disabled=true;
+      try{
+        await request(path,{room:current.id,...data});
+        if(active(serial)){closeTools();await refresh();}
+      }catch(error){if(active(serial))status(error.message);}
+      finally{activityBusy=false;button.disabled=false;}
+    }
+    function toolOptions(options,onChoose){
+      extra.replaceChildren();
+      for(const [value,label] of options){
+        const button=document.createElement('button');
+        button.type='button';button.textContent=label;
+        button.onclick=()=>onChoose(value,button);
+        extra.append(button);
+      }
+    }
+    more.onclick=()=>{
+      if(!menu.hidden){closeTools();return;}
+      const choices=el('onlineChoices');choices.hidden=true;choices.style.display='none';
+      menu.hidden=false;more.setAttribute('aria-expanded','true');
+    };
+    if(el('onlineChatMemory'))el('onlineChatMemory').onclick=()=>roomMemory(current,()=>chatRoom(current));
+    el('onlinePickImage').onclick=()=>file.click();
+    file.onchange=async()=>{
+      const selected=file.files[0];file.value='';
+      if(!selected)return;
+      status('正在处理图片…');
+      try{
+        const image=await prepareImage(selected);
+        if(active(serial)){status('');await activity('activity',{kind:'image',image},el('onlinePickImage'));}
+      }catch(error){if(active(serial))status(error.message);}
+    };
+    el('onlineEmoji').onclick=()=>toolOptions(['😊','😂','❤️','👍','✨','😭','🐉','🦉'].map(x=>[x,x]),emoji=>{
+      const input=el('onlineCompose').elements.body;
+      if(input.value.length+emoji.length<=input.maxLength)input.setRangeText(emoji,input.selectionStart,input.selectionEnd,'end');
+      closeTools();input.focus();
+    });
+    el('onlineDice').onclick=event=>activity('activity',{kind:'dice'},event.currentTarget);
+    el('onlineRps').onclick=()=>toolOptions(hands,(choice,button)=>activity('activity',{kind:'rps',choice},button));
+    el('onlineMessages').addEventListener('click',event=>{
+      const button=event.target.closest('[data-rps-id]');
+      if(button)activity('accept-rps',{id:Number(button.dataset.rpsId),choice:button.dataset.rpsChoice},button);
+    });
     form('onlineCompose',async(data,requestSerial)=>{
       const input=el('onlineCompose').elements.body;
       const body=data.body.trim();
@@ -337,54 +457,119 @@ const ledgerOnline = (() => {
     later(serial,refresh,4500);
   }
   async function members(current){
-    const back=()=>chatRoom(current);
-    const group=current.kind==='group';
-    const serial=screen(group?'群聊设置':'成员与邀请','<div class="messages" id="onlineMemberList"></div>'+end,back);
+    clearTimeout(pollTimer);
+    const serial=++generation, group=current.kind==='group';
+    dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>'+(group?'群聊设置':'成员与邀请')+'</h2><span></span></header><div id="onlineMemberList" style="display:grid;gap:14px"></div>'+end+'</div>',true);
+    el('onlineBack').onclick=()=>chatRoom(current);
     try{
       const info=await request('detail?room='+current.id);
       if(!active(serial))return;
-      const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');link.searchParams.set('onlineInvite',info.invite||'');
-      const owner=group && info.owner===me.id;
-      el('onlineMemberList').innerHTML=info.members.map(x=>'<div class="row">'+personAvatar(x.name,x.avatar)+'<span>'+esc(x.name)+(x.id===me.id?'（你）':'')+(group&&x.id===info.owner?' · 群主':'')+'</span>'+
-        (owner&&x.id!==me.id?'<button type="button" data-online-kick="'+esc(x.id)+'">移出群聊</button>':'')+'</div>').join('')+
-        info.chars.map(x=>'<div class="row"><span>'+esc(x.name)+' · AI</span>'+((owner||x.owner===me.id)?'<button type="button" data-online-remove="'+esc(x.id)+'">移除</button>':'')+'</div>').join('')+
-        (info.invite?'<label>邀请链接<input id="onlineLink" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button>':'')+
-        (group?'<button type="button" class="primary" id="onlineAddChar">邀请已有角色</button><section class="panel"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取额度…</p><p class="muted">真人消息与 AI 回复各计一条。D1 免费档上限为每天读 500 万行、写 10 万行。当前托管站点只有数据库访问权限，未连接 Cloudflare 账户级用量统计，因此无法显示账户的精确剩余额度。</p></section>':'');
+      const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');
+      link.searchParams.set('onlineInvite',info.invite||'');
+      const owner=group&&info.owner===me.id, prefs=displayFor(current.id);
+      const person=(id,name,avatar,note,canEdit)=>{
+        const tag=canEdit?'button':'div';
+        return '<'+tag+(canEdit?' type="button" data-online-manage="'+esc(id)+'"':'')+' class="group-settings-person">'+personAvatar(name,avatar)+'<span title="'+esc(name+note)+'">'+esc(name+note)+'</span></'+tag+'>';
+      };
+      const setting=(key,label)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" data-online-display="'+key+'" '+(prefs[key]!==false?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
+      el('onlineMemberList').innerHTML=
+        '<section class="group-settings-card"><div class="group-settings-profile">'+groupAvatar({name:current.name})+'<span><strong>'+esc(current.name)+'</strong><small>'+info.members.length+' 位成员'+(group?' · '+info.chars.length+' 位角色':'')+'</small></span><span></span></div></section>'+
+        '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>会话成员</h3></div><div class="group-settings-members">'+
+        info.members.map(x=>person(x.id,x.name,x.avatar,x.id===me.id?(owner?' · 群主（你）':'（你）'):x.id===info.owner&&group?' · 群主':'',owner&&x.id!==me.id)).join('')+
+        info.chars.map(x=>person(x.id,x.name,'',' · AI',owner||x.owner===me.id)).join('')+
+        (group?'<button type="button" class="group-settings-person" id="onlineAddChar"><b aria-hidden="true">＋</b><span>邀请角色</span></button>':'')+
+        '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
+        (info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请链接</h3><label><input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
+        '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
+        (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><p class="muted">当前可读取在线消息数。Cloudflare 账户剩余额度需要账户级统计授权。</p></section>':'');
+      el('onlineMemberList').querySelectorAll('[data-online-display]').forEach(input=>input.onchange=()=>{
+        try{
+          const settings=JSON.parse(localStorage.getItem(displayKey)||'{}');
+          settings[current.id]={...settings[current.id],[input.dataset.onlineDisplay]:input.checked};
+          localStorage.setItem(displayKey,JSON.stringify(settings));
+        }catch(error){input.checked=!input.checked;status('显示设置未能保存。');}
+      });
       if(group){
         async function refreshQuota(){
           const quota=await request('quota?room='+current.id);
           if(!active(serial))return;
-          const count=n=>new Intl.NumberFormat('zh-CN').format(n);
+          const count=new Intl.NumberFormat('zh-CN').format(quota.messages);
           const date=new Date(quota.resetsAt).toLocaleString('zh-CN',{hour12:false});
-          el('onlineQuota').textContent='今日在线消息 '+count(quota.messages)+' 条 · '+date+' 重置';
+          el('onlineQuota').textContent='今日在线消息 '+count+' 条 · '+date+' 重置';
         }
         refreshQuota().catch(e=>{if(active(serial))el('onlineQuota').textContent=e.message;});
         later(serial,refreshQuota,4500);
       }
-      el('onlineMemberList').querySelectorAll('[data-online-kick]').forEach(button=>button.onclick=async()=>{
-        const member=info.members.find(x=>x.id===button.dataset.onlineKick);
-        if(!member||!confirm('将 '+member.name+' 移出群聊？其邀请的角色也会退出，旧邀请链接将失效。'))return;
-        button.disabled=true;
-        try{
-          await request('kick-member',{room:current.id,id:member.id});
-          if(active(serial))await members(current);
-        }catch(e){if(active(serial))status(e.message);button.disabled=false;}
-      });
       if(el('onlineCopy'))el('onlineCopy').onclick=async()=>{
         try{await navigator.clipboard.writeText(link.href);status('已复制邀请链接。');}
         catch{el('onlineLink').select();status('已选中邀请链接，可以手动复制。');}
       };
+      if(el('onlineOpenMemory'))el('onlineOpenMemory').onclick=()=>roomMemory(current,()=>members(current));
       if(el('onlineAddChar'))el('onlineAddChar').onclick=()=>inviteCard(current);
-      el('onlineMemberList').querySelectorAll('[data-online-remove]').forEach(button=>button.onclick=async()=>{
-        if(!confirm('移除此角色？它将停止在群里回复。'))return;
+      async function managed(path,data,button){
         button.disabled=true;
         try{
-          await request('remove-char',{room:current.id,id:button.dataset.onlineRemove});
-          const map=mapping();delete map[button.dataset.onlineRemove];localStorage.setItem(mappingKey,JSON.stringify(map));
-          if(active(serial))members(current);
+          await request(path,{room:current.id,...data});
+          if(path==='remove-char'){
+            const map=mapping();delete map[data.id];localStorage.setItem(mappingKey,JSON.stringify(map));
+          }
+          if(active(serial))await members(current);
         }catch(e){if(active(serial))status(e.message);button.disabled=false;}
+      }
+      el('onlineMemberList').querySelectorAll('[data-online-manage]').forEach(button=>button.onclick=()=>{
+        const id=button.dataset.onlineManage, char=info.chars.find(x=>x.id===id), user=info.members.find(x=>x.id===id);
+        const panel=el('onlineManage');
+        panel.innerHTML=char?
+          (char.owner===me.id?'<label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
+          '<button id="onlineRemoveMember" type="button">移除角色</button>':
+          '<button id="onlineRemoveMember" type="button">移出 '+esc(user?.name)+'</button>';
+        if(el('onlineRename'))el('onlineRename').onclick=event=>{
+          const input=el('onlineCharName');
+          if(input.reportValidity())managed('rename-char',{id,name:input.value.trim()},event.currentTarget);
+        };
+        el('onlineRemoveMember').onclick=event=>{
+          const prompt=char?'移除此角色？它将停止在群里回复。':'将 '+user.name+' 移出群聊？其邀请的角色也会退出，旧邀请链接将失效。';
+          if(confirm(prompt))managed(char?'remove-char':'kick-member',{id},event.currentTarget);
+        };
+        panel.scrollIntoView({block:'nearest'});
       });
     }catch(e){if(active(serial))status(e.message);}
+  }
+  async function roomMemory(current,back){
+    clearTimeout(pollTimer);
+    const serial=++generation;
+    dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>群聊记忆</h2><span></span></header><div id="onlineMemoryWindow" style="display:grid;gap:14px"></div>'+end+'</div>',true);
+    el('onlineBack').onclick=back;
+    try{
+      const info=await request('detail?room='+current.id);
+      if(!active(serial))return;
+      const owner=info.owner===me.id;
+      const profiles=owner?state.profiles.filter(p=>p.url&&p.model&&p.key):[];
+      el('onlineMemoryWindow').innerHTML=
+        '<section class="group-settings-card group-settings-block"><h3>当前总结</h3><p id="onlineMemoryProgress" class="muted" role="status">正在读取群记忆…</p><p id="onlineMemoryText" style="white-space:pre-wrap;overflow-wrap:anywhere"></p></section>'+
+        '<section class="group-settings-card group-settings-block"><h3>总结 API</h3><p id="onlineMemoryApiStatus" class="muted"></p><p class="muted">累计每 100 条真人文字消息或 AI 回复总结一次。模型请求由群主的 API 账户承担，角色回复会读取当前总结与最近 10 条文字聊天。</p>'+
+        (owner?'<form id="onlineMemoryApi"><label>群主的 API 预设<select name="profile" required><option value="">请选择</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model)+'</option>').join('')+'</select></label><button type="submit" class="primary">保存总结 API</button></form>':'')+'</section>';
+      let previous;
+      async function refresh(){
+        const memory=await request('room-memory?room='+current.id);
+        if(!active(serial))return;
+        const signature=JSON.stringify(memory);
+        if(signature===previous)return;
+        previous=signature;
+        const updated=memory.updated?new Date(memory.updated.replace(' ','T')+'Z').toLocaleString('zh-CN',{hour12:false}):'尚未生成总结';
+        el('onlineMemoryProgress').textContent='待总结 '+memory.pending+' 条 · '+updated;
+        el('onlineMemoryText').textContent=memory.summary||'累计满 100 条且群主配置 API 后生成。';
+        el('onlineMemoryApiStatus').textContent=memory.error||(!memory.configured?'群主尚未配置总结 API。':memory.model?'当前模型：'+memory.model:'群主已配置总结 API。');
+      }
+      if(owner)form('onlineMemoryApi',async(data,requestSerial)=>{
+        const profile=profiles.find(p=>p.id===data.profile);
+        if(!profile)throw Error('请先在「API 连接」保存你自己的文本 API 预设。');
+        await request('room-memory-api',{room:current.id,endpoint:profile.url,model:profile.model,key:profile.key});
+        if(active(requestSerial)){status('已保存总结 API。');await refresh();}
+      });
+      await refresh();
+      later(serial,refresh,4500);
+    }catch(error){if(active(serial))status(error.message);}
   }
   function inviteCard(current){
     const profiles=state.profiles.filter(p=>p.url&&p.model&&p.key);
