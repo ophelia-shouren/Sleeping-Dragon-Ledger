@@ -518,11 +518,11 @@ const ledgerOnline = (() => {
     const group=current.kind==='group';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
-    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
+    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@ 角色</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
-      '<form id="onlineCompose" class="row"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false">＋</button>'+
-      '<textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></form>',()=>{rememberChat(current.id);rooms();},header);
+      '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
+      '<button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></div></form>',()=>{rememberChat(current.id);rooms();},header);
     el('onlineMembers').onclick=()=>{rememberChat(current.id);members(current);};
     const draft=el('onlineCompose').elements.body;
     draft.value=view.draft||'';
@@ -696,6 +696,23 @@ const ledgerOnline = (() => {
           '<label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
         (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><p class="muted">当前可读取在线消息数。Cloudflare 账户剩余额度需要账户级统计授权。</p></section>':'');
+      if(group){
+        el('onlineMemberList').insertAdjacentHTML('beforeend',
+          '<div class="clear-chat-row"><button type="button" class="archive-danger" id="onlineQuitGroup">'+(owner?'解散群聊':'退出群聊')+'</button></div>');
+        el('onlineQuitGroup').onclick=async event=>{
+          const button=event.currentTarget;
+          const notice=owner?'解散「'+current.name+'」后，所有成员都将失去访问权限，旧邀请链接和邀请码会失效。确定解散？':
+            '退出「'+current.name+'」后，你邀请的 AI 角色也会一起退出。确定退出？';
+          if(!confirm(notice))return;
+          button.disabled=true;
+          try{
+            await request(owner?'dissolve-group':'leave-group',{room:current.id});
+            views.delete(current.id);
+            if(knownRooms)knownRooms=knownRooms.filter(item=>item.id!==current.id);
+            if(active(serial)){rooms();status(owner?'群聊已解散。':'已退出群聊。');}
+          }catch(error){if(active(serial)){status(error.message);button.disabled=false;}}
+        };
+      }
       el('onlineMemberList').querySelectorAll('[data-online-display]').forEach(input=>input.onchange=()=>{
         try{
           const settings=JSON.parse(localStorage.getItem(displayKey)||'{}');
