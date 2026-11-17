@@ -230,6 +230,69 @@ function randomInviteCode(){
   return code;
 }
 
+async function generateReply(env,room,char,summarize,ledger,messageId=null,automatic=null){
+  const stmt=(sql,...args)=>env.DB.prepare(sql).bind(...args);
+  const run=(sql,...args)=>stmt(sql,...args).run();
+  const one=(sql,...args)=>stmt(sql,...args).first();
+  const all=async(sql,...args)=>(await stmt(sql,...args).all()).results;
+  const now = Date.now();
+  if(automatic&&!(await one('SELECT char_id FROM ledger_char_autopost WHERE char_id=? AND next_at=?',char.id,automatic.next_at)))return;
+  const claim = await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until<? AND active=1', now+70000,char.id,now);
+  if (!claim.meta.changes) {summarize();return json({ok:true,notice:'角色正在回复，请稍后再 @。'});}
+  try {
+    const history = await all('SELECT m.body,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind=\'text\' AND (? IS NULL OR m.id<=?) ORDER BY m.id DESC LIMIT ?',room.id,messageId,messageId,ledger?10:15);
+    const context = ledger ? await one('SELECT world_front,world_end FROM ledger_cast WHERE char_id=?',char.id) : null;
+    const memory = ledger ? await one('SELECT summary FROM ledger_room_memory WHERE room=?',room.id) : null;
+    const people = ledger ? [...new Map(history.filter(m=>!m.char_id && m.persona).map(m=>[m.sender,m])).values()].map(m=>m.name+'：'+m.persona.slice(0,2000)).join('\n\n') : '';
+    const personal=ledger?await one('SELECT memories,dialogue FROM ledger_char_personal_context WHERE char_id=?',char.id):null;
+    const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',automatic?'这是一次主动发言。参考上方群聊内容，用角色口吻自然加入话题。只输出一条消息，不提及定时设置。':'',context?.world_end].filter(Boolean).join('\n\n');
+    const messages = [
+      {role:'system',content:system},
+      ...history.reverse().map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.name+'：'+m.body.slice(0,1600)}))
+    ];
+    if(automatic)messages.push({role:'user',content:'请以角色身份主动在群聊发一条消息。'});
+    const reply = await requestModel(env,char,messages);
+    if(automatic){
+      await run('INSERT INTO messages (room,sender,char_id,body) SELECT c.room,c.owner,c.id,? FROM chars c JOIN ledger_char_autopost a ON a.char_id=c.id WHERE c.id=? AND c.active=1 AND a.next_at=?',reply,char.id,automatic.next_at);
+    }else await run('INSERT INTO messages (room,sender,char_id,body) SELECT room,owner,id,? FROM chars WHERE id=? AND active=1',reply, char.id);
+    return json({ok:true});
+  } catch (error) {
+    if (!error.status) console.error('Character reply could not be saved',error.name);
+    return json({ok:true,notice:error.status ? error.message : '角色回复未能保存，请稍后重试。'});
+  } finally {
+    summarize();
+    await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until=?',Date.now()+8000,char.id,now+70000);
+  }
+}
+
+const autoPostSchema='CREATE TABLE IF NOT EXISTS ledger_char_autopost (char_id TEXT PRIMARY KEY REFERENCES chars(id), minutes INTEGER NOT NULL, next_at INTEGER NOT NULL)';
+let autoPostReady;
+async function ensureAutoPost(db){
+  if(autoPostReady)return;
+  await db.prepare(autoPostSchema).bind().run();
+  autoPostReady=true;
+}
+
+async function runAutoPosts(env,ctx){
+  const db=env.DB;
+  await ensureAutoPost(db);
+  const now=Date.now();
+  const {results}=await db.prepare(`SELECT c.*,a.minutes,a.next_at FROM ledger_char_autopost a JOIN chars c ON c.id=a.char_id
+    JOIN rooms r ON r.id=c.room JOIN members m ON m.room=c.room AND m.uid=c.owner
+    WHERE a.next_at<=? AND c.active=1 AND c.busy_until<? AND r.kind='group'
+    AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=c.room)
+    ORDER BY a.next_at LIMIT 6`).bind(now,now).all();
+  const outcomes=await Promise.allSettled(results.map(async char=>{
+    const period=char.minutes*60000;
+    const next=char.next_at+(Math.floor((now-char.next_at)/period)+1)*period;
+    const claimed=await db.prepare('UPDATE ledger_char_autopost SET next_at=? WHERE char_id=? AND next_at=?').bind(next,char.id,char.next_at).run();
+    if(!claimed.meta.changes)return;
+    const summarize=()=>ctx.waitUntil(summarizeRoom(env,char.room).catch(error=>console.error('Room memory could not run',error.name)));
+    await generateReply(env,{id:char.room},char,summarize,true,null,{next_at:next});
+  }));
+  for(const outcome of outcomes)if(outcome.status==='rejected')console.error('Scheduled character reply could not run',outcome.reason?.name);
+}
+
 async function api(req, env, url, ledger, ctx) {
   const uid = ledger ? await ledgerIdentity(req) : req.headers.get('oai-authenticated-user-id');
   if (!uid) throw fail('请先登录。',401);
@@ -429,6 +492,21 @@ async function api(req, env, url, ledger, ctx) {
     if (!result[0].meta.changes) throw fail('该角色已经移除或不属于你。',404);
     return json({ok:true});
   }
+  if (ledger && room.kind==='group' && path==='char-autopost' && ['GET','POST'].includes(req.method)) {
+    const id=req.method==='GET'?url.searchParams.get('id'):field(data,'id',36);
+    const char=await one('SELECT id FROM chars WHERE id=? AND room=? AND owner=? AND active=1',id,room.id,uid);
+    if(!char)throw fail('只有邀请者可以设置角色主动发言。',403);
+    await ensureAutoPost(db);
+    if(req.method==='GET'){
+      const config=await one('SELECT minutes FROM ledger_char_autopost WHERE char_id=?',id);
+      return json({minutes:config?.minutes||0});
+    }
+    const {minutes}=data;
+    if(!Number.isInteger(minutes)||minutes<0||minutes>1440)throw fail('请输入 1 到 1440 分钟。');
+    if(minutes===0)await run('DELETE FROM ledger_char_autopost WHERE char_id=?',id);
+    else await run('INSERT INTO ledger_char_autopost VALUES (?,?,?) ON CONFLICT(char_id) DO UPDATE SET minutes=excluded.minutes,next_at=excluded.next_at',id,minutes,Date.now()+minutes*60000);
+    return json({ok:true});
+  }
   if (req.method === 'GET' && path === 'char-api') {
     const config = await one('SELECT endpoint,model FROM chars WHERE id=? AND room=? AND owner=? AND active=1',url.searchParams.get('id'),room.id,uid);
     if (!config) throw fail('只有邀请人可以查看 API 配置。',403);
@@ -531,32 +609,6 @@ async function api(req, env, url, ledger, ctx) {
   const summarize=()=>{
     if(ledger && room.kind==='group')ctx?.waitUntil(summarizeRoom(env,room.id).catch(error=>console.error('Room memory could not run',error.name)));
   };
-  async function generateReply(char,messageId=null){
-    const now = Date.now();
-    const claim = await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until<? AND active=1', now+70000,char.id,now);
-    if (!claim.meta.changes) {summarize();return json({ok:true,notice:'角色正在回复，请稍后再 @。'});}
-    try {
-      const history = await all('SELECT m.body,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind=\'text\' AND (? IS NULL OR m.id<=?) ORDER BY m.id DESC LIMIT ?',room.id,messageId,messageId,ledger?10:15);
-      const context = ledger ? await one('SELECT world_front,world_end FROM ledger_cast WHERE char_id=?',char.id) : null;
-      const memory = ledger ? await one('SELECT summary FROM ledger_room_memory WHERE room=?',room.id) : null;
-      const people = ledger ? [...new Map(history.filter(m=>!m.char_id && m.persona).map(m=>[m.sender,m])).values()].map(m=>m.name+'：'+m.persona.slice(0,2000)).join('\n\n') : '';
-      const personal=ledger?await one('SELECT memories,dialogue FROM ledger_char_personal_context WHERE char_id=?',char.id):null;
-      const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',context?.world_end].filter(Boolean).join('\n\n');
-      const messages = [
-        {role:'system',content:system},
-        ...history.reverse().map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.name+'：'+m.body.slice(0,1600)}))
-      ];
-      const reply = await requestModel(env,char,messages);
-      await run('INSERT INTO messages (room,sender,char_id,body) SELECT room,owner,id,? FROM chars WHERE id=? AND active=1',reply, char.id);
-      return json({ok:true});
-    } catch (error) {
-      if (!error.status) console.error('Character reply could not be saved',error.name);
-      return json({ok:true,notice:error.status ? error.message : '角色回复未能保存，请稍后重试。'});
-    } finally {
-      summarize();
-      await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until=?',Date.now()+8000,char.id,now+70000);
-    }
-  }
   if (req.method === 'POST' && path === 'send') {
     const body = field(data,'body',4000);
     let char;
@@ -581,7 +633,7 @@ async function api(req, env, url, ledger, ctx) {
       summarize();
       return json({ok:true,message:sent.meta.last_row_id,...(deferred?{reply:sent.meta.last_row_id}:{})});
     }
-    return generateReply(char);
+    return generateReply(env,room,char,summarize,ledger);
   }
   if (ledger && req.method==='POST' && path==='reply') {
     const id=data.message;
@@ -592,12 +644,15 @@ async function api(req, env, url, ledger, ctx) {
     if(!claimed.meta.changes)return json({ok:true});
     const char=await one('SELECT * FROM chars WHERE id=? AND room=? AND active=1',job.char_id,room.id);
     if(!char)return json({ok:true,notice:'这个角色已退出群聊。'});
-    return generateReply(char,id);
+    return generateReply(env,room,char,summarize,ledger,id);
   }
   throw fail('请求不存在。',404);
 }
 
 export default {
+  async scheduled(_controller,env,ctx){
+    await runAutoPosts(env,ctx);
+  },
   async fetch(request,env,ctx) {
     const url = new URL(request.url);
     if (request.method==='GET' && ['/', '/health'].includes(url.pathname)) {
@@ -607,7 +662,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-notifications-9'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-character-autopost-10'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
