@@ -1,5 +1,6 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
+<script src="./ledger-online.js"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -1927,8 +1928,8 @@ function chat(){
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
       '<section class="panel contact-list"><div class="row contact-list-top"><div class="row contact-list-user">'+avatarButton('user',user)+'<div class="contact-list-name"><strong title="'+esc(user.name)+'">'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row contact-list-actions">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
-      (splitDirectory?'<div class="rose-directory"><section>'+groupDirectory()+'</section><section><h3>私聊</h3>'+ (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'</section></div>':
-        groupDirectory()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>'))+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
+      (splitDirectory?'<div class="rose-directory"><section>'+groupDirectory()+(typeof ledgerOnline==='undefined'?'':ledgerOnline.directory())+'</section><section><h3>私聊</h3>'+ (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'</section></div>':
+        groupDirectory()+(typeof ledgerOnline==='undefined'?'':ledgerOnline.directory())+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>'))+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
   const lock=teaLock([c.id]);
   const chatUser={...user,name:'你',nickname:''};
@@ -4677,7 +4678,7 @@ try{
     if(applyChatDraft(state,entry))pendingChatDrafts.set(imageKey(entry.id,entry.mode),entry);
   }
 }catch{/* Ignore a malformed draft without affecting the archive. */}
-let page='home', period='week', anchor='', toastTimer;
+let page=new URL(location.href).searchParams.has('onlineInvite')?'chat':'home', period='week', anchor='', toastTimer;
 const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money = cents => '¥'+(cents/100).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
 function dateString(d=new Date()){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');}
@@ -5358,6 +5359,7 @@ document.addEventListener('click',e=>{
     return;
   }
   if(d.storyAction)storyAction(d).catch(error=>toast(error.message));
+  if(d.action==='onlineChat'){Promise.resolve().then(()=>ledgerOnline.open()).catch(error=>toast(error.message));return;}
   if(d.page){
     if(b.closest('.desktop-menu-rail')&&desktopSiteMenu.matches)setSiteMenu(true);
     else if(!desktopSiteMenu.matches)setSiteMenu(false);
