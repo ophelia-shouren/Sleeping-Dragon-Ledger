@@ -368,7 +368,7 @@ async function sendPacket(env,ctx,room,uid,char,data,reply=null){
 function requestedPacketMode(body){
   const text=body.replace(/[@＠][^\s@＠]+/gu,'').trim();
   if(/(?:不要|不用|别|不必)\s*(?:给我)?\s*(?:发|送|来|给)?[^。！？!?，,]{0,8}红包/u.test(text))return null;
-  if(!/(?:想要|我要|我想|求|讨|(?:发|送|给|来|包)(?!了|过|的))[^。！？!?，,\n]{0,20}红包/u.test(text))return null;
+  if(!/(?:想要|我要|我想|求|讨|没(?:有)?(?:收到|领到|看到)|补发|重发|(?:发|送|给|来|包)(?!了|过|的))[^。！？!?，,\n]{0,20}红包/u.test(text))return null;
   return text.includes('专属红包')?'exclusive':text.includes('拼手气红包')?'lucky':'normal';
 }
 
@@ -378,12 +378,13 @@ function characterPacketResponse(raw,mode,requester,charName){
   try{parsed=JSON.parse(input);}catch{}
   const proposed=parsed?.redPacket;
   const main=String(proposed?.amount?.main??'');
-  const approved=parsed?.sendRedPacket===true&&/^\d{1,12}(?:\.\d{1,2})?$/.test(main)&&Number(main)>0;
+  const decision=typeof parsed?.sendRedPacket==='boolean'?parsed.sendRedPacket:null;
+  const validAmount=/^\d{1,12}(?:\.\d{1,2})?$/.test(main)&&Number(main)>0;
   const reply=stripCharacterPrefix(
     typeof parsed?.reply==='string'?parsed.reply:(parsed===undefined&&!/^[{[]/u.test(input)?input:''),
     charName
   );
-  return {reply,action:approved&&reply?{mode,amount:{main},count:1,target:mode==='exclusive'?'user:'+requester:undefined}:null};
+  return {reply,decision,action:decision===true&&reply?{mode,amount:{main:validAmount?main:'1'},count:1,target:mode==='exclusive'?'user:'+requester:undefined}:null};
 }
 
 async function generateReply(env,room,char,summarize,ledger,messageId=null,automatic=null,ctx=null){
@@ -416,10 +417,23 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
     ];
     if(automatic)messages.push({role:'user',content:'请以角色身份主动在群聊发一条消息。'});
     const raw=await requestModel(env,char,messages);
-    const packetResponse=packetMode?characterPacketResponse(raw,packetMode,trigger.sender,char.name):null;
+    let packetResponse=packetMode?characterPacketResponse(raw,packetMode,trigger.sender,char.name):null;
+    if(packetResponse?.decision===null){
+      const retry=[...messages,{role:'assistant',content:raw.slice(0,3000)},
+        {role:'user',content:'上一条回答尚未执行任何发送操作。请按原本的角色意图重新输出规定的 JSON，明确填写 sendRedPacket 为 true 或 false，并给出角色台词。可以拒绝。'}];
+      try{
+        const corrected=await requestModel(env,char,retry,800,12000);
+        packetResponse=characterPacketResponse(corrected,packetMode,trigger.sender,char.name);
+      }catch(error){
+        console.error('Could not confirm character red packet decision',error.name);
+      }
+    }
     if(packetResponse?.action){
       await sendPacket(env,ctx,room.id,char.owner,char,packetResponse.action,packetResponse.reply);
       return json({ok:true,...(imageContext.notice?{notice:imageContext.notice}:{})});
+    }
+    if(packetResponse?.decision===null||packetResponse?.decision===true){
+      return json({ok:true,notice:'角色未能确认发红包，本次没有发出红包。'});
     }
     const reply=packetResponse?packetResponse.reply:stripCharacterPrefix(raw,char.name);
     if(!reply)throw fail('模型没有返回发言正文。',502);
@@ -972,7 +986,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-char-red-packet-choice-23'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-char-red-packet-followup-24'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
