@@ -520,7 +520,7 @@ const ledgerOnline = (() => {
   }
   function cardContext(card){
     return {
-      persona:[['姓名',card.name],['性别',card.gender],['性格',card.personality],['人设',card.description],['与用户的关系',card.relationship]].filter(x=>x[1]).map(([k,v])=>k+'：'+v).concat(charRelationContext(card)).join('\n'),
+      persona:[['姓名',card.name],['性别',card.gender],['性格',card.personality],['人设',card.description],['必须遵守的发言规则',card.speechRules],['与用户的关系',card.relationship]].filter(x=>x[1]).map(([k,v])=>k+'：'+v).concat(charRelationContext(card)).join('\n'),
       worldFront:worldContext('front',card.id),worldEnd:worldContext('end',card.id)
     };
   }
