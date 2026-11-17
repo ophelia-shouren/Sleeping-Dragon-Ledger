@@ -514,6 +514,19 @@ async function accountD1Usage(env){
   return value;
 }
 
+async function personalUserCode(db,uid){
+  await db.prepare('CREATE TABLE IF NOT EXISTS ledger_user_codes (uid TEXT PRIMARY KEY REFERENCES profiles(id),code TEXT NOT NULL UNIQUE)').run();
+  const existing=await db.prepare('SELECT code FROM ledger_user_codes WHERE uid=?').bind(uid).first();
+  if(existing)return existing.code;
+  for(let attempt=0;attempt<5;attempt++){
+    const value=crypto.randomUUID().replaceAll('-','').slice(0,12).toUpperCase();
+    const code='ML-'+value.slice(0,4)+'-'+value.slice(4,8)+'-'+value.slice(8);
+    await db.prepare('INSERT OR IGNORE INTO ledger_user_codes (uid,code) SELECT id,? FROM profiles WHERE id=?').bind(code,uid).run();
+    const saved=await db.prepare('SELECT code FROM ledger_user_codes WHERE uid=?').bind(uid).first();
+    if(saved)return saved.code;
+  }
+  throw fail('个人用户码暂时无法分配，请稍后重试。',503);
+}
 async function api(req, env, url, ledger, ctx) {
   const uid = ledger ? await ledgerIdentity(req) : req.headers.get('oai-authenticated-user-id');
   if (!uid) throw fail('请先登录。',401);
@@ -542,10 +555,11 @@ async function api(req, env, url, ledger, ctx) {
       if(Object.hasOwn(data,'frame'))updates.push(stmt('INSERT INTO ledger_person_look VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET frame=excluded.frame',uid,frameValue(data)));
       await db.batch(updates);
     } else await profile.run();
-    return json({id:uid,name});
+    return json({id:uid,name,...(ledger?{userCode:await personalUserCode(db,uid)}:{})});
   }
   if (req.method === 'GET' && path === 'me') return json({me});
   if (!me) throw fail('请先设置昵称。',403);
+  if(ledger&&req.method==='GET'&&path==='user-code')return json({code:await personalUserCode(db,uid)});
   if (ledger && req.method==='POST' && path==='vision-api') {
     await ensureVisionTable(db);
     if(data.enabled===false){
@@ -1000,7 +1014,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-revoke-tom-api-26'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-personal-user-code-27'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
