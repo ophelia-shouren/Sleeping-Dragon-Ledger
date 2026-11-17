@@ -4739,7 +4739,7 @@ function skinAvailable(id,archive){
   return Object.hasOwn(skins,id)&&(!Object.hasOwn(skinUnlockIds,id)||archive.mysteryActive.includes(skinUnlockIds[id]));
 }
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],teaSessions:[],groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
 const chatDraftKey=key+'-chat-drafts';
 const pendingChatDrafts=new Map();
 let state = initial(), storageError = '';
@@ -4768,6 +4768,7 @@ function validate(data){
     if(typeof result[k]==='string'&&!string(data[k]))throw Error('存档文字字段无效');
     result[k]=data[k];
   }
+  if(!Array.isArray(result.billPresets)||!result.billPresets.every(p=>p&&string(p.id)&&p.id&&string(p.title)&&p.title.trim()&&string(p.category)&&p.category.trim()&&['income','expense'].includes(p.type)&&Number.isSafeInteger(p.cents)&&p.cents>0)||!unique(result.billPresets))throw Error('记账预设存档无效。');
   if(!Array.isArray(result.mysteryActive)||!result.mysteryActive.every(id=>typeof id==='string'&&/^[a-z0-9-]+$/.test(id)))throw Error('神秘小入口存档无效。');
   if(!Array.isArray(result.scenePresets)||!result.scenePresets.every(p=>p&&string(p.id)&&p.id&&string(p.name)&&p.name.trim()&&string(p.scene)&&p.scene.trim()&&p.scene.length<=4000)||!unique(result.scenePresets))throw Error('场景预设存档无效');
   if(!Array.isArray(result.teaSessions)||!result.teaSessions.every(validTeaSession)||!unique(result.teaSessions))throw Error('茶叙存档无效');
@@ -4906,7 +4907,7 @@ let billSelection=null;
 function ledgerDetails(){
   const tools=billSelection?'<div class="bill-batch-tools" role="group" aria-label="批量操作"><div class="bill-batch-heading"><strong id="billSelectionCount" role="status">已选 '+billSelection.size+' 笔</strong></div><div class="bill-batch-actions"><button class="primary" data-action="billBatchCategory" '+(billSelection.size?'':'disabled')+'>编辑分类</button><button class="bill-batch-delete" data-action="billBatchDelete" '+(billSelection.size?'':'disabled')+'>删除所选</button><button class="bill-batch-cancel" data-action="billSelectionCancel">取消</button></div></div>':
     '<div class="row">'+recordButtons+(state.bills.length?'<button data-action="billSelectionStart">多选</button>':'')+'</div>';
-  return heading('TRANSACTION REGISTER','收支明细','每一笔交易都会即时计入结余。')+'<section class="panel">'+tools+table(state.bills,Infinity,true)+'</section>';
+  return heading('TRANSACTION REGISTER','收支明细','每一笔交易都会即时计入结余。')+(billSelection?'':billPresetPanel())+'<section class="panel">'+tools+table(state.bills,Infinity,true)+'</section>';
 }
 function startBillSelection(id){
   billSelection=new Set(id===undefined?[]:[id]);
@@ -5026,8 +5027,8 @@ function heroCrest(skin){
 }
 function home(){
   const all=total(state.bills),m=summary('month',dateString());
-  if(state.skin==='rose-graphite')return roseHome(all,m);
-  if(state.skin==='baker-street')return bakerHome(all,m);
+  if(state.skin==='rose-graphite')return roseHome(all,m)+billPresetPanel();
+  if(state.skin==='baker-street')return bakerHome(all,m)+billPresetPanel();
   const dawnFrost=state.skin==='dawn-frost';
   const title=dawnFrost&&state.heroTitle==='格兰芬多账本'?'晨曦酒庄账本':state.heroTitle;
   const subtitle=dawnFrost&&state.heroSubtitle==='壁炉旁留着一卷羊皮纸，等你记下今天的收支。'
@@ -5037,7 +5038,7 @@ function home(){
     ?'晨曦酒庄 · 炉火与霜'
     :'EST. HOGWARTS　✦　'+(['day','night'].includes(state.skin)?'PRIVATE LEDGER':['mist','obsidian-duet'].includes(state.skin)?skins[state.skin]:state.skin.toUpperCase());
   return '<section class="hero">'+heroCrest(state.skin)+'<div class="eyebrow">'+heroLabel+'</div><h1>'+esc(title)+'</h1><p>'+esc(subtitle)+'</p><div class="row">'+recordButtons+'<button data-action="hero">编辑首页文字</button>'+'</div></section>'+
-    metrics([['当前结余',state.opening+all.income-all.expense],['本月收入',m.income,'in'],['本月支出',m.expense,'out']])+
+    metrics([['当前结余',state.opening+all.income-all.expense],['本月收入',m.income,'in'],['本月支出',m.expense,'out']])+billPresetPanel()+
     '<div class="columns"><section class="panel"><div class="row between"><h2>近期账目</h2><button data-page="ledger">查看明细 ↗</button></div>'+table(state.bills,6)+'</section><section class="panel"><h2>本月支出分布</h2>'+breakdown(m.bills)+'</section></div>'+
     '<section class="panel quick"><div class="eyebrow">MAGICAL CORRESPONDENCE</div><h2>魔法通信</h2><p class="muted">把今日、本周或本月账目整理成信，发给你设定的角色。</p><button data-page="chat">进入魔法通信 →</button></section>';
 }
@@ -5291,8 +5292,29 @@ function handleLedgerAndroidBack(){
   go('home');
   return true;
 }
-function billFields(x={}){
-  return '<div class="fields"><label>项目<input name="title" required value="'+esc(x.title)+'"></label><div class="amount-control"><label>金额（元）<input name="amount" type="number" required min="0.01" step="0.01" value="'+(x.cents?x.cents/100:'')+'"></label><button type="button" data-action="calculator" aria-haspopup="dialog">计算器</button></div><label>方向<select name="type"><option value="expense">支出</option><option value="income" '+(x.type==='income'?'selected':'')+'>收入</option></select></label><label>日期<input name="date" type="date" required value="'+esc(x.date||dateString())+'"></label><label>分类<input name="category" required value="'+esc(x.category||'其他')+'"></label></div>';
+function billPresetPanel(){
+  return '<section class="panel"><div class="row between"><h2>快捷记账</h2><button type="button" data-action="newBillPreset">＋ 新建预设</button></div>'+
+    '<p class="muted">每点一次，按预设金额记一笔到今天。</p><div class="row">'+state.billPresets.map(p=>
+      '<div class="row" role="group" aria-label="'+esc(p.title)+'"><button type="button" data-use-bill-preset="'+esc(p.id)+'">'+esc(p.title)+' <span class="'+(p.type==='income'?'in':'out')+'">'+(p.type==='income'?'+':'−')+money(p.cents)+'</span></button>'+
+      '<button type="button" data-remove-bill-preset="'+esc(p.id)+'" aria-label="'+esc('删除预设 '+p.title)+'" title="删除预设">×</button></div>'
+    ).join('')+'</div></section>';
+}
+function applyBillPreset(id){
+  const preset=state.billPresets.find(p=>p.id===id);
+  if(!preset)return;
+  const bill={...preset,id:crypto.randomUUID(),date:dateString()};
+  if(commit({...state,bills:[...state.bills,bill]})){
+    render();toast('已记入今天：'+bill.title+' '+(bill.type==='income'?'+':'−')+money(bill.cents));
+  }
+}
+function removeBillPreset(id){
+  const preset=state.billPresets.find(p=>p.id===id);
+  if(preset&&confirm('删除「'+preset.title+'」记账预设？已有账目会保留。')&&commit({...state,billPresets:state.billPresets.filter(p=>p.id!==id)})){
+    render();toast('预设已删除');
+  }
+}
+function billFields(x={},includeDate=true){
+  return '<div class="fields"><label>项目<input name="title" required value="'+esc(x.title)+'"></label><div class="amount-control"><label>金额（元）<input name="amount" type="number" required min="0.01" step="0.01" value="'+(x.cents?x.cents/100:'')+'"></label><button type="button" data-action="calculator" aria-haspopup="dialog">计算器</button></div><label>方向<select name="type"><option value="expense">支出</option><option value="income" '+(x.type==='income'?'selected':'')+'>收入</option></select></label>'+(includeDate?'<label>日期<input name="date" type="date" required value="'+esc(x.date||dateString())+'"></label>':'')+'<label>分类<input name="category" required value="'+esc(x.category||'其他')+'"></label></div>';
 }
 function editor(id){
   const x=state.bills.find(x=>x.id===id);
@@ -5328,10 +5350,11 @@ function parseDialog(raw='', results=null){
     (results?'<p class="notice">识别 '+results.filter(x=>x.bill).length+' 笔。请核对金额和收支方向。</p><form id="batchForm">'+results.map((x,i)=>x.bill?'<fieldset><legend><label><input type="checkbox" checked style="width:auto"> 第 '+(i+1)+' 行</label></legend>'+billFields(x.bill)+'</fieldset>':'<p class="notice">第 '+(i+1)+' 行无法确认金额或日期：'+esc(x.line)+'</p>').join('')+'<button class="primary actions">保存勾选账目</button></form>':''));
 }
 function readBill(root,id){
-  const v=k=>root.querySelector('[name="'+k+'"]').value.trim();
+  const v=k=>root.querySelector('[name="'+k+'"]')?.value.trim()||'';
+  const date=v('date')||(!root.querySelector('[name="date"]')?dateString():'');
   const cents=Math.round(Number(v('amount'))*100);
-  if(!validDate(v('date'))||!v('title')||!v('category')||!Number.isSafeInteger(cents)||cents<=0)throw Error('请核对日期、金额和账目名称。');
-  return {id:id||crypto.randomUUID(),title:v('title'),date:v('date'),cents,type:v('type'),category:v('category')};
+  if(!validDate(date)||!v('title')||!v('category')||!Number.isSafeInteger(cents)||cents<=0)throw Error('请核对日期、金额和账目名称。');
+  return {id:id||crypto.randomUUID(),title:v('title'),date,cents,type:v('type'),category:v('category')};
 }
 function share(unit){
   const prev=anchor;if(page!=='report')anchor='';
@@ -5504,6 +5527,8 @@ document.addEventListener('click',e=>{
   if(d.ledgerFont&&Object.hasOwn(fontOptions,d.ledgerFont))void chooseLedgerFont(d.ledgerFont,b);
   if(d.period){period=d.period;render();}
   if(d.share){if($('dialog').open)$('dialog').close();share(d.share);}
+  if(d.useBillPreset)applyBillPreset(d.useBillPreset);
+  if(d.removeBillPreset)removeBillPreset(d.removeBillPreset);
   if(d.edit)editor(d.edit);
   if(d.delete && confirm('确定删除这笔账目？') && commit({...state,bills:state.bills.filter(x=>x.id!==d.delete)})){$('dialog').close();render();}
   switch(d.action){
@@ -5632,6 +5657,7 @@ document.addEventListener('click',e=>{
     case 'newContact':openCard('');break;
     case 'newWorld':openWorld('');break;
     case 'new':editor();break;
+    case 'newBillPreset':dialog('<h2>新建记账预设</h2><form id="billPresetForm">'+billFields({},false)+'<div class="row"><button class="primary">保存预设</button><button type="button" data-action="close">取消</button></div></form>');break;
     case 'parse':parseDialog();break;
     case 'formatArchive':confirmArchiveFormat();break;
     case 'selectContacts':selectContacts();break;
@@ -5829,6 +5855,10 @@ document.addEventListener('submit',e=>{
       const category=f.elements.category.value.trim();
       if(!category)throw Error('请填写分类。');
       updateSelectedBills(category);
+    }
+    if(f.id==='billPresetForm'){
+      const {date,...preset}=readBill(f);
+      if(commit({...state,billPresets:[...state.billPresets,preset]})){$('dialog').close();render();toast('记账预设已保存');}
     }
     if(f.id==='billForm'){
       const x=readBill(f,f.dataset.id);
