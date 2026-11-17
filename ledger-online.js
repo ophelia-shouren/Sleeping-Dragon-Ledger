@@ -200,7 +200,7 @@ const ledgerOnline = (() => {
   function chatRoom(current){
     if(!current)return rooms();
     room=current;messages=[];older=false;detail=null;
-    const serial=screen(current.name,'<div class="row"><button type="button" id="onlineMembers">成员与邀请</button>'+(current.kind==='group'?'<button type="button" id="onlineMention">@ 角色</button>':'')+'</div>'+end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose" class="row"><textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="primary composer-send">发送</button></form>',rooms);
+    const serial=screen(current.name,'<div class="row"><button type="button" id="onlineMembers">'+(current.kind==='group'?'群聊设置':'成员与邀请')+'</button>'+(current.kind==='group'?'<button type="button" id="onlineMention">@ 角色</button>':'')+'</div>'+end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose" class="row"><textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="primary composer-send">发送</button></form>',rooms);
     el('onlineMembers').onclick=()=>members(current);
     if(el('onlineMention'))el('onlineMention').onclick=()=>{
       const chars=detail?.chars||[];
@@ -254,21 +254,45 @@ const ledgerOnline = (() => {
   }
   async function members(current){
     const back=()=>chatRoom(current);
-    const serial=screen('成员与邀请','<div class="messages" id="onlineMemberList"></div>'+end,back);
+    const group=current.kind==='group';
+    const serial=screen(group?'群聊设置':'成员与邀请','<div class="messages" id="onlineMemberList"></div>'+end,back);
     try{
       const info=await request('detail?room='+current.id);
       if(!active(serial))return;
       const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');link.searchParams.set('onlineInvite',info.invite||'');
-      el('onlineMemberList').innerHTML=info.members.map(x=>'<div class="row">'+personAvatar(x.name,x.avatar)+'<span>'+esc(x.name)+(x.id===me.id?'（你）':'')+'</span></div>').join('')+
-        info.chars.map(x=>'<div class="row"><span>'+esc(x.name)+' · AI</span>'+(x.owner===me.id?'<button type="button" data-online-remove="'+esc(x.id)+'">移除</button>':'')+'</div>').join('')+
+      const owner=group && info.owner===me.id;
+      el('onlineMemberList').innerHTML=info.members.map(x=>'<div class="row">'+personAvatar(x.name,x.avatar)+'<span>'+esc(x.name)+(x.id===me.id?'（你）':'')+(group&&x.id===info.owner?' · 群主':'')+'</span>'+
+        (owner&&x.id!==me.id?'<button type="button" data-online-kick="'+esc(x.id)+'">移出群聊</button>':'')+'</div>').join('')+
+        info.chars.map(x=>'<div class="row"><span>'+esc(x.name)+' · AI</span>'+((owner||x.owner===me.id)?'<button type="button" data-online-remove="'+esc(x.id)+'">移除</button>':'')+'</div>').join('')+
         (info.invite?'<label>邀请链接<input id="onlineLink" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button>':'')+
-        (current.kind==='group'?'<button type="button" class="primary" id="onlineAddChar">邀请已有角色</button>':'');
+        (group?'<button type="button" class="primary" id="onlineAddChar">邀请已有角色</button><section class="panel"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取额度…</p><p class="muted">真人消息与 AI 回复各计一条。D1 免费档上限为每天读 500 万行、写 10 万行。平台未提供本账户的剩余额度。</p></section>':'');
+      if(group){
+        async function refreshQuota(){
+          const quota=await request('quota?room='+current.id);
+          if(!active(serial))return;
+          const count=n=>new Intl.NumberFormat('zh-CN').format(n);
+          const date=new Date(quota.resetsAt).toLocaleString('zh-CN',{hour12:false});
+          el('onlineQuota').textContent='今日在线消息 '+count(quota.messages)+' 条 · '+date+' 重置';
+        }
+        refreshQuota().catch(e=>{if(active(serial))el('onlineQuota').textContent=e.message;});
+        later(serial,refreshQuota,4500);
+      }
+      el('onlineMemberList').querySelectorAll('[data-online-kick]').forEach(button=>button.onclick=async()=>{
+        const member=info.members.find(x=>x.id===button.dataset.onlineKick);
+        if(!member||!confirm('将 '+member.name+' 移出群聊？其邀请的角色也会退出，旧邀请链接将失效。'))return;
+        button.disabled=true;
+        try{
+          await request('kick-member',{room:current.id,id:member.id});
+          if(active(serial))await members(current);
+        }catch(e){if(active(serial))status(e.message);button.disabled=false;}
+      });
       if(el('onlineCopy'))el('onlineCopy').onclick=async()=>{
         try{await navigator.clipboard.writeText(link.href);status('已复制邀请链接。');}
         catch{el('onlineLink').select();status('已选中邀请链接，可以手动复制。');}
       };
       if(el('onlineAddChar'))el('onlineAddChar').onclick=()=>inviteCard(current);
       el('onlineMemberList').querySelectorAll('[data-online-remove]').forEach(button=>button.onclick=async()=>{
+        if(!confirm('移除此角色？它将停止在群里回复。'))return;
         button.disabled=true;
         try{
           await request('remove-char',{room:current.id,id:button.dataset.onlineRemove});
