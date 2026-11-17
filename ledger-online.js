@@ -82,11 +82,11 @@ const ledgerOnline = (() => {
     const node=el('onlineStatus');
     if(scope()&&node)node.textContent=message;
   }
-  function screen(title,body,back,headerAction=''){
+  function screen(title,body,back,headerAction='',headerAvatar=''){
     clearTimeout(pollTimer);
     imageObserver?.disconnect();
     const serial=++generation;
-    dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button><div class="chat-name"><h2>'+esc(title)+'</h2></div>'+headerAction+'</div>'+body+'</section>',true);
+    dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button>'+headerAvatar+'<div class="chat-name"><h2 id="onlineTitle">'+esc(title)+'</h2></div>'+headerAction+'</div>'+body+'</section>',true);
     el('onlineBack').onclick=back||(()=>el('dialog').close());
     return serial;
   }
@@ -238,7 +238,7 @@ const ledgerOnline = (() => {
       const signature=JSON.stringify(list);
       if(signature===previous)return;
       previous=signature;
-      el('onlineList').innerHTML=list.map(x=>'<button type="button" class="directory-item" data-online-room="'+esc(x.id)+'">'+personAvatar(x.kind==='group'?'群':x.name)+'<span><strong>'+esc(x.name)+'</strong><small>'+esc(x.preview||(x.kind==='group'?'群聊':'私聊'))+'</small></span><b>›</b></button>').join('')||'<div class="empty">还没有在线会话</div>';
+      el('onlineList').innerHTML=list.map(x=>'<button type="button" class="directory-item" data-online-room="'+esc(x.id)+'">'+(x.kind==='group'?groupAvatar(x):personAvatar(x.name))+'<span><strong>'+esc(x.name)+'</strong><small>'+esc(x.preview||(x.kind==='group'?'群聊':'私聊'))+'</small></span><b>›</b></button>').join('')||'<div class="empty">还没有在线会话</div>';
       el('onlineList').querySelectorAll('button').forEach(b=>{
         b.onclick=()=>chatRoom(list.find(x=>x.id===b.dataset.onlineRoom));
         b.onpointerdown=()=>prefetchRoom(b.dataset.onlineRoom);
@@ -533,13 +533,14 @@ const ledgerOnline = (() => {
     const view=viewFor(current.id);
     room=current;messages=view.messages;older=view.older;detail=view.detail||null;typingCharacters=view.typing;
     const group=current.kind==='group';
+    if(group&&detail?.name)Object.assign(current,{name:detail.name,avatar:detail.avatar});
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
     const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@ 角色</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
-      '<button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></div></form>',()=>{rememberChat(current.id);rooms();},header);
+      '<button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></div></form>',()=>{rememberChat(current.id);rooms();},header,group?'<span id="onlineGroupAvatar">'+groupAvatar(current)+'</span>':'');
     el('onlineMembers').onclick=()=>{rememberChat(current.id);members(current);};
     const draft=el('onlineCompose').elements.body;
     draft.value=view.draft||'';
@@ -554,6 +555,13 @@ const ledgerOnline = (() => {
         if(!active(serial))return;
         const changed=detail!==info&&JSON.stringify(detail)!==JSON.stringify(info);
         view.detail=info;detail=info;
+        if(group&&info.name){
+          el('onlineTitle').textContent=info.name;
+          if(current.name!==info.name||current.avatar!==info.avatar){
+            Object.assign(current,{name:info.name,avatar:info.avatar});
+            el('onlineGroupAvatar').innerHTML=groupAvatar(current);
+          }
+        }
         if(changed&&view.loaded){
           const box=el('onlineMessages');
           drawMessages(box.scrollHeight-box.clientHeight-box.scrollTop<120?'bottom':'keep');
@@ -696,13 +704,14 @@ const ledgerOnline = (() => {
       const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');
       link.searchParams.set('onlineInvite',info.invite||'');
       const owner=group&&info.owner===me.id, prefs=displayFor(current.id);
+      if(group&&info.name)Object.assign(current,{name:info.name,avatar:info.avatar});
       const person=(id,name,avatar,note,canEdit,frame)=>{
         const tag=canEdit?'button':'div';
         return '<'+tag+(canEdit?' type="button" data-online-manage="'+esc(id)+'"':'')+' class="group-settings-person">'+personAvatar(name,avatar,frame)+'<span title="'+esc(name+note)+'">'+esc(name+note)+'</span></'+tag+'>';
       };
       const setting=(key,label)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" data-online-display="'+key+'" '+(prefs[key]!==false?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
       el('onlineMemberList').innerHTML=
-        '<section class="group-settings-card"><div class="group-settings-profile">'+groupAvatar({name:current.name})+'<span><strong>'+esc(current.name)+'</strong><small>'+info.members.length+' 位成员'+(group?' · '+info.chars.length+' 位角色':'')+'</small></span><span></span></div></section>'+
+        '<section class="group-settings-card"><div class="group-settings-profile">'+groupAvatar(current)+'<span><strong>'+esc(current.name)+'</strong><small>'+info.members.length+' 位成员'+(group?' · '+info.chars.length+' 位角色':'')+'</small></span>'+(owner?'<button id="onlineEditGroupLook" type="button">编辑</button>':'<span></span>')+'</div></section>'+
         '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>会话成员</h3></div><div class="group-settings-members">'+
         info.members.map(x=>person(x.id,x.name,x.avatar,x.id===me.id?(owner?' · 群主（你）':'（你）'):x.id===info.owner&&group?' · 群主':'',owner&&x.id!==me.id,x.frame)).join('')+
         info.chars.map(x=>person(x.id,x.name,x.avatar_image,' · AI',owner||x.owner===me.id,x.frame)).join('')+
@@ -735,6 +744,7 @@ const ledgerOnline = (() => {
       };
       if(el('onlineOpenMemory'))el('onlineOpenMemory').onclick=()=>roomMemory(current,()=>members(current));
       if(el('onlineAddChar'))el('onlineAddChar').onclick=()=>inviteCard(current);
+      if(el('onlineEditGroupLook'))el('onlineEditGroupLook').onclick=()=>editOnlineGroup(current);
       async function managed(path,data,button){
         button.disabled=true;
         try{
@@ -801,6 +811,34 @@ const ledgerOnline = (() => {
         status(error.message);
       }
     }
+  }
+  function editOnlineGroup(current){
+    let avatar=current.avatar||'';
+    const serial=screen('编辑群聊','<section class="group-settings-card group-settings-block"><form id="onlineGroupLookForm"><div id="onlineGroupPreview"></div><label>群聊名称<input name="name" required maxlength="40" value="'+esc(current.name)+'"></label><label>群头像<input type="file" id="onlineGroupFile" accept="image/png,image/jpeg,image/webp,image/gif"></label><div class="row"><button type="button" id="onlineGroupAvatarClear">移除群头像</button><button type="submit" class="primary">保存</button></div></form></section>'+end,()=>members(current));
+    const name=el('onlineGroupLookForm').elements.name, file=el('onlineGroupFile');
+    const save=el('onlineGroupLookForm').querySelector('[type=submit]');
+    const preview=()=>{if(active(serial))el('onlineGroupPreview').innerHTML=groupAvatar({name:name.value,avatar});};
+    name.oninput=preview;
+    file.onchange=async()=>{
+      if(!file.files[0])return;
+      save.disabled=true;
+      try{avatar=await readLookFile(file.files[0]);preview();}
+      catch(error){if(active(serial))status(error.message);}
+      finally{save.disabled=false;}
+    };
+    el('onlineGroupAvatarClear').onclick=()=>{avatar='';file.value='';preview();};
+    form('onlineGroupLookForm',async(data,requestSerial)=>{
+      const title=fitText(data.name,40);
+      if(!title)throw Error('请输入群聊名称。');
+      const updated=await request('group-look',{room:current.id,name:title,avatar});
+      const changes={name:updated.name,avatar:updated.avatar};
+      Object.assign(current,changes);
+      const view=viewFor(current.id);
+      if(view.detail)Object.assign(view.detail,changes);
+      if(knownRooms)knownRooms=knownRooms.map(item=>item.id===current.id?{...item,...changes}:item);
+      if(active(requestSerial))await members(current);
+    });
+    preview();
   }
   function confirmGroupExit(current,owner){
     const action=owner?'解散群聊':'退出群聊';
