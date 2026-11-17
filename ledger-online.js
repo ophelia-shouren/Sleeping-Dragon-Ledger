@@ -165,7 +165,27 @@ const ledgerOnline = (() => {
   function status(message){
     const node=el('onlineStatus');
     if(!scope()||!node)return;
+    delete node.dataset.connectionError;
     node.textContent=message;
+    if(message==='在线聊天服务连接失败，请稍后再试。'&&el('onlineMessages')&&resumeChat){
+      node.dataset.connectionError='1';
+      const retry=document.createElement('button');
+      retry.type='button';
+      retry.textContent='重试';
+      retry.style.cssText='margin-inline-start:auto;flex:none;min-height:36px;padding:0 10px';
+      const row=document.createElement('span');
+      row.style.cssText='display:flex;align-items:center;gap:8px';
+      const label=document.createElement('span');
+      label.textContent=message;
+      row.append(label,retry);
+      node.replaceChildren(row);
+      retry.onclick=async()=>{
+        retry.disabled=true;
+        retry.textContent='重试中…';
+        try{await resumeChat();}finally{retry.disabled=false;retry.textContent='重试';}
+      };
+      return;
+    }
     if(!/请稍后再\s*@/u.test(message))return;
     const close=document.createElement('button');
     close.type='button';
@@ -717,6 +737,7 @@ const ledgerOnline = (() => {
         const cursor=messages.at(-1)?.id||0;
         const feed=await roomFeed(current.id,cursor);
         if(!active(serial))return;
+        if(el('onlineStatus')?.dataset.connectionError)status('');
         const rows=Array.isArray(feed)?feed:feed.rows;
         const nextTyping=Array.isArray(feed)?[]:feed.typing||[];
         const typingChanged=JSON.stringify(typingCharacters)!==JSON.stringify(nextTyping);
@@ -835,7 +856,7 @@ const ledgerOnline = (() => {
     resumeChat=()=>{
       if(!active(serial))return;
       lastActivity=Date.now();
-      refresh().catch(error=>{if(active(serial))status(error.message);});
+      return refresh().catch(error=>{if(active(serial))status(error.message);});
     };
     if(!view.updated||Date.now()-view.updated>=1200)resumeChat();
     later(serial,refresh,()=>Date.now()-lastActivity<45000?1200:2500);
