@@ -1,6 +1,7 @@
 const ledgerOnline = (() => {
   const base='https://sleeping-dragon-ledger.yearnwingwings.workers.dev/ledger-api/';
   const key='sleeping-dragon-online-identity';
+  const profileReadyKey='sleeping-dragon-online-profile-confirmed';
   const displayKey='sleeping-dragon-online-display';
   const pictures=new Map();
   const views=new Map(), feedsInFlight=new Map(), detailsInFlight=new Map();
@@ -62,16 +63,17 @@ const ledgerOnline = (() => {
     let value=localStorage.getItem(key);
     if(!/^[a-f0-9]{64}$/.test(value||'')){
       value=Array.from(crypto.getRandomValues(new Uint8Array(32)),n=>n.toString(16).padStart(2,'0')).join('');
+      localStorage.removeItem(profileReadyKey);
       localStorage.setItem(key,value);
     }
     return value;
   }
-  async function request(path,data){
+  async function request(path,data,signal){
     const headers={Authorization:'Bearer '+identity()};
     if(data)headers['Content-Type']='application/json';
     let response;
-    try{response=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined});}
-    catch{throw Error('在线聊天服务连接失败，请稍后再试。');}
+    try{response=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined,signal});}
+    catch{throw Error(signal?.aborted?'同步 User 人设超时，请重试。':'在线聊天服务连接失败，请稍后再试。');}
     const result=await response.json().catch(()=>null);
     if(!response.ok||!result)throw Object.assign(Error(result?.error||'在线聊天服务暂时不可用。'),{status:response.status});
     return result;
@@ -182,24 +184,39 @@ const ledgerOnline = (() => {
       if(!me||JSON.stringify(snapshot)!==syncedProfile){
         const [avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(snapshot.frame)]);
         if(onlineIdentity!==token)return;
-        const user=await request('profile',{...snapshot,avatar,frame});
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),15000);
+        let user;
+        try{user=await request('profile',{...snapshot,avatar,frame},controller.signal);}
+        finally{clearTimeout(timeout);}
+        if(!user?.id)throw Error('服务器没有确认在线身份，请重试。');
         if(onlineIdentity!==token)return;
         me=user;syncedProfile=JSON.stringify(snapshot);
+        localStorage.setItem(profileReadyKey,'1');
       }
       if(!active(serial))return;
       if(invite)join(invite);else if(!el('onlineList'))rooms();
     }catch(error){
       if(!active(serial))return;
       if(el('onlineList')){status('在线资料同步失败。'+error.message);return;}
-      screen('在线聊天','<p role="alert" id="onlineConnectError"></p><button type="button" class="primary" id="onlineRetryConnect">重试</button>'+end);
-      el('onlineConnectError').textContent='连接未完成。'+error.message;
-      el('onlineRetryConnect').onclick=activate;
+      showProfileGate('在线 User 人设同步未完成。'+error.message);
     }
   }
-  function open(){
-    if(localStorage.getItem(key))return activate();
-    screen('在线聊天','<p>你将使用当前 User 人设卡参与聊天。昵称和头像会显示给会话成员，角色回复时可参考近期发言者的人设。在线身份保存在此浏览器或设备。</p><div class="row"><button type="button" class="primary" id="onlineStart">使用当前人设进入</button></div>'+end);
+  function showProfileGate(message=''){
+    const look=appearance('user');
+    const name=fitText(look.name,30)||'你';
+    screen('在线聊天',
+      '<section class="group-settings-card group-settings-block"><h3>在线 User 人设</h3><p class="muted">当前昵称：'+esc(name)+'</p>'+
+      '<p>使用本机的 User 人设卡进入在线聊天。昵称和头像会显示给会话成员。</p>'+
+      (message?'<p role="alert">'+esc(message)+'</p>':'')+
+      '<div class="row"><button type="button" class="primary" id="onlineStart">'+(message?'重新同步并进入':'使用当前 User 人设进入')+'</button>'+
+      '<button type="button" id="onlineEditUser">编辑 User 人设卡</button></div></section>'+end);
     el('onlineStart').onclick=activate;
+    el('onlineEditUser').onclick=()=>openCard('user');
+  }
+  function open(){
+    if(localStorage.getItem(key)&&localStorage.getItem(profileReadyKey)==='1')return activate();
+    showProfileGate();
   }
   function later(serial, refresh, delay){
     if(!active(serial))return;
