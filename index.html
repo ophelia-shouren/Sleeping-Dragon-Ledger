@@ -3040,10 +3040,16 @@ async function generateTea(id,input,rerollIndex,guide='',draft){
       JSON.stringify(recentDialogue((x.mode==='ai'?cast[0]:localConfig(cast[0])[x.mode]).messages)).slice(-6000);
     const roleId=cast.length===1?cast[0].id:undefined;
     const world=x.bonus||roleId!==undefined?[worldContext('front',roleId),worldContext('end',roleId)].filter(Boolean).join('\n'):'';
-    const system='你在续写一段角色同场的中文小说。输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。用'+x.pov+'叙事，文风为'+x.style+'，本次约'+x.words+'字。紧接用户的最新输入，不照抄前文，尊重用户对自己行动与选择的设定。'+(x.bonus&&!x.includeUser?'':'第一人称默认从用户角色的视角叙述。')+'不得输出 NSFW 内容。\n'+chatTimeContext();
-    const castRule=x.bonus?(x.includeUser?'User 参与剧情。':'User 不作为人物登场，其输入仅作创作指令。第一人称从所选角色的视角叙述。'):'';
+    const userParticipates=!x.bonus||x.includeUser;
+    const system=(index===0?'你在创作一段角色同场的中文小说。':'你在续写一段角色同场的中文小说。')+
+      '输出完整连贯的小说正文，可自然分段，不加标题、总结或解释。文风为'+x.style+'，本次约'+x.words+
+      '字。根据用户的最新输入展开剧情，不照抄前文，尊重用户对自己行动与选择的设定。不得输出 NSFW 内容。\n'+chatTimeContext();
+    const castRule=x.bonus?(userParticipates?'User 参与剧情。':'User 不作为人物登场，其输入仅作创作指令。'):'';
+    const povRule=x.pov==='第三人称'?
+      '叙事视角固定为第三人称。正文从第一句起，以角色姓名或第三人称代词描述行动、感受与想法。角色直接对白可以自然使用“我”。文风、人物设定、聊天背景、前文和改写指导均须服从所选叙事视角。':
+      '用'+x.pov+'叙事。'+(x.pov==='第一人称'?(userParticipates?'默认从用户角色的视角叙述。':'从所选角色的视角叙述。'):'');
     const response=await request(p,'chat/completions',{model:p.model,stream:true,messages:[
-      {role:'system',content:[system,castRule,reroll?'重新生成选中的段落，提供不同的表达。'+(guide?'本次改写指导：'+guide:''):''].filter(Boolean).join('\n')},
+      {role:'system',content:[system,castRule,reroll?'重新生成选中的段落，提供不同的表达。'+(guide?'本次改写指导：'+guide:''):'',povRule].filter(Boolean).join('\n')},
       {role:'user',content:JSON.stringify({参与角色:roles,用户:x.bonus&&!x.includeUser?undefined:{姓名:state.userName,人设:state.user},世界书:world,场景:group?.scene||(!group?currentScene(cast[0]):''),原聊天背景:context,茶叙前文:JSON.stringify(current.turns.slice(0,index).filter(turn=>!turn.htmlCard)).slice(-32000),最新输入:current.turns[index].input})}
     ]},delta=>showTeaDelta(id,delta));
     const output=dialogueReply(response).trim();
