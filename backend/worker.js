@@ -273,11 +273,11 @@ async function api(req, env, url, ledger, ctx) {
     throw fail('暂时无法生成邀请码，请重试。',503);
   }
   if (req.method === 'GET' && path === 'rooms') {
-    return json(await all(`SELECT r.id,r.kind,r.owner,
+    return json(await all(`SELECT r.id,r.kind,r.owner,COALESCE(g.avatar,'') avatar,
       CASE WHEN r.kind='dm' THEN COALESCE((SELECT p.name FROM members m2 JOIN profiles p ON p.id=m2.uid WHERE m2.room=r.id AND p.id<>? LIMIT 1),r.name) ELSE r.name END name,
       (SELECT body FROM messages WHERE room=r.id ORDER BY id DESC LIMIT 1) preview,
       (SELECT created FROM messages WHERE room=r.id ORDER BY id DESC LIMIT 1) updated
-      FROM rooms r JOIN members m ON r.id=m.room WHERE m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id) ORDER BY updated DESC, r.name`,uid,uid));
+      FROM rooms r JOIN members m ON r.id=m.room LEFT JOIN ledger_group_look g ON g.room=r.id WHERE m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id) ORDER BY updated DESC, r.name`,uid,uid));
   }
   if (req.method === 'POST' && path === 'rooms') {
     const kind = data.kind === 'dm' ? 'dm' : 'group';
@@ -309,6 +309,16 @@ async function api(req, env, url, ledger, ctx) {
   if (ledger && req.method === 'GET' && path === 'quota' && room.kind === 'group') {
     const usage = await one("SELECT COALESCE((SELECT messages FROM ledger_daily_usage WHERE day=date('now')),0) messages, strftime('%Y-%m-%dT00:00:00Z','now','start of day','+1 day') resets");
     return json({messages:usage.messages,resetsAt:usage.resets});
+  }
+  if (ledger && req.method==='POST' && path==='group-look') {
+    if(room.kind!=='group'||room.owner!==uid)throw fail('只有群主可以修改群名称和头像。',403);
+    const name=field(data,'name',40), avatar=visualSource(field(data,'avatar',120000,false));
+    const [changed]=await db.batch([
+      stmt('UPDATE rooms SET name=? WHERE id=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)',name,room.id,room.id),
+      stmt('INSERT INTO ledger_group_look (room,avatar) SELECT id,? FROM rooms WHERE id=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?) ON CONFLICT(room) DO UPDATE SET avatar=excluded.avatar',avatar,room.id,room.id)
+    ]);
+    if(!changed.meta.changes)throw fail('这个群聊已解散。',404);
+    return json({ok:true,name,avatar});
   }
   if (ledger && req.method==='POST' && path==='dissolve-group') {
     if(room.kind!=='group')throw fail('只能解散群聊。',400);
@@ -342,12 +352,13 @@ async function api(req, env, url, ledger, ctx) {
     return json({ok:true});
   }
   if (req.method === 'GET' && path === 'detail') {
-    const [members,chars] = await Promise.all([
+    const [members,chars,look] = await Promise.all([
       all('SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
-      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',room.id)
+      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',room.id),
+      room.kind==='group'?one('SELECT avatar FROM ledger_group_look WHERE room=?',room.id):null
     ]);
     const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
-    return json({members,chars,owner:room.owner,invite:room.owner===uid ? room.invite : null,inviteCode});
+    return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid ? room.invite : null,inviteCode});
   }
   if (req.method === 'GET' && path === 'messages') {
     const cursor = Number(url.searchParams.get('after') || url.searchParams.get('before')) || 0;
@@ -560,11 +571,11 @@ export default {
     if (request.method==='GET' && ['/', '/health'].includes(url.pathname)) {
       try {
         if (!env.DB) return json({service:'sleeping-dragon-ledger',status:'missing_database'},503);
-        await env.DB.prepare('SELECT room FROM ledger_dissolved_groups LIMIT 0').all();
+        await env.DB.prepare('SELECT avatar FROM ledger_group_look LIMIT 0').all();
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-lifecycle-5'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-appearance-6'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
