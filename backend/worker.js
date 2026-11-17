@@ -230,6 +230,12 @@ function randomInviteCode(){
   return code;
 }
 
+function stripCharacterPrefix(body,name){
+  if(!name)return body;
+  const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return body.replace(new RegExp('^[^\\S\\r\\n]*'+escaped+'[^\\S\\r\\n]*[:：][^\\S\\r\\n]*','gm'),'').trim();
+}
+
 async function generateReply(env,room,char,summarize,ledger,messageId=null,automatic=null){
   const stmt=(sql,...args)=>env.DB.prepare(sql).bind(...args);
   const run=(sql,...args)=>stmt(sql,...args).run();
@@ -245,13 +251,14 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
     const memory = ledger ? await one('SELECT summary FROM ledger_room_memory WHERE room=?',room.id) : null;
     const people = ledger ? [...new Map(history.filter(m=>!m.char_id && m.persona).map(m=>[m.sender,m])).values()].map(m=>m.name+'：'+m.persona.slice(0,2000)).join('\n\n') : '';
     const personal=ledger?await one('SELECT memories,dialogue FROM ledger_char_personal_context WHERE char_id=?',char.id):null;
-    const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',automatic?'这是一次主动发言。参考上方群聊内容，用角色口吻自然加入话题。只输出一条消息，不提及定时设置。':'',context?.world_end].filter(Boolean).join('\n\n');
+    const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言正文，省略行首的角色名和冒号，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',automatic?'这是一次主动发言。参考上方群聊内容，用角色口吻自然加入话题。只输出一条消息，不提及定时设置。':'',context?.world_end].filter(Boolean).join('\n\n');
     const messages = [
       {role:'system',content:system},
-      ...history.reverse().map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.name+'：'+m.body.slice(0,1600)}))
+      ...history.reverse().map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.char_id===char.id?stripCharacterPrefix(m.body,m.name).slice(0,1600):m.name+'：'+(m.char_id?stripCharacterPrefix(m.body,m.name):m.body).slice(0,1600)}))
     ];
     if(automatic)messages.push({role:'user',content:'请以角色身份主动在群聊发一条消息。'});
-    const reply = await requestModel(env,char,messages);
+    const reply = stripCharacterPrefix(await requestModel(env,char,messages),char.name);
+    if(!reply)throw fail('模型没有返回发言正文。',502);
     if(automatic){
       await run('INSERT INTO messages (room,sender,char_id,body) SELECT c.room,c.owner,c.id,? FROM chars c JOIN ledger_char_autopost a ON a.char_id=c.id WHERE c.id=? AND c.active=1 AND a.next_at=?',reply,char.id,automatic.next_at);
     }else await run('INSERT INTO messages (room,sender,char_id,body) SELECT room,owner,id,? FROM chars WHERE id=? AND active=1',reply, char.id);
@@ -342,13 +349,13 @@ async function api(req, env, url, ledger, ctx) {
     const cursor=Number(after);
     if(!Number.isSafeInteger(cursor)||cursor<0)throw fail('消息游标无效。',400);
     if(cursor>=head)return json({cursor:head,rows:[]});
-    const rows=await all(`SELECT m.id,m.room,m.kind,substr(m.body,1,180) body,r.name group_name,COALESCE(c.name,p.name) name
+    const rows=await all(`SELECT m.id,m.room,m.kind,m.char_id,substr(m.body,1,180) body,r.name group_name,COALESCE(c.name,p.name) name
       FROM messages m JOIN rooms r ON r.id=m.room JOIN members member ON member.room=r.id AND member.uid=?
       JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id
       WHERE m.id>? AND m.id<=? AND r.kind='group' AND (m.sender<>? OR m.char_id IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)
       ORDER BY m.id DESC LIMIT 32`,uid,cursor,head,uid);
-    return json({cursor:head,rows:rows.reverse()});
+    return json({cursor:head,rows:rows.reverse().map(row=>row.char_id?{...row,body:stripCharacterPrefix(row.body,row.name)}:row)});
   }
   if (req.method === 'GET' && path === 'rooms') {
     return json(await all(`SELECT r.id,r.kind,r.owner,COALESCE(g.avatar,'') avatar,
@@ -662,7 +669,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-character-autopost-10'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-character-speech-11'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
