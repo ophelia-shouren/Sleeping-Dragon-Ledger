@@ -366,7 +366,24 @@ const ledgerOnline = (() => {
   }
   function rooms(){
     room=null;
-    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button></div>'+end+'<div class="messages" id="onlineList"></div>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
+    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature" tabindex="0" role="button">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
+    const signature=el('onlineSignature');
+    let revealing=false;
+    async function revealCode(){
+      if(revealing)return;
+      revealing=true;
+      try{
+        const identityAtStart=me?.id;
+        const code=me?.userCode||(await request('user-code')).code;
+        if(!active(serial)||me?.id!==identityAtStart)return;
+        me.userCode=code;
+        screen('个人用户码','<section class="group-settings-card group-settings-block"><p style="text-align:center;overflow-wrap:anywhere"><strong>'+esc(code)+'</strong></p><button type="button" id="onlineCodeBack">返回</button></section>'+end,rooms);
+        el('onlineCodeBack').onclick=rooms;
+      }catch(error){if(active(serial))status(error.message);}
+      finally{revealing=false;}
+    }
+    signature.onclick=revealCode;
+    signature.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();void revealCode();}};
     el('onlineNew').onclick=create;
     el('onlineJoin').onclick=()=>join();
     let previous;
