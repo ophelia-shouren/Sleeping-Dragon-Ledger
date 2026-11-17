@@ -353,7 +353,7 @@ const ledgerOnline = (() => {
     room=null;
     const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button></div>'+end+'<div class="messages" id="onlineList"></div>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
     el('onlineNew').onclick=create;
-    el('onlineJoin').onclick=()=>join('');
+    el('onlineJoin').onclick=()=>join();
     let previous;
     function paint(list){
       if(!active(serial))return;
@@ -391,16 +391,21 @@ const ledgerOnline = (() => {
       if(active(serial))chatRoom({id,name:data.kind==='dm'?'好友私聊':data.name,kind:data.kind});
     });
   }
-  function join(code){
-    screen('加入群聊','<form id="onlineJoinForm"><label>六位邀请码或邀请链接<input name="invite" autocomplete="off" autocapitalize="none" spellcheck="false" required value="'+esc(code)+'" placeholder="例如 a7k2m9"></label><button type="submit" class="primary">加入</button></form>'+end,rooms);
+  function join(linkInvite=''){
+    const linked=/^[a-f0-9-]{36}$/i.test(linkInvite);
+    const url=new URL(location.href);
+    if(url.searchParams.has('onlineInvite')){
+      url.searchParams.delete('onlineInvite');history.replaceState(null,'',url);
+    }
+    screen(linked?'好友私聊邀请':'加入群聊','<form id="onlineJoinForm">'+(linked
+      ?'<p class="muted">如果你要加入在线群聊，请返回并输入群主提供的六位邀请码。</p>'
+      :'<label>六位邀请码<input name="invite" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="6" pattern="[A-Za-z0-9]{6}" required placeholder="例如 a7k2m9"></label>')+
+      '<button type="submit" class="primary">加入</button></form>'+end,rooms);
     form('onlineJoinForm',async(data,serial)=>{
-      let invite=data.invite.trim();
-      try{invite=new URL(invite).searchParams.get('onlineInvite')||'';}catch{}
-      if(/^[A-Za-z0-9]{6}$/.test(invite))invite=invite.toLowerCase();
-      else if(!/^[a-f0-9-]{36}$/i.test(invite))throw Error('请输入六位邀请码或有效的邀请链接。');
+      const invite=linked?linkInvite:data.invite.trim().toLowerCase();
+      if(!linked&&!/^[a-z0-9]{6}$/.test(invite))throw Error('请输入六位邀请码。');
       const {id}=await request('join',{invite});
       if(!active(serial))return;
-      const url=new URL(location.href);url.searchParams.delete('onlineInvite');history.replaceState(null,'',url);
       const list=await readRooms(true);
       if(active(serial))chatRoom(list.find(x=>x.id===id));
     });
@@ -963,9 +968,8 @@ const ledgerOnline = (() => {
         info.chars.map(x=>person(x.id,x.name,x.avatar_image,'',owner||x.owner===me.id,x.frame)).join('')+
         (group?'<button type="button" class="group-settings-person" id="onlineAddChar"><b aria-hidden="true">＋</b><span>邀请角色</span></button>':'')+
         '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
-        (info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3>'+
-          (info.inviteCode?'<label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode)+'"></label><button id="onlineCopyCode" type="button">复制邀请码</button>':'')+
-          '<label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
+        (owner?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode||'')+'"></label><div class="row"><button id="onlineCopyCode" type="button">复制邀请码</button><button id="onlineRotateCode" type="button">重新生成邀请码</button></div></section>':
+          !group&&info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
         (group?'<section class="group-settings-card group-settings-block"><h3>消息通知</h3><label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" id="onlineMute" '+(groupMuted(current.id)?'checked':'')+'><span aria-hidden="true"></span>消息免打扰</label></section>':'')+
         (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><div id="onlineD1Quota" class="muted"></div></section>':'');
@@ -989,6 +993,21 @@ const ledgerOnline = (() => {
           localStorage.setItem(displayKey,JSON.stringify(settings));
         }catch(error){input.checked=!input.checked;status('显示设置未能保存。');}
       });
+      if(el('onlineRotateCode'))el('onlineRotateCode').onclick=async event=>{
+        if(!confirm('重新生成邀请码？旧邀请码将立即失效。'))return;
+        const button=event.currentTarget;
+        button.disabled=true;
+        try{
+          const result=await request('rotate-invite-code',{room:current.id});
+          view.detail={...info,inviteCode:result.inviteCode};
+          if(active(serial)){
+            info.inviteCode=result.inviteCode;
+            el('onlineInviteCode').value=result.inviteCode;
+            status('已生成新邀请码，旧邀请码已失效。');
+          }
+        }catch(error){if(active(serial))status(error.message);}
+        finally{button.disabled=false;}
+      };
       if(el('onlineCopyCode'))el('onlineCopyCode').onclick=async()=>{
         try{await navigator.clipboard.writeText(info.inviteCode);status('已复制邀请码。');}
         catch{el('onlineInviteCode').select();status('已选中邀请码，可以手动复制。');}
@@ -1027,7 +1046,7 @@ const ledgerOnline = (() => {
           if(input.reportValidity())managed('rename-char',{id,name:input.value.trim()},event.currentTarget);
         };
         el('onlineRemoveMember').onclick=event=>{
-          const prompt=char?'移除此角色？它将停止在群里回复。':'将 '+user.name+' 移出群聊？其邀请的角色也会退出，旧邀请链接和邀请码将失效。';
+          const prompt=char?'移除此角色？它将停止在群里回复。':'将 '+user.name+' 移出群聊？其邀请的角色也会退出，旧邀请码将失效。';
           if(confirm(prompt))managed(char?'remove-char':'kick-member',{id},event.currentTarget);
         };
         panel.scrollIntoView({block:'nearest'});
