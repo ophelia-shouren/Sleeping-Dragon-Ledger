@@ -818,7 +818,7 @@ const ledgerOnline = (() => {
           '<label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
         (group?'<section class="group-settings-card group-settings-block"><h3>消息通知</h3><label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" id="onlineMute" '+(groupMuted(current.id)?'checked':'')+'><span aria-hidden="true"></span>消息免打扰</label></section>':'')+
-        (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><p class="muted">当前可读取在线消息数。Cloudflare 账户剩余额度需要账户级统计授权。</p></section>':'');
+        (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><div id="onlineD1Quota" class="muted"></div></section>':'');
       if(group){
         el('onlineMute').onchange=event=>{
           const input=event.currentTarget;
@@ -897,6 +897,21 @@ const ledgerOnline = (() => {
       const count=new Intl.NumberFormat('zh-CN').format(view.quota.messages);
       const date=new Date(view.quota.resetsAt).toLocaleString('zh-CN',{hour12:false});
       el('onlineQuota').textContent='今日在线消息 '+count+' 条 · '+date+' 重置';
+      const node=el('onlineD1Quota'), d1=view.quota.d1;
+      if(!node)return;
+      if(d1?.status!=='ready'){
+        node.textContent=d1?.status==='unavailable'?'暂时无法读取 Cloudflare D1 统计。':'Cloudflare D1 统计尚未配置完成。';
+        return;
+      }
+      const format=new Intl.NumberFormat('zh-CN');
+      const rows=(label,used,limit)=>{
+        const line=document.createElement('div');
+        line.textContent=label+'已用 '+format.format(used)+' 行 · 免费档预计剩余 '+format.format(Math.max(0,limit-used))+' 行';
+        return line;
+      };
+      const note=document.createElement('small');
+      note.textContent='D1 账户统计可能有延迟 · '+new Date(d1.checkedAt).toLocaleTimeString('zh-CN',{hour12:false})+' 查询';
+      node.replaceChildren(rows('读取',d1.reads,d1.readLimit),rows('写入',d1.writes,d1.writeLimit),note);
     }
     function requestQuota(){
       refreshQuota().catch(error=>{if(active(serial)&&el('onlineQuota'))el('onlineQuota').textContent=error.message;});
