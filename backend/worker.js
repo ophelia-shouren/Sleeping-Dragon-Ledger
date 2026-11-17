@@ -445,6 +445,64 @@ async function api(req, env, url, ledger, ctx) {
   throw fail('请求不存在。',404);
 }
 
+const ledgerImportDigest='3ddf5174f2bee58cf915d98d60fe76bf7fbc06b6d67135a897540b9a1c9380e5';
+const ledgerTransferTables = {
+  profiles: ['id','id,name',"id GLOB 'ledger:*'"],
+  ledger_people: ['uid','uid,persona,avatar',"uid GLOB 'ledger:*'"],
+  rooms: ['id','id,name,kind,owner,invite',"owner GLOB 'ledger:*'"],
+  members: ['room,uid','room,uid',"room IN (SELECT id FROM rooms WHERE owner GLOB 'ledger:*')"],
+  chars: ['id','id,room,owner,name,avatar,persona,endpoint,model,secret,active,busy_until',"room IN (SELECT id FROM rooms WHERE owner GLOB 'ledger:*')"],
+  ledger_cast: ['char_id','char_id,world_front,world_end',"char_id IN (SELECT id FROM chars WHERE owner GLOB 'ledger:*')"],
+  messages: ['id','id,room,sender,char_id,body,created,kind,attachment',"room IN (SELECT id FROM rooms WHERE owner GLOB 'ledger:*')"],
+  ledger_rps: ['message_id','message_id,choice,resolution',"message_id IN (SELECT m.id FROM messages m JOIN rooms r ON r.id=m.room WHERE r.owner GLOB 'ledger:*')"],
+  ledger_room_memory: ['room','room,endpoint,model,secret,summary,cursor,busy_until,updated,error',"room IN (SELECT id FROM rooms WHERE owner GLOB 'ledger:*')"],
+  ledger_daily_usage: ['day','day,messages','1']
+};
+function ledgerTransferKey(env) {
+  const key=env.LEDGER_MIGRATION;
+  return /^[a-f0-9]{64}$/.test(key||'')?key:null;
+}
+function ledgerTransferStatement(env,query,...args) {
+  return env.DB.prepare(query).bind(...args);
+}
+async function ledgerTransferValue(env,label) {
+  return (await ledgerTransferStatement(env,'SELECT value FROM ledger_transfer WHERE label=?',label).first())?.value||0;
+}
+async function ledgerTransferSet(env,label,value) {
+  await ledgerTransferStatement(env,'INSERT INTO ledger_transfer VALUES (?,?) ON CONFLICT(label) DO UPDATE SET value=excluded.value',label,value).run();
+}
+async function importLedger(request,env,url) {
+  const token=/^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('authorization')||'')?.[1];
+  if(!token)return json({error:'Not found'},404);
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))),x=>x.toString(16).padStart(2,'0')).join('');
+  if(digest!==ledgerImportDigest)return json({error:'Not found'},404);
+  if(url.pathname==='/ledger-import/status' && request.method==='GET'){
+    const counts={};
+    for(const name of Object.keys(ledgerTransferTables)){
+      counts[name]=(await ledgerTransferStatement(env,'SELECT COUNT(*) total FROM '+name).first()).total;
+    }
+    return json({counts});
+  }
+  const name=url.pathname.slice('/ledger-import/'.length);
+  if(request.method!=='POST'||!Object.hasOwn(ledgerTransferTables,name))return json({error:'Invalid import action'},400);
+  const data=await request.json();
+  if(!Array.isArray(data.rows)||data.rows.length>12)return json({error:'Invalid import chunk'},400);
+  const columns=ledgerTransferTables[name][1].split(',');
+  const sql='INSERT OR REPLACE INTO '+name+' ('+columns.join(',')+') VALUES ('+columns.map(()=>'?').join(',')+')';
+  const inserts=[];
+  if(name==='ledger_daily_usage'&&data.reset===true)inserts.push(ledgerTransferStatement(env,'DELETE FROM ledger_daily_usage'));
+  for(const row of data.rows){
+    if(row.secret){
+      const id=name==='chars'?row.id:row.room;
+      row.secret=await encrypt(env,await decrypt({CHAT_KEY_ENCRYPTION:token},row.secret,id),id);
+    }
+    if(Object.hasOwn(row,'busy_until'))row.busy_until=0;
+    inserts.push(ledgerTransferStatement(env,sql,...columns.map(column=>row[column])));
+  }
+  if(inserts.length)await env.DB.batch(inserts);
+  return json({imported:data.rows.length});
+}
+
 export default {
   async fetch(request,env,ctx) {
     const url = new URL(request.url);
@@ -459,6 +517,10 @@ export default {
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
+    }
+    if (url.pathname.startsWith('/ledger-import/')) {
+      try {return await importLedger(request,env,url);}
+      catch(error){console.error('Ledger import failed',error.name);return json({error:'Import unavailable'},503);}
     }
     const ledger = url.pathname.startsWith('/ledger-api/');
     if (!ledger) return new Response(null,{status:404});
