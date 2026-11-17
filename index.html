@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
-<script src="./ledger-online.js?v=d339f651"></script>
+<script src="./ledger-online.js?v=f06d1993"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -5881,7 +5881,10 @@ document.addEventListener('submit',e=>{
     if(f.id==='imageForm'){
       const fields=new FormData(f),imageApi=Object.fromEntries(Object.keys(imageDefaults()).map(k=>[k,String(fields.get(k)||'').trim()]));
       if(imageApi.url)apiEndpoint(imageApi.url,'chat/completions');
-      if(commit({...state,imageApi}))toast('图片 API 已保存');
+      if(commit({...state,imageApi})){
+        toast('图片 API 已保存');
+        ledgerOnline.syncVision?.().catch(()=>toast('图片 API 已保存在本机。在线识图配置同步失败，请检查后重试。'));
+      }
     }
     if(f.id==='imageBillForm')recognizeImage(f);
     if(f.id==='billCategoryBatchForm'){
