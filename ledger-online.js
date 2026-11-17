@@ -434,6 +434,45 @@ const ledgerOnline = (() => {
       throw Error('图片过大，压缩后仍无法发送。');
     }finally{URL.revokeObjectURL(url);}
   }
+  async function shareArchive(card,back){
+    const type=card.htmlCard?'moon':'story';
+    const serial=screen('分享到在线群聊','<p class="muted">正在读取在线群聊…</p>'+end,back);
+    try{
+      const groups=(await request('rooms')).filter(item=>item.kind==='group');
+      if(!active(serial))return;
+      if(!groups.length){
+        screen('分享到在线群聊','<p class="muted">你还没有加入在线群聊。</p>',back);
+        return;
+      }
+      screen('分享到在线群聊','<form id="onlineArchiveShare"><p>'+esc(card.title)+'</p><label>选择群聊<select name="target" required><option value="">请选择</option>'+
+        groups.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">发送卡片</button></form>'+end,back);
+      form('onlineArchiveShare',async(data,requestSerial)=>{
+        await request('archive-card',{room:data.target,title:card.title,body:card.body,type});
+        if(active(requestSerial)){back();toast('卡片已分享到在线群聊');}
+      });
+    }catch(error){
+      if(active(serial))status(error.status===403?'请先从通讯录进入在线聊天，完成在线身份设置。':error.message);
+    }
+  }
+  async function readOnlineArchive(current,id,serial,button){
+    button.disabled=true;
+    try{
+      const card=await request('archive-card?room='+current.id+'&id='+id);
+      if(!active(serial))return;
+      rememberChat(current.id);
+      const back=()=>chatRoom(current);
+      const body=card.type==='moon'
+        ? storyHtmlPreview(card.body,card.title).replace('sandbox="allow-scripts"','sandbox=""')+
+          '<details class="story-panel"><summary>查看 HTML 代码</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(card.body)+'</pre></details>'
+        : '<article class="story-paper story-reader" style="font-size:'+state.storyFont+'px">'+esc(card.body)+'</article>';
+      storyDialog(card.title,body+'<footer class="story-reader-exit"><button type="button" data-action="storyBack">返回聊天</button></footer>','reader',back);
+      const exit=el('dialog').querySelector('.story-header-exit');
+      exit?.setAttribute('aria-label','返回聊天');
+      exit?.setAttribute('title','返回聊天');
+      if(card.type==='story')bindStoryScrubber();
+    }catch(error){if(active(serial))status(error.message);}
+    finally{button.disabled=false;}
+  }
   function imageInOnlineMessage(id){
     return '<img data-online-image="'+id+'" alt="聊天图片" class="message-image" decoding="async">';
   }
@@ -508,6 +547,7 @@ const ledgerOnline = (() => {
           const first=index===0;
           let content='<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
           if(m.kind==='image')content=imageInOnlineMessage(m.id);
+          if(m.kind==='archive-card')content='<button type="button" class="forwarded-story-card" data-online-archive="'+esc(m.id)+'" style="display:grid;text-align:start;max-width:100%;overflow-wrap:anywhere"><small>✦ 群聊分享</small><strong>'+esc(m.body)+'</strong><span>点开阅读 ›</span></button>';
           if(m.kind==='rps'){
             const closed=m.resolved||resolved.has(m.id);
             content+=closed?'<small class="muted">已结束</small>':mine?'<small class="muted">等待另一位真人出拳</small>':
@@ -839,6 +879,8 @@ const ledgerOnline = (() => {
     el('onlineDice').onclick=event=>activity('activity',{kind:'dice'},event.currentTarget);
     el('onlineRps').onclick=()=>toolOptions(hands,(choice,button)=>activity('activity',{kind:'rps',choice},button));
     el('onlineMessages').addEventListener('click',event=>{
+      const card=event.target.closest('[data-online-archive]');
+      if(card){void readOnlineArchive(current,card.dataset.onlineArchive,serial,card);return;}
       const button=event.target.closest('[data-rps-id]');
       if(button)activity('accept-rps',{id:Number(button.dataset.rpsId),choice:button.dataset.rpsChoice},button);
     });
@@ -1237,19 +1279,41 @@ const ledgerOnline = (() => {
       const owner=info.owner===me.id;
       const profiles=owner?state.profiles.filter(p=>p.url&&p.model&&p.key):[];
       el('onlineMemoryWindow').innerHTML=
-        '<section class="group-settings-card group-settings-block"><h3>当前总结</h3><p id="onlineMemoryProgress" class="muted" role="status">正在读取群记忆…</p><p id="onlineMemoryText" style="white-space:pre-wrap;overflow-wrap:anywhere"></p></section>'+
-        '<section class="group-settings-card group-settings-block"><h3>总结 API</h3><p id="onlineMemoryApiStatus" class="muted"></p><p class="muted">累计每 100 条真人文字消息或 AI 回复总结一次。模型请求由群主的 API 账户承担，角色回复会读取当前总结与最近 10 条文字聊天。</p>'+
+        '<section class="group-settings-card group-settings-block"><h3>记忆卡片</h3><p id="onlineMemoryProgress" class="muted" role="status">正在读取群记忆…</p><div id="onlineMemoryCards" style="display:grid;gap:8px"></div>'+(owner?'<button id="onlineMergeMemory" type="button" disabled>精简所选记忆</button>':'')+'</section>'+
+        '<section class="group-settings-card group-settings-block"><h3>总结 API</h3><p id="onlineMemoryApiStatus" class="muted"></p><p class="muted">累计每 100 条真人文字消息或 AI 回复总结一次。模型请求由群主的 API 账户承担，角色回复会读取近期群记忆卡片与最近 10 条文字聊天。</p>'+
         (owner?'<form id="onlineMemoryApi"><label>群主的 API 预设<select name="profile" required><option value="">请选择</option>'+profiles.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name||p.model)+'</option>').join('')+'</select></label><button type="submit" class="primary">保存总结 API</button></form>':'')+'</section>';
-      let previous;
+      let previousCards, merging=false;
+      const cardList=el('onlineMemoryCards'), merge=el('onlineMergeMemory');
+      const selected=()=>[...cardList.querySelectorAll('input:checked')].map(input=>input.value);
+      const syncMerge=()=>{if(merge)merge.disabled=merging||selected().length<2;};
+      cardList.onchange=syncMerge;
+      if(merge)merge.onclick=async()=>{
+        const ids=selected();
+        if(ids.length<2||merging||!confirm('将所选 '+ids.length+' 张记忆卡精简为一张？'))return;
+        merging=true;merge.textContent='精简中…';syncMerge();
+        try{
+          await request('room-memory-merge',{room:current.id,ids});
+          if(active(serial)){await refresh();status('所选记忆已精简。');}
+        }catch(error){if(active(serial))status(error.message);}
+        finally{merging=false;merge.textContent='精简所选记忆';syncMerge();}
+      };
       async function refresh(){
         const memory=await request('room-memory?room='+current.id);
         if(!active(serial))return;
-        const signature=JSON.stringify(memory);
-        if(signature===previous)return;
-        previous=signature;
-        const updated=memory.updated?new Date(memory.updated.replace(' ','T')+'Z').toLocaleString('zh-CN',{hour12:false}):'尚未生成总结';
-        el('onlineMemoryProgress').textContent='待总结 '+memory.pending+' 条 · '+updated;
-        el('onlineMemoryText').textContent=memory.summary||'累计满 100 条且群主配置 API 后生成。';
+        const cards=memory.cards||(memory.summary?[{id:'legacy',title:'原有群聊总结',body:memory.summary,created:memory.updated}]:[]);
+        const signature=JSON.stringify(cards);
+        if(signature!==previousCards){
+          const checked=new Set(selected());
+          const expanded=new Set([...cardList.querySelectorAll('details[open]')].map(node=>node.dataset.memoryId));
+          cardList.innerHTML=cards.slice().reverse().map(card=>{
+            const date=card.created?new Date(card.created.includes('T')?card.created:card.created.replace(' ','T')+'Z').toLocaleString('zh-CN',{hour12:false}):'';
+            return '<div class="group-settings-card">'+(owner?'<label><input type="checkbox" class="bulk-check" value="'+esc(card.id)+'" '+(checked.has(card.id)?'checked':'')+'> 选择记忆卡</label>':'')+
+              '<details data-memory-id="'+esc(card.id)+'" '+(expanded.has(card.id)?'open':'')+'><summary>'+esc(card.title)+(date?' · '+esc(date):'')+'</summary><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(card.body)+'</p></details></div>';
+          }).join('')||'<p class="muted">累计满 100 条且群主配置 API 后生成。</p>';
+          previousCards=signature;
+          syncMerge();
+        }
+        el('onlineMemoryProgress').textContent='待总结 '+memory.pending+' 条 · 已收纳 '+cards.length+' 张记忆卡';
         el('onlineMemoryApiStatus').textContent=memory.error||(!memory.configured?'群主尚未配置总结 API。':memory.model?'当前模型：'+memory.model:'群主已配置总结 API。');
       }
       if(owner)form('onlineMemoryApi',async(data,requestSerial)=>{
@@ -1288,5 +1352,5 @@ const ledgerOnline = (() => {
       if(active(serial))members(current);
     });
   }
-  return {directory,open,inviteFromUrl};
+  return {directory,open,inviteFromUrl,shareArchive};
 })();
