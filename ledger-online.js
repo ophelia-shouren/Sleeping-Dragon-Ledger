@@ -14,6 +14,11 @@ const ledgerOnline = (() => {
     if(value!==undefined)localStorage.setItem(storageKey,value?'1':'0');
     return localStorage.getItem(storageKey)==='1';
   }
+  function stripCharacterPrefix(body,name){
+    if(!name)return body;
+    const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    return body.replace(new RegExp('^[^\\S\\r\\n]*'+escaped+'[^\\S\\r\\n]*[:：][^\\S\\r\\n]*','gm'),'').trim();
+  }
   function canShowNotice(message){
     return !groupMuted(message.room)&&!(scope()&&room?.id===message.room&&el('onlineMessages'));
   }
@@ -437,11 +442,11 @@ const ledgerOnline = (() => {
         const role=mine?'user':'assistant';
         const look=m.char_id?cast.get(m.char_id):people.get(m.sender);
         const avatar='<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+personAvatar(m.name,m.char_id?look?.avatar_image:look?.avatar,look?.frame)+'</button>';
-        const name=mine||display.showName===false?'':'<small>'+esc(m.name)+(m.char_id?' · AI':'')+'</small>';
+        const name=mine||display.showName===false?'':'<small>'+esc(m.name)+'</small>';
         const date=new Date(m.created.replace(' ','T')+'Z');
         const time=display.showTime===false||Number.isNaN(date.getTime())?'':'<small class="muted">'+date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})+'</small>';
         const layout=chatMessageLayout(avatar,name,time);
-        const parts=m.char_id?chatBubbleParts({role:'assistant',content:m.body},{split:display.split!==false,limit:30}):[m.body];
+        const parts=m.char_id?chatBubbleParts({role:'assistant',content:stripCharacterPrefix(m.body,m.name)},{split:display.split!==false,limit:30}):[m.body];
         return parts.map((part,index)=>{
           const first=index===0;
           let content='<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
@@ -805,7 +810,7 @@ const ledgerOnline = (() => {
         '<section class="group-settings-card"><div class="group-settings-profile">'+groupAvatar(current)+'<span><strong>'+esc(current.name)+'</strong><small>'+info.members.length+' 位成员'+(group?' · '+info.chars.length+' 位角色':'')+'</small></span>'+(owner?'<button id="onlineEditGroupLook" type="button">编辑</button>':'<span></span>')+'</div></section>'+
         '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>会话成员</h3></div><div class="group-settings-members">'+
         info.members.map(x=>person(x.id,x.name,x.avatar,x.id===me.id?(owner?' · 群主（你）':'（你）'):x.id===info.owner&&group?' · 群主':'',owner&&x.id!==me.id,x.frame)).join('')+
-        info.chars.map(x=>person(x.id,x.name,x.avatar_image,' · AI',owner||x.owner===me.id,x.frame)).join('')+
+        info.chars.map(x=>person(x.id,x.name,x.avatar_image,'',owner||x.owner===me.id,x.frame)).join('')+
         (group?'<button type="button" class="group-settings-person" id="onlineAddChar"><b aria-hidden="true">＋</b><span>邀请角色</span></button>':'')+
         '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
         (info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3>'+
