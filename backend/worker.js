@@ -590,6 +590,18 @@ async function api(req, env, url, ledger, ctx) {
   const path = url.pathname.slice(ledger ? 12 : 5);
   if (req.method === 'POST' && ((!ledger && req.headers.get('origin') !== url.origin) || !req.headers.get('content-type')?.startsWith('application/json'))) throw fail('请求来源无效。',403);
   const data = req.method === 'POST' ? await req.json().catch(() => {throw fail('请求数据无效。');}) : {};
+  if(ledger&&req.method==='POST'&&path==='kindroid-send'){
+    const key=field(data,'key',512),ai_id=field(data,'ai_id',160),message=field(data,'message',16000);
+    if(!/^kn_[A-Za-z0-9_-]+$/.test(key))throw fail('Kindroid API Key 格式无效。');
+    const upstream=await fetch('https://api.kindroid.ai/v1/send-message',{
+      method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+      body:JSON.stringify({ai_id,message,stream:true}),redirect:'error',signal:AbortSignal.timeout(240000)
+    });
+    if(!upstream.ok)throw fail('Kindroid 返回 HTTP '+upstream.status+'，请核对 Key、角色 ID 和订阅状态。',upstream.status);
+    const reply=await upstream.text();
+    if(/<<HTTP_ERROR>>|<<ERROR>>/.test(reply)||!reply.trim())throw fail('Kindroid 本次未能完成回复，请先在 Kindroid 核对会话，勿重复发送。',502);
+    return json({reply});
+  }
   let me = await one('SELECT id,name FROM profiles WHERE id=?',uid);
   if (req.method === 'POST' && path === 'profile') {
     const name = field(data,'name',30);
@@ -1157,7 +1169,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-forwarded-chat-cards-29'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'kindroid-private-bridge-30'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
@@ -1178,5 +1190,6 @@ export default {
     return response;
   }
 };
+
 
 
