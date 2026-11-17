@@ -434,7 +434,7 @@ const ledgerOnline = (() => {
     }finally{URL.revokeObjectURL(url);}
   }
   function imageInOnlineMessage(id){
-    return '<img data-online-image="'+id+'" alt="聊天图片" style="display:block;max-width:min(68vw,400px);max-height:55vh;object-fit:contain;border-radius:6px">';
+    return '<img data-online-image="'+id+'" alt="聊天图片" class="message-image" decoding="async">';
   }
   function loadPictures(box){
     const serial=generation, currentRoom=room.id;
