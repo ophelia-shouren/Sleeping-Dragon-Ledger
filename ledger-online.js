@@ -1733,7 +1733,7 @@ const ledgerOnline = (() => {
       if(active(serial))members(current);
     });
   }
-  return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal};
+  return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal,kindroid:data=>request('kindroid-send',data)};
 })();
 
 
