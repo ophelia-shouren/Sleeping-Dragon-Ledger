@@ -272,6 +272,21 @@ async function api(req, env, url, ledger, ctx) {
     }
     throw fail('暂时无法生成邀请码，请重试。',503);
   }
+  if (req.method === 'GET' && path === 'notifications') {
+    const head=(await one('SELECT COALESCE(MAX(id),0) id FROM messages')).id;
+    const after=url.searchParams.get('after');
+    if(after===null)return json({cursor:head,rows:[]});
+    const cursor=Number(after);
+    if(!Number.isSafeInteger(cursor)||cursor<0)throw fail('消息游标无效。',400);
+    if(cursor>=head)return json({cursor:head,rows:[]});
+    const rows=await all(`SELECT m.id,m.room,m.kind,substr(m.body,1,180) body,r.name group_name,COALESCE(c.name,p.name) name
+      FROM messages m JOIN rooms r ON r.id=m.room JOIN members member ON member.room=r.id AND member.uid=?
+      JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id
+      WHERE m.id>? AND m.id<=? AND r.kind='group' AND (m.sender<>? OR m.char_id IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)
+      ORDER BY m.id DESC LIMIT 32`,uid,cursor,head,uid);
+    return json({cursor:head,rows:rows.reverse()});
+  }
   if (req.method === 'GET' && path === 'rooms') {
     return json(await all(`SELECT r.id,r.kind,r.owner,COALESCE(g.avatar,'') avatar,
       CASE WHEN r.kind='dm' THEN COALESCE((SELECT p.name FROM members m2 JOIN profiles p ON p.id=m2.uid WHERE m2.room=r.id AND p.id<>? LIMIT 1),r.name) ELSE r.name END name,
@@ -592,7 +607,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-personal-context-8'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-notifications-9'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
