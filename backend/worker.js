@@ -142,6 +142,25 @@ function publicAvatar(value) {
   if (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(value)) return value;
   return '';
 }
+function visualSource(value) {
+  if (!value) return '';
+  if (/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
+  try {
+    const url=new URL(value);
+    if(url.protocol==='https:'&&!url.username&&!url.password)return url.href;
+  } catch {}
+  throw fail('请使用 HTTPS 图片地址或上传图片。');
+}
+function frameValue(data) {
+  const frame=data.frame;
+  if(!frame || typeof frame!=='object')return '';
+  const limit=(n,min,max,fallback)=>Number.isFinite(n)?Math.min(max,Math.max(min,n)):fallback;
+  return JSON.stringify({
+    src:visualSource(field(frame,'src',120000,false)),
+    scale:limit(frame.scale,0.5,3,1.15),x:limit(frame.x,-100,100,0),y:limit(frame.y,-100,100,0),ring:frame.ring===true
+  });
+}
+
 function ledgerWorld(data) {
   return [field(data,'worldFront',48000,false),field(data,'worldEnd',48000,false)];
 }
@@ -219,7 +238,9 @@ async function api(req, env, url, ledger, ctx) {
     if (ledger) {
       const persona = field(data,'persona',18000,false);
       const avatar = publicAvatar(field(data,'avatar',24000,false));
-      await db.batch([profile,stmt('INSERT INTO ledger_people VALUES (?,?,?) ON CONFLICT(uid) DO UPDATE SET persona=excluded.persona,avatar=excluded.avatar',uid,persona,avatar)]);
+      const updates=[profile,stmt('INSERT INTO ledger_people (uid,persona,avatar) VALUES (?,?,?) ON CONFLICT(uid) DO UPDATE SET persona=excluded.persona,avatar=excluded.avatar',uid,persona,avatar)];
+      if(Object.hasOwn(data,'frame'))updates.push(stmt('INSERT INTO ledger_person_look VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET frame=excluded.frame',uid,frameValue(data)));
+      await db.batch(updates);
     } else await profile.run();
     return json({id:uid,name});
   }
@@ -266,8 +287,8 @@ async function api(req, env, url, ledger, ctx) {
   }
   if (req.method === 'GET' && path === 'detail') {
     const [members,chars] = await Promise.all([
-      all('SELECT p.id,p.name,l.avatar FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
-      all('SELECT id,name,avatar,owner,model FROM chars WHERE room=? AND active=1 ORDER BY name',room.id)
+      all('SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
+      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',room.id)
     ]);
     return json({members,chars,owner:room.owner,invite:room.owner===uid ? room.invite : null});
   }
@@ -291,7 +312,7 @@ async function api(req, env, url, ledger, ctx) {
     const base = endpoint(field(data,'endpoint',400),url.origin);
     const secret = await encrypt(env,key,id);
     const insert = stmt('INSERT OR IGNORE INTO chars (id,room,owner,name,avatar,persona,endpoint,model,secret) VALUES (?,?,?,?,?,?,?,?,?)',id,room.id,uid,name,avatar,persona,base,model,secret);
-    const result = ledger ? (await db.batch([insert,stmt('INSERT INTO ledger_cast SELECT id,?,? FROM chars WHERE id=?',...ledgerWorld(data),id)]))[0] : await insert.run();
+    const result = ledger ? (await db.batch([insert,stmt('INSERT INTO ledger_cast (char_id,world_front,world_end) SELECT id,?,? FROM chars WHERE id=?',...ledgerWorld(data),id)]))[0] : await insert.run();
     if (!result.meta.changes) throw fail('群内已有同名角色。',409);
     return json({id});
   }
@@ -326,6 +347,13 @@ async function api(req, env, url, ledger, ctx) {
     }
     const result = await run('UPDATE chars SET endpoint=?,model=?,secret=? WHERE id=? AND room=? AND owner=? AND active=1',base,model,secret,id,room.id,uid);
     if (!result.meta.changes) throw fail('该角色已被移除。',409);
+    return json({ok:true});
+  }
+  if (ledger && req.method==='POST' && path==='char-look') {
+    const id=field(data,'id',36);
+    const avatar=visualSource(field(data,'avatar',120000,false)), frame=frameValue(data);
+    const result=await run('INSERT INTO ledger_char_look (char_id,avatar_image,frame) SELECT id,?,? FROM chars WHERE room=? AND id=? AND owner=? AND active=1 ON CONFLICT(char_id) DO UPDATE SET avatar_image=excluded.avatar_image,frame=excluded.frame',avatar,frame,room.id,id,uid);
+    if(!result.meta.changes)throw fail('只有邀请者可以更改角色头像和头像框。',403);
     return json({ok:true});
   }
   if (ledger && req.method === 'POST' && path === 'rename-char') {
@@ -398,31 +426,15 @@ async function api(req, env, url, ledger, ctx) {
     if (!results[0].meta.changes) throw fail('这局猜拳已结束，或有玩家离开了会话。',409);
     return json({ok:true});
   }
-  if (req.method === 'POST' && path === 'send') {
-    const body = field(data,'body',4000);
-    let char;
-    if (ledger && Object.hasOwn(data,'charId')) {
-      const id = field(data,'charId',36,false);
-      if (id) {
-        const candidate = await one('SELECT * FROM chars WHERE room=? AND id=? AND active=1',room.id,id);
-        const tokens = [...body.matchAll(/[@＠]([^\s@＠]+)/gu)].map(match=>match[1]);
-        if (candidate && tokens.some(token=>token===candidate.name || token.replace(/[，。！？、；：,.!?;:]+$/u,'')===candidate.name)) char = candidate;
-      }
-    } else {
-      const match = body.match(/^[@＠]([^\s@＠]+)(?:\s|$)/u);
-      if (match) char = await one('SELECT * FROM chars WHERE room=? AND name=? AND active=1',room.id,match[1]);
-    }
-    const sent = await run('INSERT INTO messages (room,sender,body) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)',room.id,uid,body,room.id,uid);
-    if (!sent.meta.changes) throw fail('你已离开此会话。',404);
-    const summarize=()=>{
-      if(ledger && room.kind==='group')ctx?.waitUntil(summarizeRoom(env,room.id).catch(error=>console.error('Room memory could not run',error.name)));
-    };
-    if (!char) {summarize();return json({ok:true});}
+  const summarize=()=>{
+    if(ledger && room.kind==='group')ctx?.waitUntil(summarizeRoom(env,room.id).catch(error=>console.error('Room memory could not run',error.name)));
+  };
+  async function generateReply(char,messageId=null){
     const now = Date.now();
     const claim = await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until<? AND active=1', now+70000,char.id,now);
     if (!claim.meta.changes) {summarize();return json({ok:true,notice:'角色正在回复，请稍后再 @。'});}
     try {
-      const history = await all('SELECT m.body,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind=\'text\' ORDER BY m.id DESC LIMIT ?',room.id,ledger?10:15);
+      const history = await all('SELECT m.body,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind=\'text\' AND (? IS NULL OR m.id<=?) ORDER BY m.id DESC LIMIT ?',room.id,messageId,messageId,ledger?10:15);
       const context = ledger ? await one('SELECT world_front,world_end FROM ledger_cast WHERE char_id=?',char.id) : null;
       const memory = ledger ? await one('SELECT summary FROM ledger_room_memory WHERE room=?',room.id) : null;
       const people = ledger ? [...new Map(history.filter(m=>!m.char_id && m.persona).map(m=>[m.sender,m])).values()].map(m=>m.name+'：'+m.persona.slice(0,2000)).join('\n\n') : '';
@@ -442,6 +454,43 @@ async function api(req, env, url, ledger, ctx) {
       await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until=?',Date.now()+8000,char.id,now+70000);
     }
   }
+  if (req.method === 'POST' && path === 'send') {
+    const body = field(data,'body',4000);
+    let char;
+    if (ledger && Object.hasOwn(data,'charId')) {
+      const id = field(data,'charId',36,false);
+      if (id) {
+        const candidate = await one('SELECT * FROM chars WHERE room=? AND id=? AND active=1',room.id,id);
+        const tokens = [...body.matchAll(/[@＠]([^\s@＠]+)/gu)].map(match=>match[1]);
+        if (candidate && tokens.some(token=>token===candidate.name || token.replace(/[，。！？、；：,.!?;:]+$/u,'')===candidate.name)) char = candidate;
+      }
+    } else {
+      const match = body.match(/^[@＠]([^\s@＠]+)(?:\s|$)/u);
+      if (match) char = await one('SELECT * FROM chars WHERE room=? AND name=? AND active=1',room.id,match[1]);
+    }
+    const insert=stmt('INSERT INTO messages (room,sender,body) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)',room.id,uid,body,room.id,uid);
+    const deferred=ledger&&char&&data.deferReply===true;
+    const [sent]=deferred?await db.batch([
+      insert,stmt('INSERT INTO ledger_reply_jobs (message,char_id) SELECT last_insert_rowid(),? WHERE changes()=1',char.id)
+    ]):[await insert.run()];
+    if (!sent.meta.changes) throw fail('你已离开此会话。',404);
+    if (!char || deferred) {
+      summarize();
+      return json({ok:true,message:sent.meta.last_row_id,...(deferred?{reply:sent.meta.last_row_id}:{})});
+    }
+    return generateReply(char);
+  }
+  if (ledger && req.method==='POST' && path==='reply') {
+    const id=data.message;
+    if(!Number.isSafeInteger(id)||id<1)throw fail('找不到这条消息。',404);
+    const job=await one('SELECT j.char_id FROM ledger_reply_jobs j JOIN messages m ON m.id=j.message WHERE j.message=? AND m.room=? AND m.sender=?',id,room.id,uid);
+    if(!job)throw fail('找不到此回复任务。',404);
+    const claimed=await run('UPDATE ledger_reply_jobs SET started=1 WHERE message=? AND started=0',id);
+    if(!claimed.meta.changes)return json({ok:true});
+    const char=await one('SELECT * FROM chars WHERE id=? AND room=? AND active=1',job.char_id,room.id);
+    if(!char)return json({ok:true,notice:'这个角色已退出群聊。'});
+    return generateReply(char,id);
+  }
   throw fail('请求不存在。',404);
 }
 
@@ -451,11 +500,11 @@ export default {
     if (request.method==='GET' && ['/', '/health'].includes(url.pathname)) {
       try {
         if (!env.DB) return json({service:'sleeping-dragon-ledger',status:'missing_database'},503);
-        await env.DB.prepare('SELECT room FROM ledger_room_memory LIMIT 0').all();
+        await env.DB.prepare('SELECT frame FROM ledger_person_look LIMIT 0').all();
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-looks-2'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
