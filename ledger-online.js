@@ -74,8 +74,12 @@ const ledgerOnline = (() => {
     if(document.hidden)return;
     if(queuedNotice){showNotice(queuedNotice);queuedNotice=null;}
     pollNotices();
+    resumeChat?.();
   });
-  window.addEventListener('online',pollNotices);
+  window.addEventListener('online',()=>{
+    pollNotices();
+    resumeChat?.();
+  });
   function readRooms(force=false){
     if(!force&&knownRooms&&Date.now()-roomsAt<12000)return Promise.resolve(knownRooms);
     if(roomsRequest)return roomsRequest;
@@ -129,7 +133,7 @@ const ledgerOnline = (() => {
       view.top=box.scrollHeight-box.clientHeight-box.scrollTop<120?null:box.scrollTop;
     }
   }
-  let pendingMessage=null, typingCharacters=[];
+  let pendingMessage=null, typingCharacters=[], resumeChat;
   const localTyping=new Map();
   const hands=[['rock','✊ 石头'],['paper','✋ 布'],['scissors','✌️ 剪刀']];
   const mappingKey='sleeping-dragon-online-cards';
@@ -164,6 +168,7 @@ const ledgerOnline = (() => {
   }
   function screen(title,body,back,headerAction='',headerAvatar=''){
     clearTimeout(pollTimer);
+    resumeChat=null;
     imageObserver?.disconnect();
     const serial=++generation;
     dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button>'+headerAvatar+'<div class="chat-name"><h2 id="onlineTitle">'+esc(title)+'</h2></div>'+headerAction+'</div>'+body+'</section>',true);
@@ -307,7 +312,7 @@ const ledgerOnline = (() => {
       try{if(!document.hidden)await refresh();}
       catch(error){if(active(serial))status(error.message);}
       finally{later(serial,refresh,delay);}
-    },delay);
+    },typeof delay==='function'?delay():delay);
   }
   function rooms(){
     room=null;
@@ -412,7 +417,7 @@ const ledgerOnline = (() => {
         if(src&&active(serial)&&image.isConnected)image.src=src;
       }).catch(()=>{if(active(serial)&&image.isConnected)image.alt='图片加载失败';});
     }
-    const images=box.querySelectorAll('[data-online-image]');
+    const images=box.querySelectorAll('[data-online-image]:not([src])');
     if(typeof IntersectionObserver!=='function'){
       images.forEach(loadImage);
       return;
@@ -427,14 +432,13 @@ const ledgerOnline = (() => {
     },{root:box,rootMargin:'180px 0px'});
     images.forEach(image=>imageObserver.observe(image));
   }
-  function drawMessages(mode){
+  function drawMessages(mode,added=null){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
     const people=new Map((detail?.members||[]).map(x=>[x.id,x]));
     const display=displayFor(room.id);
     const cast=new Map((detail?.chars||[]).map(x=>[x.id,x]));
     const resolved=new Set(messages.filter(m=>m.challenge).map(m=>Number(m.challenge)));
-    box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
-      (messages.map(m=>{
+    const markup=(added||messages).map(m=>{
         if(m.kind==='member-joined'){
           return '<div class="muted" style="text-align:center;margin:10px 0"><small style="display:inline-block;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--field);overflow-wrap:anywhere">'+esc(m.body)+'</small></div>';
         }
@@ -463,9 +467,15 @@ const ledgerOnline = (() => {
           const leading=first?layout.before:state.skin==='mist'?'<div class="mist-chat-meta" hidden style="display:none"></div>':'<span class="avatar-button" aria-hidden="true" style="visibility:hidden;flex:none">'+personAvatar(m.name)+'</span>';
           return '<div class="message-row '+role+'">'+leading+'<article class="bubble '+role+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
         }).join('');
-      }).join('')||(!(pendingMessage?.room===room.id)?'<div class="empty">还没有消息，打声招呼吧。</div>':'')) +
+      }).join('');
+    if(added){
+      el('onlineTyping').insertAdjacentHTML('beforebegin',markup);
+    }else{
+      box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
+      (markup||(!(pendingMessage?.room===room.id)?'<div class="empty">还没有消息，打声招呼吧。</div>':'')) +
       (pendingMessage?.room===room.id?'<div class="message-row user"><span class="avatar-button">'+personAvatar(me.name,people.get(me.id)?.avatar,people.get(me.id)?.frame)+'</span><article class="bubble user"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(pendingMessage.body)+'</p><small class="muted">'+(pendingMessage.saved?'已发送':'发送中…')+'</small></article></div>':'')+
       '<div id="onlineTyping"></div>';
+    }
     drawTyping();
     box.scrollTop=mode==='bottom'?box.scrollHeight:mode==='prepend'?oldTop+box.scrollHeight-oldHeight:oldTop;
     loadPictures(box);
@@ -658,7 +668,7 @@ const ledgerOnline = (() => {
       drawMessages(view.top===null?'bottom':'keep');
       if(view.top!==null)el('onlineMessages').scrollTop=view.top;
     }else el('onlineMessages').textContent='正在加载聊天记录…';
-    let refreshing=false,ticks=0;
+    let refreshing=false, lastDetail=0, lastActivity=Date.now();
     function refreshDetail(){
       roomDetail(current.id).then(info=>{
         if(!active(serial))return;
@@ -683,9 +693,12 @@ const ledgerOnline = (() => {
       }).catch(error=>{if(active(serial)&&error.status===404){views.delete(current.id);rooms();status(error.message);}});
     }
     async function refresh(){
-      if(refreshing)return;
+      if(refreshing||!active(serial))return;
       refreshing=true;
-      if(ticks++%7===0)refreshDetail();
+      if(Date.now()-lastDetail>=17500){
+        lastDetail=Date.now();
+        refreshDetail();
+      }
       try{
         const cursor=messages.at(-1)?.id||0;
         const feed=await roomFeed(current.id,cursor);
@@ -696,13 +709,19 @@ const ledgerOnline = (() => {
         typingCharacters=nextTyping;view.typing=nextTyping;
         const box=el('onlineMessages'),stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
         const firstLoad=!view.loaded;
+        const added=cursor?rows.filter(message=>message.id>cursor):rows;
         if(!cursor&&!messages.length){
           older=rows.length>36;
           messages=rows.slice(-36);
-        }else messages.push(...rows.filter(x=>x.id>(messages.at(-1)?.id||0)));
+        }else messages.push(...added);
         view.messages=messages;view.older=older;view.loaded=true;view.updated=Date.now();
-        if(pendingMessage?.room===current.id&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
-        if(rows.length||firstLoad)drawMessages(stick?'bottom':'keep');
+        const hadPending=pendingMessage?.room===current.id;
+        if(hadPending&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
+        if(added.length||nextTyping.length)lastActivity=Date.now();
+        if(added.length||firstLoad){
+          const append=cursor&&!firstLoad&&!hadPending&&el('onlineTyping')&&!added.some(row=>row.kind==='rps-result');
+          drawMessages(stick?'bottom':'keep',append?added:null);
+        }
         else if(typingChanged)drawTyping();
       }catch(error){
         if(active(serial)&&error.status===404){views.delete(current.id);rooms();status(error.message);}
@@ -761,6 +780,7 @@ const ledgerOnline = (() => {
       const input=el('onlineCompose').elements.body;
       const body=data.body.trim();
       if(!body)return;
+      lastActivity=Date.now();
       const charId=mentions.target(body);
       input.value='';
       const pending={room:current.id,body};
@@ -798,11 +818,17 @@ const ledgerOnline = (() => {
       if(result.notice)status(result.notice);
       refresh().catch(error=>{if(active(requestSerial))status(error.message);});
     });
-    if(!view.updated||Date.now()-view.updated>=2500)refresh().catch(e=>{if(active(serial))status(e.message);});
-    later(serial,refresh,2500);
+    resumeChat=()=>{
+      if(!active(serial))return;
+      lastActivity=Date.now();
+      refresh().catch(error=>{if(active(serial))status(error.message);});
+    };
+    if(!view.updated||Date.now()-view.updated>=1200)resumeChat();
+    later(serial,refresh,()=>Date.now()-lastActivity<45000?1200:2500);
   }
   async function members(current){
     clearTimeout(pollTimer);
+    resumeChat=null;
     imageObserver?.disconnect();
     const serial=++generation, group=current.kind==='group';
     const view=viewFor(current.id);
@@ -1130,6 +1156,7 @@ const ledgerOnline = (() => {
   }
   async function roomMemory(current,back){
     clearTimeout(pollTimer);
+    resumeChat=null;
     imageObserver?.disconnect();
     const serial=++generation;
     dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>群聊记忆</h2><span></span></header><div id="onlineMemoryWindow" style="display:grid;gap:14px"></div>'+end+'</div>',true);
