@@ -441,7 +441,10 @@ const ledgerOnline = (() => {
         const mine=!m.char_id&&m.sender===me.id;
         const role=mine?'user':'assistant';
         const look=m.char_id?cast.get(m.char_id):people.get(m.sender);
-        const avatar='<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+personAvatar(m.name,m.char_id?look?.avatar_image:look?.avatar,look?.frame)+'</button>';
+        const face=personAvatar(m.name,m.char_id?look?.avatar_image:look?.avatar,look?.frame);
+        const avatar=room.kind==='group'&&!mine
+          ? '<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+face+'</button>'
+          : '<span class="avatar-button">'+face+'</span>';
         const name=mine||display.showName===false?'':'<small>'+esc(m.name)+'</small>';
         const date=new Date(m.created.replace(' ','T')+'Z');
         const time=display.showTime===false||Number.isNaN(date.getTime())?'':'<small class="muted">'+date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})+'</small>';
@@ -544,19 +547,22 @@ const ledgerOnline = (() => {
       input.focus();
     }
     function show(range, query=''){
-      const choices=(detail?.chars||[]).filter(c=>c.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+      const choices=[
+        ...(detail?.chars||[]).map(char=>({name:char.name,charId:char.id})),
+        ...(detail?.members||[]).filter(member=>member.id!==me.id).map(member=>({name:member.name}))
+      ].filter(person=>person.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
       el('onlineComposerMenu').hidden=true;
       el('onlineMore').setAttribute('aria-expanded','false');
       picker.replaceChildren();
       if(!choices.length){
         const empty=document.createElement('span');
-        empty.className='muted';empty.textContent=query?'没有匹配的角色。':'还没有可提及的角色。';
+        empty.className='muted';empty.textContent=query?'没有匹配的成员。':'还没有可提及的成员。';
         picker.append(empty);
       }
-      for(const char of choices){
+      for(const person of choices){
         const button=document.createElement('button');
-        button.type='button';button.textContent='@'+char.name;
-        button.onclick=()=>insert({name:char.name,charId:char.id},range);
+        button.type='button';button.textContent='@'+person.name;
+        button.onclick=()=>insert(person,range);
         picker.append(button);
       }
       picker.hidden=false;picker.style.display='';
@@ -579,30 +585,35 @@ const ledgerOnline = (() => {
     input.addEventListener('compositionend',()=>{composing=false;suggest();});
     input.addEventListener('keydown',event=>{if(event.key==='Escape'&&!picker.hidden){event.preventDefault();event.stopPropagation();close();}});
     function cancelPress(){clearTimeout(press);press=null;}
-    function mentionAvatar(avatar){
-      const message=messages.find(m=>String(m.id)===avatar.dataset.onlineAvatar);
-      if(!message)return;
-      if(message.char_id&&!detail?.chars.some(x=>x.id===message.char_id)){status('此角色已离开群聊。');return;}
-      insert({name:message.name,charId:message.char_id});
+    function mentionAvatar(message){
+      if(!group||!message||(!message.char_id&&message.sender===me.id))return;
+      const member=message.char_id
+        ? detail?.chars.find(item=>item.id===message.char_id)
+        : detail?.members.find(item=>item.id===message.sender);
+      if(detail&&!member){status('对方已离开群聊。');return;}
+      insert({name:member?.name||message.name,charId:message.char_id});
     }
     feed.addEventListener('pointerdown',event=>{
       const avatar=event.target.closest('[data-online-avatar]');
       if(!avatar||event.button!==0)return;
+      const message=messages.find(item=>String(item.id)===avatar.dataset.onlineAvatar);
+      if(!message)return;
       cancelPress();
+      feed.setPointerCapture?.(event.pointerId);
       position=[event.clientX,event.clientY];
-      press=setTimeout(()=>{press=null;if(avatar.isConnected)mentionAvatar(avatar);},500);
+      press=setTimeout(()=>{press=null;if(feed.isConnected)mentionAvatar(message);},500);
     });
     feed.addEventListener('pointermove',event=>{
       if(press && Math.hypot(event.clientX-position[0],event.clientY-position[1])>10)cancelPress();
     });
-    for(const event of ['pointerup','pointercancel','pointerleave','scroll'])feed.addEventListener(event,cancelPress);
+    for(const event of ['pointerup','pointercancel','pointerleave','lostpointercapture','scroll'])feed.addEventListener(event,cancelPress);
     feed.addEventListener('contextmenu',event=>{
       const avatar=event.target.closest('[data-online-avatar]');
       if(avatar)event.preventDefault();
     });
     feed.addEventListener('click',event=>{
       const avatar=event.target.closest('[data-online-avatar]');
-      if(avatar&&event.detail===0)mentionAvatar(avatar);
+      if(avatar&&event.detail===0)mentionAvatar(messages.find(item=>String(item.id)===avatar.dataset.onlineAvatar));
     });
     return {
       target(body){
@@ -632,8 +643,8 @@ const ledgerOnline = (() => {
     if(group&&detail?.name)Object.assign(current,{name:detail.name,avatar:detail.avatar});
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
-    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的角色" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
-      '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@ 角色</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
+    const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
+      '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及成员" aria-controls="onlineChoices" aria-expanded="false">@ 成员</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
       '<button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></div></form>',()=>{rememberChat(current.id);rooms();},header,group?'<span id="onlineGroupAvatar">'+groupAvatar(current)+'</span>':'');
