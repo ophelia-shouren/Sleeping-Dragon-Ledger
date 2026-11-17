@@ -653,6 +653,12 @@ async function api(req, env, url, ledger, ctx) {
   const summarize=()=>{
     if(ledger && room.kind==='group')ctx?.waitUntil(summarizeRoom(env,room.id).catch(error=>console.error('Room memory could not run',error.name)));
   };
+  if (ledger && req.method==='POST' && path==='send-human-only' && room.kind==='group') {
+    const body=field(data,'body',4000);
+    const sent=await run("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'human-only' WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))",room.id,uid,body,room.id,uid);
+    if(!sent.meta.changes)throw fail('你已离开此会话。',404);
+    return json({ok:true,message:sent.meta.last_row_id});
+  }
   if (req.method === 'POST' && path === 'send') {
     const body = field(data,'body',4000);
     let char;
@@ -706,7 +712,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-character-rules-13'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-human-only-messages-14'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
