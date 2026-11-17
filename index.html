@@ -347,7 +347,8 @@ body.full-chat{overflow:hidden}
 .story-generation #storyLive{flex:1 1 0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain}
 .forwarded-story-card{display:grid;gap:5px;min-width:min(185px,42vw);max-width:300px}.forwarded-story-card small,.forwarded-story-card span{font-size:.8em;color:var(--gold)}.forwarded-story-card strong{overflow-wrap:anywhere}.forwarded-story-card p{margin:0;overflow-wrap:anywhere}
 .group-room{height:100%;min-height:0;display:flex;flex-direction:column;gap:10px}.group-room .chat-top,.group-room form{flex:none}.group-room .messages{flex:1;min-height:0;max-height:none;overflow:auto}.group-room form textarea{flex:1;min-width:0;min-height:52px}.group-room .messages .panel{margin:0 0 8px;padding:10px 14px}.group-room .messages strong{color:var(--gold)}
-.group-room .messages{padding:8px 3px}.group-room #groupChatForm textarea{width:100%}.group-room #groupChatForm{min-width:0}
+.group-room .messages{padding:12px}
+[data-skin="mist"] #groupMessages{margin-inline:-8px}.group-room #groupChatForm textarea{width:100%}.group-room #groupChatForm{min-width:0}
 .bubble .chat-timestamp{display:block;margin-top:4px;font-size:11px;color:inherit;opacity:.75;text-align:right;font-variant-numeric:tabular-nums}
 .chat-quote{margin:0 0 5px;padding:3px 8px;border-inline-start:2px solid currentColor;font-size:.85em;opacity:.8;white-space:pre-wrap;overflow-wrap:anywhere}.chat-quote-draft{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .tea-room{height:100%;min-height:0;max-width:900px;margin:auto;display:flex;flex-direction:column;gap:12px;color:var(--ink);background:radial-gradient(ellipse at 50% 0%,color-mix(in srgb,var(--gold) 11%,transparent),transparent 65%)}.tea-top{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:12px}.tea-top h2{margin:4px 0}.tea-meta{text-align:center;color:var(--muted);font-size:.9em}.tea-scroll{flex:1;min-height:0;overflow:auto;padding:10px clamp(6px,4vw,42px);overscroll-behavior:contain}.tea-passage,.tea-cue{white-space:pre-wrap;overflow-wrap:anywhere}.tea-cue{color:var(--muted);font-size:.9em;margin:12px 0 7px}.tea-passage{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:clamp(14px,3vw,26px);font-family:var(--ledger-font);font-size:1.08rem;line-height:1.9;margin-bottom:18px}.tea-room form{display:grid;gap:8px}.tea-room form button{justify-self:end}.tea-card{width:min(310px,92%);margin:10px auto;text-align:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.tea-card strong,.tea-card small{display:block;margin-bottom:5px}.tea-card strong{color:var(--gold)}.tea-card .row{justify-content:center}
@@ -482,6 +483,8 @@ body:not(.full-chat)>aside #siteMenu{max-height:calc(100dvh - 80px);overflow-y:a
   #dialog .group-settings-page{width:min(100%,1060px)}
   #dialog.story-fullscreen .group-room,#dialog.story-fullscreen .tea-room{width:min(100%,1400px);max-width:none;margin-inline:auto}
   .full-chat .chat-thread{padding-inline:clamp(18px,3vw,56px)}
+  #dialog.story-fullscreen:has(>[data-group-room]){padding-inline:clamp(18px,3vw,56px)}
+  #dialog.story-fullscreen>[data-group-room]{width:min(100%,1440px)}
   .full-chat .chat-thread>:is(.chat-top,.messages,.notice,#chatForm,.message-selection){width:min(100%,1440px);margin-inline:auto}
   #dialog.story-studio>.story-header,#dialog.story-studio>.story-shell,
   #dialog.story-studio:has(.story-generation)>.story-shell{width:min(100%,1440px)}
