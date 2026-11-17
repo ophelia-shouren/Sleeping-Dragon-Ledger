@@ -427,14 +427,15 @@ async function api(req, env, url, ledger, ctx) {
     const byCode=ledger&&/^[a-z0-9]{6}$/.test(invite);
     const match=byCode
       ? "r.kind='group' AND EXISTS (SELECT 1 FROM ledger_invite_codes c WHERE c.room=r.id AND c.code=?)"
-      : 'r.invite=?';
+      : ledger?"r.kind='dm' AND r.invite=?":'r.invite=?';
     const available=' AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)';
     const group=await one('SELECT r.id,r.kind,r.owner FROM rooms r WHERE '+match+available,invite);
-    if(!group||isLedgerId(group.owner)!==ledger)throw fail('邀请链接或邀请码无效。',404);
+    if(!group||isLedgerId(group.owner)!==ledger)throw fail('邀请码无效或已更新。在线群聊请在眠龙内输入群主提供的六位邀请码。',404);
     const insert=stmt("INSERT OR IGNORE INTO members (room,uid) SELECT r.id,? FROM rooms r WHERE r.id=? AND "+match+available+
       " AND (r.kind='group' OR (SELECT COUNT(*) FROM members WHERE room=r.id)<2)",uid,group.id,invite);
     if(ledger&&group.kind==='group'){
-      await db.batch([insert,stmt("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'member-joined' WHERE changes()=1",group.id,uid,me.name+' 加入了群聊')]);
+      const [joined]=await db.batch([insert,stmt("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'member-joined' WHERE changes()=1",group.id,uid,me.name+' 加入了群聊')]);
+      if(!joined.meta.changes&&!await one('SELECT 1 FROM ledger_invite_codes WHERE room=? AND code=?',group.id,invite))throw fail('邀请码已更新，请输入新邀请码。',404);
     }else await insert.run();
     await requireRoom(group.id).catch(()=>{throw fail(group.kind==='dm'?'这个私聊已经有两位成员。':'此邀请已失效。',group.kind==='dm'?409:404);});
     return json({id:group.id});
@@ -443,6 +444,18 @@ async function api(req, env, url, ledger, ctx) {
   if (ledger && req.method === 'GET' && path === 'quota' && room.kind === 'group') {
     const usage = await one("SELECT COALESCE((SELECT messages FROM ledger_daily_usage WHERE day=date('now')),0) messages, strftime('%Y-%m-%dT00:00:00Z','now','start of day','+1 day') resets");
     return json({messages:usage.messages,resetsAt:usage.resets,d1:await accountD1Usage(env)});
+  }
+  if (ledger && req.method==='POST' && path==='rotate-invite-code' && room.kind==='group') {
+    if(room.owner!==uid)throw fail('只有群主可以重新生成邀请码。',403);
+    for(let attempt=0;attempt<8;attempt++){
+      const code=randomInviteCode();
+      const result=await run(`INSERT INTO ledger_invite_codes (room,code)
+        SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM ledger_invite_codes WHERE code=?)
+        AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)
+        ON CONFLICT(room) DO UPDATE SET code=excluded.code`,room.id,code,code,room.id);
+      if(result.meta.changes)return json({inviteCode:code});
+    }
+    throw fail('暂时无法重新生成邀请码，请重试。',503);
   }
   if (ledger && req.method==='POST' && path==='group-look') {
     if(room.kind!=='group'||room.owner!==uid)throw fail('只有群主可以修改群名称和头像。',403);
@@ -492,7 +505,7 @@ async function api(req, env, url, ledger, ctx) {
       room.kind==='group'?one('SELECT avatar FROM ledger_group_look WHERE room=?',room.id):null
     ]);
     const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
-    return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid ? room.invite : null,inviteCode});
+    return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid&&(!ledger||room.kind==='dm') ? room.invite : null,inviteCode});
   }
   if (req.method === 'GET' && path === 'messages') {
     const cursor = Number(url.searchParams.get('after') || url.searchParams.get('before')) || 0;
@@ -773,7 +786,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-archive-memory-cards-16'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-invite-codes-17'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
