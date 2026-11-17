@@ -208,6 +208,7 @@ const ledgerOnline = (() => {
     const serial=++generation;
     dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button>'+headerAvatar+'<div class="chat-name"><h2 id="onlineTitle">'+esc(title)+'</h2></div>'+headerAction+'</div>'+body+'</section>',true);
     el('onlineBack').onclick=back||(()=>el('dialog').close());
+    el('dialog').orbBack=el('onlineBack').onclick;
     return serial;
   }
   function storedFrame(value){
@@ -1304,6 +1305,7 @@ const ledgerOnline = (() => {
     dialog('<style>#dialog.story-fullscreen:has(>#ledgerOnline.group-settings-page){overflow:hidden}#dialog>#ledgerOnline.group-settings-page{height:100%;overflow:auto;overscroll-behavior:contain}</style>'+
       '<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>'+(group?'群聊设置':'成员与邀请')+'</h2><span></span></header><div id="onlineMemberList" style="display:grid;gap:14px"></div>'+end+'</div>',true);
     el('onlineBack').onclick=()=>chatRoom(current);
+    el('dialog').orbBack=el('onlineBack').onclick;
     function paint(info){
       if(!active(serial))return;
       const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');
@@ -1651,6 +1653,7 @@ const ledgerOnline = (() => {
     const serial=++generation;
     dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>群聊记忆</h2><span></span></header><div id="onlineMemoryWindow" style="display:grid;gap:14px"></div>'+end+'</div>',true);
     el('onlineBack').onclick=back;
+    el('dialog').orbBack=el('onlineBack').onclick;
     try{
       const info=viewFor(current.id).detail||await roomDetail(current.id);
       if(!active(serial))return;
@@ -1732,5 +1735,6 @@ const ledgerOnline = (() => {
   }
   return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal};
 })();
+
 
 
