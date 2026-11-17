@@ -558,7 +558,7 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .clear-chat-row button{width:100%;min-height:44px}
 
 :root{--ledger-font:"Source Han Serif SC","Noto Serif SC","Noto Serif CJK SC","Songti SC",SimSun,serif}
-:root[data-ledger-font="mincho"]{--ledger-font:"Huiwen Mincho","Source Han Serif SC","Noto Serif SC","Songti SC",SimSun,serif}
+:root[data-ledger-font="mincho"]{--ledger-font:"Ledger Installed Mincho","Source Han Serif SC","Noto Serif SC","Songti SC",SimSun,serif}
 :root[data-ledger-font="mincho"] body{font-synthesis-weight:none}
 :root[data-skin="mist"][data-ledger-font]{--mist-font:var(--ledger-font)}
 .font-choice-row{display:flex;flex-wrap:wrap;gap:8px}
@@ -4660,6 +4660,59 @@ function calculatorAction(key){
 const $ = id => document.getElementById(id);
 const key = 'scarlet-vault-v1';
 const fontOptions={source:'思源宋体',mincho:'明朝'};
+const minchoFile=new URL('./fonts/huiwen-source/匯文明朝體v1.0.ttf',location.href).href;
+const minchoFamily='Ledger Installed Mincho';
+let minchoFace, minchoReading, minchoDownloading;
+async function loadMinchoFace(response){
+  const font=new FontFace(minchoFamily,await response.arrayBuffer());
+  await font.load();
+  document.fonts.add(font);
+  minchoFace=font;
+}
+function restoreMincho(){
+  if(minchoFace)return Promise.resolve(true);
+  if(!minchoReading)minchoReading=(async()=>{
+    if(!globalThis.caches)return false;
+    const cache=await caches.open('ledger-fonts-v1');
+    const stored=await cache.match(minchoFile);
+    if(!stored)return false;
+    try{await loadMinchoFace(stored);return true;}
+    catch{await cache.delete(minchoFile);return false;}
+  })().catch(()=>false);
+  return minchoReading;
+}
+async function installMincho(){
+  if(await restoreMincho())return true;
+  if(minchoDownloading)return minchoDownloading;
+  if(!confirm('下载安装明朝字体？字库约 24 MB，下载后保存在此浏览器中，下次打开可直接使用。'))return false;
+  minchoDownloading=(async()=>{
+    toast('正在下载明朝字体，请稍候…');
+    try{
+      const response=await fetch(minchoFile);
+      if(!response.ok||response.status!==200)throw Error('Font download failed');
+      const copy=response.clone();
+      await loadMinchoFace(response);
+      try{
+        const cache=await caches.open('ledger-fonts-v1');
+        await cache.put(minchoFile,copy);
+        toast('明朝字体已下载并保存到本机。');
+      }catch{toast('明朝字体已加载，但浏览器未能保存字体。');}
+      return true;
+    }catch{
+      toast('明朝字体下载失败，请检查网络后重试。');
+      return false;
+    }
+  })().finally(()=>{minchoDownloading=null;});
+  return minchoDownloading;
+}
+async function chooseLedgerFont(font,button){
+  const skin=state.skin;
+  button.disabled=true;
+  try{
+    if(font==='mincho'&&!await installMincho())return;
+    if(commit({...state,skinFonts:{...state.skinFonts,[skin]:font}}))render();
+  }finally{button.disabled=false;}
+}
 const activeLedgerFont=(skin,preferences)=>preferences[skin]||(skin==='mist'?'mincho':'source');
 const skins={day:'日间',night:'夜间',gryffindor:'格兰芬多',slytherin:'斯莱特林',hufflepuff:'赫奇帕奇',ravenclaw:'拉文克劳',mist:'雾蓝夜航','dawn-frost':'晨曦与霜','obsidian-duet':'落爪无声','rose-graphite':'暮色玫瑰','baker-street':'贝克街档案'};
 const skinUnlockIds={'dawn-frost':'skin-dawn-frost','obsidian-duet':'skin-obsidian-duet'};
@@ -5012,7 +5065,7 @@ function api(){
   '<section class="panel"><h2>字体</h2><div class="font-choice-row">'+Object.entries(fontOptions).map(([id,label])=>{
     const selected=id===activeLedgerFont(state.skin,state.skinFonts);
     return '<button type="button" class="'+(selected?'active':'')+'" data-ledger-font="'+id+'" aria-pressed="'+selected+'">'+label+'</button>';
-  }).join('')+'</div></section>';
+  }).join('')+'</div><p class="muted">明朝首次使用需下载字库，之后从本机加载。</p></section>';
 }
 function backup(){return heading('VAULT ARCHIVE','存档管理','账单、聊天、人设、世界书与已保存的 API 预设均保存在当前浏览器。')+
   '<section class="panel"><h2>设备锁</h2><p class="muted">'+(deviceConfig?'已开启 · '+(deviceConfig.delay?deviceConfig.delay+' 分钟后锁定':'立即锁定'):'尚未开启')+'</p><button data-action="deviceSettings">设备锁设置</button></section>'+
@@ -5148,6 +5201,7 @@ function render(){
   refreshStoryOrb();
   document.documentElement.dataset.skin=state.skin;
   document.documentElement.dataset.ledgerFont=activeLedgerFont(state.skin,state.skinFonts);
+  if(document.documentElement.dataset.ledgerFont==='mincho')void restoreMincho();
   if(deviceLocked)return;
   $('ledgerLocation').textContent=state.skin==='dawn-frost'?'蒙德':'霍格沃茨';
   $('ledgerLocale').textContent=state.skin==='dawn-frost'?'MONDSTADT · PRIVATE LEDGER':'HOGWARTS · PRIVATE LEDGER';
@@ -5424,8 +5478,11 @@ document.addEventListener('click',e=>{
     const form=$('lookForm'),target=d.clearLook;
     form.look[target]='';form.elements[target+'Url'].value='';form.elements[target+'File'].value='';refreshLook(form);
   }
-  if(d.skin&&skinAvailable(d.skin,state)&&commit({...state,skin:d.skin}))render();
-  if(d.ledgerFont&&Object.hasOwn(fontOptions,d.ledgerFont)&&commit({...state,skinFonts:{...state.skinFonts,[state.skin]:d.ledgerFont}}))render();
+  if(d.skin&&skinAvailable(d.skin,state)&&commit({...state,skin:d.skin})){
+    render();
+    if(activeLedgerFont(state.skin,state.skinFonts)==='mincho')void installMincho();
+  }
+  if(d.ledgerFont&&Object.hasOwn(fontOptions,d.ledgerFont))void chooseLedgerFont(d.ledgerFont,b);
   if(d.period){period=d.period;render();}
   if(d.share){if($('dialog').open)$('dialog').close();share(d.share);}
   if(d.edit)editor(d.edit);
