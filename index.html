@@ -1780,7 +1780,7 @@ function openGroup(id,page=groupHistoryId===id?groupHistoryPage:0){
   dialog('<section class="group-room" data-group-room="'+esc(id)+'"><div class="chat-top"><button data-action="close" aria-label="返回通讯录">‹</button>'+groupAvatar(g)+'<div class="chat-name"><h2>'+esc(g.name)+'</h2><div class="muted">'+esc(g.members.map(contact).filter(Boolean).map(displayName).join(' · '))+'</div></div><button type="button" class="star-button" data-group-edit="'+esc(id)+'" aria-label="打开群聊设置" title="群聊设置" '+(busy?'disabled':'')+'>★</button></div>'+messageActionBar(selected)+'<div id="groupMessages" class="messages">'+
     (history.start?'<div class="chat-history-page"><button type="button" data-action="olderGroupPage">查看更早的消息</button></div>':'')+
     (history.messages.map((m,i)=>groupBubble(m,g,history.start+i,selected)).join('')||'<div class="empty">✧　发一条消息，开始群聊。</div>')+
-    (history.current?'<div class="chat-history-page"><button type="button" data-action="newerGroupPage">查看较新的消息</button><button type="button" data-action="latestGroupPage">回到最新</button></div>':speaker?typingBubble(speaker,g.showName!==false,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
+    (history.current?'<div class="chat-history-page"><button type="button" data-action="newerGroupPage">查看较新的消息</button><button type="button" data-action="latestGroupPage">回到最新</button></div>':speaker?typingBubble(speaker,g.showName!==false,true):'')+'</div>'+ (mysteryChatBlocked(g.members)?'<p class="notice" role="status">群成员的绑定世界书已关闭。重新启用后可继续群聊。</p>':lock?teaLockNotice(lock):'<form id="groupChatForm" data-id="'+esc(id)+'">'+quoteDraft(id,'group')+'<textarea name="message" aria-label="群聊消息" placeholder="写一条群消息…也可留空让角色接着聊" '+(locked?'disabled':'')+'>'+esc(groupDrafts.get(id)||'')+'</textarea>'+
     (g.pending.length?'<div class="row"><button type="button" data-group-retry="'+esc(id)+'" '+(busy?'disabled':'')+'>继续回复</button><button type="button" data-group-skip="'+esc(id)+'" '+(busy?'disabled':'')+'>跳过剩余回复</button></div>':chatAttachments(null,busy,g))+'</form>')+'</section>',true);
   $('groupMessages').scrollTop=$('groupMessages').scrollHeight;
 }
@@ -1842,7 +1842,7 @@ async function groupRoundReply(g,roles){
   const action=g.actionWriting===true;
   const visible=g.messages.filter(m=>!m.tea?.bonus&&roles.every(c=>!m.audience||m.audience.includes(c.id)))
     .slice(-24).map(m=>Array.isArray(m.quote?.audience)&&roles.some(c=>!m.quote.audience.includes(c.id))?{...m,quote:undefined}:m);
-  const latest=visible.findLast(m=>!m.roleId),gameResult=latest?.gameResult;
+  const latest=visible.findLast(m=>!m.roleId),gameResult=g.continueContext===true?null:latest?.gameResult;
   const people=roles.map(c=>({
     roleId:c.id,姓名:displayName(c),性别:c.gender,性格:c.personality,人设:c.description,...(c.speechRules?{必须遵守的发言规则:c.speechRules}:{}),与用户的关系:c.relationship,
     角色关系:charRelationContext(c),世界书:[worldContext('front',c.id),worldContext('end',c.id)].filter(Boolean),
@@ -1851,6 +1851,7 @@ async function groupRoundReply(g,roles){
   const system=[
     chatTimeContext(),
     '你负责生成一轮群聊。按给定角色顺序，每位角色各回复一次。后面的角色可以接前面角色的话。不要代替用户发言。每位角色只能使用自己的设定、世界书、个人记忆和私聊，以及共同可见的群聊内容。',
+    g.continueContext===true?'用户按了发送键让角色继续聊天，本轮没有新增用户消息。承接聊天记录里最后的发言或话题，自然接着聊，避免重复已有的回答。':'',
     '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
     '本轮发言角色（按顺序）：'+JSON.stringify(people),
     g.scene?'【当前场景】\n'+g.scene:'',
@@ -1881,7 +1882,7 @@ async function rerollGroup(id,index,guide){
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);groupRerolls.delete(id);refreshGroup(id);}
 }
-async function sendGroup(id,message='',file=null,game=null,storyForward=false){
+async function sendGroup(id,message='',file=null,game=null,storyForward=false,continueContext=false){
   if(groupJobs.has(id))return;
   let g=groupById(id);if(!g||teaSendBlocked(g.members))return;
   groupJobs.add(id);
@@ -1896,9 +1897,15 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false){
       const quote=!game&&!storyForward&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
-      patchGroup(g,{pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
+      patchGroup(g,{continueContext:false,pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
+    }else if(continueContext&&!g.pending.length){
+      const members=g.members.map(contact).filter(Boolean);
+      if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
+      groupModelProfile();
+      if(!g.messages.some(message=>!message.tea?.bonus&&members.every(member=>!message.audience||message.audience.includes(member.id))))throw Error('请先发一条群消息，再让角色接着聊。');
+      patchGroup(g,{continueContext:true,pending:members.map(member=>member.id)});
     }
-    if((message||file)&&groupHistoryId===id)groupHistoryPage=0;
+    if((message||file||continueContext)&&groupHistoryId===id)groupHistoryPage=0;
     if(!game&&!storyForward&&(message||file)){groupImages.delete(id);groupDrafts.delete(id);chatQuotes.delete(quoteKey(id,'group'));}
     refreshNeeded=true;
     refreshGroup(id);
@@ -1907,7 +1914,7 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false){
     const roles=[...new Set(g.pending)].map(contact).filter(Boolean);
     const replies=roles.length?await groupRoundReply(g,roles):[];
     if(groupById(id)!==g)throw Error('群聊已更新，请核对后重试。');
-    patchGroup(g,{pending:[],messages:[...g.messages,...replies]});
+    patchGroup(g,{pending:[],continueContext:false,messages:[...g.messages,...replies]});
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);if(refreshNeeded)refreshGroup(id);}
 }
@@ -5462,7 +5469,7 @@ document.addEventListener('click',e=>{
   if(d.groupRetry)sendGroup(d.groupRetry);
   if(d.groupSkip&&!groupJobs.has(d.groupSkip)){
     const g=groupById(d.groupSkip);
-    if(g){try{patchGroup(g,{pending:[]});refreshGroup(g.id);}catch(error){toast(error.message);}}
+    if(g){try{patchGroup(g,{pending:[],continueContext:false});refreshGroup(g.id);}catch(error){toast(error.message);}}
   }
   if(d.card)openCard(d.card);
   if(d.deleteContact)removeContact(d.deleteContact);
@@ -5776,7 +5783,7 @@ document.addEventListener('submit',e=>{
       const message=f.elements.message.value.trim();
       if($('chatImage')?.dataset.loading)throw Error('图片正在处理，请稍候。');
       const picture=groupImages.get(f.dataset.id);
-      if(message||picture)sendGroup(f.dataset.id,message,picture);
+      sendGroup(f.dataset.id,message,picture,null,false,!message&&!picture);
     }
     if(f.id==='contactForm'&&saveCard(f)){$('dialog').close();render();toast('人设卡已保存');}
     if((f.id==='currentSceneForm'||f.id==='groupSceneForm')&&e.submitter?.value==='savePreset'){
