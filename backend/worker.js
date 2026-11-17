@@ -397,9 +397,17 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
   const claim = await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until<? AND active=1', now+90000,char.id,now);
   if (!claim.meta.changes) {summarize();return json({ok:true,notice:'角色正在回复，请稍后再 @。'});}
   try {
-    const history = await all('SELECT m.body,m.kind,m.attachment,m.created,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind IN (\'text\',?) AND (? IS NULL OR m.id<=?) ORDER BY m.id DESC LIMIT ?',room.id,ledger?'image':'text',messageId,messageId,ledger?10:15);
+    const history = await all('SELECT m.body,m.kind,m.attachment,m.created,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind IN (\'text\',?,?) AND (? IS NULL OR m.id<=?) ORDER BY m.id DESC LIMIT ?',room.id,ledger?'image':'text',ledger?'forwarded-chat':'text',messageId,messageId,ledger?10:15);
     history.reverse();
     for(const message of history){
+      if(message.kind==='forwarded-chat'){
+        const card=JSON.parse(message.attachment);
+        const readable=await all("SELECT json_extract(payload,'$.speaker') speaker,json_extract(payload,'$.body') body,json_extract(payload,'$.quote') quote,json_extract(payload,'$.image') IS NOT NULL image FROM ledger_forward_items WHERE card=? AND COALESCE(json_extract(payload,'$.humanOnly'),0)=0 ORDER BY position",card.card);
+        message.body='[转发的聊天记录]\n'+readable.map(entry=>{
+          let quote;try{quote=JSON.parse(entry.quote||'null');}catch{}
+          return entry.speaker+'：'+(quote&&!quote.humanOnly?'[引用 '+quote.speaker+'：'+quote.content+']\n':'')+entry.body+(entry.image?' [图片]':'');
+        }).join('\n').slice(0,6000);
+      }
       const quote=messageMeta(message).quote;
       message.body=(message.created?'[发送时间 UTC '+message.created+'] ':'')+(quote&&!quote.humanOnly?'[引用 '+quote.speaker+'：'+quote.content+']\n':'')+message.body;
     }
@@ -540,6 +548,7 @@ async function personalUserCode(db,uid){
 let onlineFeaturesReady;
 async function ensureOnlineFeatures(db){
   if(!onlineFeaturesReady)onlineFeaturesReady=db.batch([
+    db.prepare('CREATE TABLE IF NOT EXISTS ledger_forward_items (card TEXT NOT NULL,position INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(card,position))'),
     db.prepare('CREATE TABLE IF NOT EXISTS ledger_announcements (room TEXT PRIMARY KEY,body TEXT NOT NULL,updated TEXT NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS ledger_quiet_hours (char_id TEXT PRIMARY KEY,start TEXT NOT NULL,end TEXT NOT NULL,offset INTEGER NOT NULL)'),
     db.prepare('CREATE TABLE IF NOT EXISTS ledger_room_reads (room TEXT NOT NULL,uid TEXT NOT NULL,cursor INTEGER NOT NULL,PRIMARY KEY(room,uid))')
@@ -683,30 +692,71 @@ async function api(req, env, url, ledger, ctx) {
     await run("INSERT INTO ledger_announcements VALUES (?,?,datetime('now')) ON CONFLICT(room) DO UPDATE SET body=excluded.body,updated=excluded.updated",room.id,body);
     return json({ok:true});
   }
+  if(ledger&&req.method==='GET'&&['forward-card','forward-image','forward-archive'].includes(path)){
+    const message=await one("SELECT attachment,body FROM messages WHERE room=? AND id=? AND kind='forwarded-chat'",room.id,Number(url.searchParams.get('id')));
+    if(!message)throw fail('聊天记录卡片已被删除或不存在。',404);
+    const card=JSON.parse(message.attachment);
+    if(path==='forward-archive'){
+      const item=await one("SELECT json_extract(payload,'$.archive') archive FROM ledger_forward_items WHERE card=? AND position=?",card.card,Number(url.searchParams.get('position')));
+      if(!item?.archive)throw fail('分享内容不存在。',404);
+      return json(JSON.parse(item.archive));
+    }
+    if(path==='forward-image'){
+      const item=await one("SELECT json_extract(payload,'$.image') image FROM ledger_forward_items WHERE card=? AND position=?",card.card,Number(url.searchParams.get('position')));
+      if(!item?.image)throw fail('图片不存在。',404);
+      return json(item);
+    }
+    const after=Number(url.searchParams.get('after')||-1);
+    if(!Number.isSafeInteger(after)||after< -1)throw fail('消息位置无效。');
+    const entries=await all("SELECT position,json_extract(payload,'$.speaker') speaker,json_extract(payload,'$.body') body,json_extract(payload,'$.created') created,json_extract(payload,'$.humanOnly') humanOnly,json_extract(payload,'$.quote') quote,json_extract(payload,'$.image') IS NOT NULL image,json_extract(payload,'$.archive') IS NOT NULL archive FROM ledger_forward_items WHERE card=? AND position>? ORDER BY position LIMIT 20",card.card,after);
+    return json({title:card.title,count:card.count,entries,more:entries.length>0&&entries.at(-1).position+1<card.count});
+  }
   if(ledger&&req.method==='POST'&&['forward-message','external-forward'].includes(path)){
     if(room.kind!=='group')throw fail('只能转发到在线群聊。',403);
-    let body,kind='text',attachment=null,meta={forwarded:true};
+    let entries=[],title;
     if(path==='forward-message'){
       const source=await requireRoom(field(data,'sourceRoom',36));
       if(source.kind!=='group')throw fail('来源必须是在线群聊。');
-      const message=await one("SELECT m.*,COALESCE(c.name,p.name) name FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id WHERE m.room=? AND m.id=? AND m.kind IN ('text','human-only','mention-all','image','human-image','archive-card','red-packet','dice','rps','rps-result')",source.id,Number(data.id));
-      if(!message)throw fail('该消息无法转发或已被删除。',404);
-      body=('【转发 · '+message.name+'】\n'+message.body).slice(0,4000);
-      kind=['image','human-image','archive-card'].includes(message.kind)?message.kind:['human-only','mention-all','red-packet'].includes(message.kind)?'human-only':'text';
-      attachment=message.attachment;
-      if(['text','human-only'].includes(kind))attachment=JSON.stringify({...messageMeta(message),...meta});
+      const ids=[...new Set(Array.isArray(data.ids)?data.ids:[data.id])];
+      if(!ids.length||ids.some(id=>!Number.isSafeInteger(id)||id<1))throw fail('请选择有效消息。');
+      let selected=[];
+      for(let offset=0;offset<ids.length;offset+=80){
+        const batch=ids.slice(offset,offset+80);
+        selected.push(...await all("SELECT m.*,COALESCE(c.name,p.name) name FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id WHERE m.room=? AND m.id IN ("+batch.map(()=>'?').join(',')+") AND m.kind IN ('text','human-only','mention-all','image','human-image','archive-card','red-packet','dice','rps','rps-result','forwarded-chat')",source.id,...batch));
+      }
+      if(selected.length!==ids.length)throw fail('选中的消息已删除或无法转发，请重新选择。',409);
+      selected.sort((a,b)=>a.id-b.id);
+      for(const message of selected){
+        if(message.kind==='forwarded-chat'){
+          const original=JSON.parse(message.attachment);
+          const items=await all('SELECT payload FROM ledger_forward_items WHERE card=? ORDER BY position',original.card);
+          entries.push(...items.map(item=>JSON.parse(item.payload)));
+        }else{
+          const quote=messageMeta(message).quote;
+          entries.push({speaker:message.name,body:message.body,created:message.created,humanOnly:['human-only','human-image','mention-all','archive-card','red-packet'].includes(message.kind),...(quote?{quote}:{}),...(message.kind==='archive-card'?{archive:JSON.parse(message.attachment)}:{}),...(['image','human-image'].includes(message.kind)?{image:message.attachment}:{})});
+        }
+      }
+      title=source.name+'的聊天记录';
     }else{
       if(!Array.isArray(data.charIds)||!data.charIds.length||data.charIds.length>100)throw fail('涉及角色尚未开启在线群聊读取私聊记录。',403);
-      for(const id of new Set(data.charIds)){
-        if(!await one('SELECT c.id FROM chars c JOIN ledger_char_personal_context p ON p.char_id=c.id WHERE c.id=? AND c.owner=? AND c.active=1',id,uid))throw fail('涉及角色尚未开启在线群聊读取私聊记录。',403);
-      }
-      body='【外部聊天转发】\n'+field(data,'body',4000,false);
-      if(data.image){kind='image';attachment=visualSource(field(data,'image',2000000));}
-      else attachment=JSON.stringify(meta);
-      if(!body.trim()&&!attachment)throw fail('消息为空。');
+      for(const id of new Set(data.charIds))if(!await one('SELECT c.id FROM chars c JOIN ledger_char_personal_context p ON p.char_id=c.id WHERE c.id=? AND c.owner=? AND c.active=1',id,uid))throw fail('涉及角色尚未开启在线群聊读取私聊记录。',403);
+      const body=field(data,'body',4000,false);
+      const speaker=field(data,'speaker',60,false)||me.name;
+      entries=[{speaker,body,created:typeof data.created==='string'?data.created.slice(0,40):new Date().toISOString(),humanOnly:false,...(data.image?{image:visualSource(field(data,'image',2000000))}:{})}];
+      if(!body.trim()&&!data.image)throw fail('消息为空。');
+      title='转发的聊天记录';
     }
-    await run('INSERT INTO messages (room,sender,body,kind,attachment) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?) AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)',room.id,uid,body,kind,attachment,room.id,uid,room.id);
-    return json({ok:true});
+    if(!entries.length)throw fail('聊天记录为空。');
+    const card=uuid(),metadata=JSON.stringify({card,title,count:entries.length,preview:entries.slice(0,3).map(entry=>({speaker:entry.speaker,body:(entry.image?'[图片] ':'' )+entry.body.slice(0,60)}))});
+    const statements=[stmt("INSERT INTO messages (room,sender,body,kind,attachment) SELECT ?,?,?,'forwarded-chat',? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?) AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)",room.id,uid,title,metadata,room.id,uid,room.id)];
+    for(let offset=0;offset<entries.length;offset+=25){
+      const batch=entries.slice(offset,offset+25);
+      const values=batch.flatMap((entry,index)=>[card,offset+index,JSON.stringify(entry)]);
+      statements.push(stmt('INSERT INTO ledger_forward_items (card,position,payload) SELECT column1,column2,column3 FROM (VALUES '+batch.map(()=>'(?,?,?)').join(',')+") WHERE EXISTS (SELECT 1 FROM messages WHERE room=? AND sender=? AND kind='forwarded-chat' AND json_extract(attachment,'$.card')=?)",...values,room.id,uid,card));
+    }
+    const results=await db.batch(statements);
+    if(!results[0].meta.changes)throw fail('你已离开该群聊。',403);
+    return json({ok:true,message:results[0].meta.last_row_id});
   }
   async function quoteAttachment(){
     if(!data.quoteId)return null;
@@ -807,6 +857,7 @@ async function api(req, env, url, ledger, ctx) {
     const id=Number(data.id);
     if(!Number.isSafeInteger(id)||id<1)throw fail('消息不存在。',404);
     await db.batch([
+      stmt("DELETE FROM ledger_forward_items WHERE card IN (SELECT json_extract(attachment,'$.card') FROM messages WHERE id=? AND room=? AND kind='forwarded-chat')",id,room.id),
       stmt("UPDATE messages SET body='',attachment=NULL,kind='deleted' WHERE id=? AND room=? AND kind NOT IN ('deleted','message-deleted','currency-config') AND EXISTS (SELECT 1 FROM rooms r JOIN members m ON m.room=r.id WHERE r.id=? AND r.owner=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=r.id))",id,room.id,room.id,uid,uid),
       stmt("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'message-deleted' WHERE changes()=1",room.id,uid,String(id))
     ]);
@@ -824,7 +875,7 @@ async function api(req, env, url, ledger, ctx) {
   }
   if (req.method === 'GET' && path === 'messages') {
     const cursor = Number(url.searchParams.get('after') || url.searchParams.get('before')) || 0;
-    const select = 'SELECT m.id,m.sender,m.char_id,m.body,m.created,m.kind,CASE WHEN m.kind IN (\'text\',\'human-only\',\'mention-all\') THEN m.attachment ELSE NULL END meta,CASE WHEN m.kind=\'rps-result\' THEN m.attachment ELSE NULL END challenge,CASE WHEN m.kind=\'rps\' THEN EXISTS (SELECT 1 FROM ledger_rps WHERE message_id=m.id AND resolution IS NOT NULL) ELSE 0 END resolved,COALESCE(c.name,p.name) name,c.avatar FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id WHERE m.room=? AND m.kind<>\'currency-config\'';
+    const select = 'SELECT m.id,m.sender,m.char_id,m.body,m.created,m.kind,CASE WHEN m.kind IN (\'text\',\'human-only\',\'mention-all\',\'forwarded-chat\') THEN m.attachment ELSE NULL END meta,CASE WHEN m.kind=\'rps-result\' THEN m.attachment ELSE NULL END challenge,CASE WHEN m.kind=\'rps\' THEN EXISTS (SELECT 1 FROM ledger_rps WHERE message_id=m.id AND resolution IS NOT NULL) ELSE 0 END resolved,COALESCE(c.name,p.name) name,c.avatar FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id WHERE m.room=? AND m.kind<>\'currency-config\'';
     const history = url.searchParams.has('before');
     const rows=history ? (await all(select+' AND m.id<? ORDER BY m.id DESC LIMIT 60',room.id,cursor)).reverse()
       : cursor ? await all(select+' AND m.id>? ORDER BY m.id LIMIT 60',room.id,cursor)
@@ -1106,7 +1157,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-chat-tools-quiet-time-28'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-forwarded-chat-cards-29'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
@@ -1127,4 +1178,5 @@ export default {
     return response;
   }
 };
+
 
