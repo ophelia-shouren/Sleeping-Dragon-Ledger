@@ -3,6 +3,8 @@ const ledgerOnline = (() => {
   const key='sleeping-dragon-online-identity';
   const displayKey='sleeping-dragon-online-display';
   const pictures=new Map();
+  let pendingMessage=null, typingCharacters=[];
+  const localTyping=new Map();
   const hands=[['rock','✊ 石头'],['paper','✋ 布'],['scissors','✌️ 剪刀']];
   const mappingKey='sleeping-dragon-online-cards';
   let room=null, me=null, messages=[], detail=null, pollTimer, generation=0, older=false;
@@ -40,7 +42,31 @@ const ledgerOnline = (() => {
     el('onlineBack').onclick=back||(()=>el('dialog').close());
     return serial;
   }
-  const personAvatar=(name,src)=>avatarMarkup({name,avatar:src||'',frame:{src:'',ring:false}});
+  function storedFrame(value){
+    if(typeof value==='string')try{value=JSON.parse(value);}catch{value=null;}
+    return {...frameDefaults(),ring:false,...(value||{})};
+  }
+  const personAvatar=(name,src,frame)=>avatarMarkup({name,avatar:src||'',frame:storedFrame(frame)});
+  async function compactFrame(frame){
+    const src=safePicture(frame?.src||'');
+    if(!src||!src.startsWith('data:')||src.length<=120000)return {...storedFrame(frame),src};
+    const resized=await renderLook(src);
+    return {...storedFrame(frame),src:resized};
+  }
+  async function renderLook(src){
+    const img=new Image();img.src=src;await img.decode();
+    const canvas=document.createElement('canvas');
+    const scale=Math.min(1,256/Math.max(img.naturalWidth,img.naturalHeight));
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    return canvas.toDataURL('image/webp',0.78);
+  }
+  async function readLookFile(file){
+    if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type))throw Error('请选择有效图片。');
+    const url=URL.createObjectURL(file);
+    try{return await renderLook(url);}finally{URL.revokeObjectURL(url);}
+  }
   function directory(){
     return '<button type="button" class="directory-item" data-action="onlineChat" aria-haspopup="dialog">'+personAvatar('◈')+'<span><strong>在线聊天</strong><small>'+(inviteFromUrl()?'你收到了会话邀请':'和朋友私聊、建群或邀请角色')+'</small></span><b>›</b></button>';
   }
@@ -84,9 +110,9 @@ const ledgerOnline = (() => {
   async function activate(){
     const serial=screen('在线聊天','<p class="muted">正在连接…</p>'+end);
     try{
-      const avatar=await avatarThumbnail();
+      const [avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(appearance('user').frame)]);
       if(!active(serial))return;
-      me=await request('profile',{name:(appearance('user').name||'你').slice(0,30),persona:userPersona(),avatar});
+      me=await request('profile',{name:(appearance('user').name||'你').slice(0,30),persona:userPersona(),avatar,frame});
       if(!active(serial))return;
       const invite=inviteFromUrl();
       if(invite)join(invite);else rooms();
@@ -199,12 +225,14 @@ const ledgerOnline = (() => {
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
     const people=new Map((detail?.members||[]).map(x=>[x.id,x]));
     const display=displayFor(room.id);
+    const cast=new Map((detail?.chars||[]).map(x=>[x.id,x]));
     const resolved=new Set(messages.filter(m=>m.challenge).map(m=>Number(m.challenge)));
     box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
       (messages.map(m=>{
         const mine=!m.char_id&&m.sender===me.id;
         const role=mine?'user':'assistant';
-        const avatar='<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+personAvatar(m.name,m.char_id?'':people.get(m.sender)?.avatar)+'</button>';
+        const look=m.char_id?cast.get(m.char_id):people.get(m.sender);
+        const avatar='<button type="button" class="avatar-button" data-online-avatar="'+esc(m.id)+'" style="touch-action:pan-y;user-select:none;-webkit-touch-callout:none" aria-label="长按提及 '+esc(m.name)+'">'+personAvatar(m.name,m.char_id?look?.avatar_image:look?.avatar,look?.frame)+'</button>';
         const name=mine||display.showName===false?'':'<small>'+esc(m.name)+(m.char_id?' · AI':'')+'</small>';
         const date=new Date(m.created.replace(' ','T')+'Z');
         const time=display.showTime===false||Number.isNaN(date.getTime())?'':'<small class="muted">'+date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})+'</small>';
@@ -219,9 +247,14 @@ const ledgerOnline = (() => {
             content+=closed?'<small class="muted">已结束</small>':mine?'<small class="muted">等待另一位真人出拳</small>':
               '<div class="row">'+hands.map(([value,label])=>'<button type="button" data-rps-id="'+m.id+'" data-rps-choice="'+value+'">'+label+'</button>').join('')+'</div>';
           }
-          return '<div class="message-row '+role+'">'+(first?layout.before:'')+'<article class="bubble '+role+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
+          return '<div class="message-row '+role+'">'+(first?layout.before:chatMessageLayout('<span class="avatar-button" aria-hidden="true" style="visibility:hidden;flex:none">'+personAvatar(m.name)+'</span>','','').before)+'<article class="bubble '+role+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
         }).join('');
-      }).join('')||'<div class="empty">还没有消息，打声招呼吧。</div>');
+      }).join('')||(!(pendingMessage?.room===room.id)?'<div class="empty">还没有消息，打声招呼吧。</div>':'')) +
+      (pendingMessage?.room===room.id?'<div class="message-row user"><span class="avatar-button">'+personAvatar(me.name,people.get(me.id)?.avatar,people.get(me.id)?.frame)+'</span><article class="bubble user"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(pendingMessage.body)+'</p><small class="muted">'+(pendingMessage.saved?'已发送':'发送中…')+'</small></article></div>':'')+
+      [...new Map([...typingCharacters,...[...localTyping.values()].filter(x=>x.room===room.id)].map(char=>[char.id,char])).values()].map(char=>{
+        const look=cast.get(char.id)||char;
+        return typingBubble({...look,avatar:look.avatar_image||'',frame:storedFrame(look.frame)},display.showName!==false,true);
+      }).join('');
     box.scrollTop=mode==='bottom'?box.scrollHeight:mode==='prepend'?oldTop+box.scrollHeight-oldHeight:oldTop;
     loadPictures(box);
     if(el('onlineOlder'))el('onlineOlder').onclick=loadOlder;
@@ -360,7 +393,7 @@ const ledgerOnline = (() => {
   }
   function chatRoom(current){
     if(!current)return rooms();
-    room=current;messages=[];older=false;detail=null;
+    room=current;messages=[];older=false;detail=null;typingCharacters=[];
     const group=current.kind==='group';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
@@ -378,16 +411,21 @@ const ledgerOnline = (() => {
       try{
         const cursor=messages.at(-1)?.id||0;
         const refreshDetail=ticks++%4===0;
-        const [rows,info]=await Promise.all([
-          request('messages?room='+current.id+(cursor?'&after='+cursor:'')),
+        const [feed,info]=await Promise.all([
+          request('messages?live=1&room='+current.id+(cursor?'&after='+cursor:'')),
           refreshDetail?request('detail?room='+current.id):null
         ]);
         if(!active(serial))return;
         if(info)detail=info;
+        const rows=Array.isArray(feed)?feed:feed.rows;
+        const nextTyping=Array.isArray(feed)?[]:feed.typing||[];
+        const typingChanged=JSON.stringify(typingCharacters)!==JSON.stringify(nextTyping);
+        typingCharacters=nextTyping;
         const box=el('onlineMessages'), stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
         if(!cursor)older=rows.length===60;
         messages.push(...rows.filter(x=>x.id>(messages.at(-1)?.id||0)));
-        if(rows.length||info||!cursor)drawMessages(stick?'bottom':'keep');
+        if(pendingMessage?.room===current.id&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
+        if(rows.length||info||!cursor||typingChanged)drawMessages(stick?'bottom':'keep');
         if(info)await syncCards(serial,current,info);
       }finally{refreshing=false;}
     }
@@ -445,16 +483,43 @@ const ledgerOnline = (() => {
       if(!body)return;
       const charId=mentions.target(body);
       input.value='';
+      const pending={room:current.id,body};
+      pendingMessage=pending;
+      drawMessages('bottom');
       let result;
-      try{result=await request('send',{room:current.id,body,charId});}
-      catch(error){if(active(requestSerial)&&!input.value)input.value=body;throw error;}
+      try{result=await request('send',{room:current.id,body,charId,deferReply:true});}
+      catch(error){
+        if(pendingMessage===pending)pendingMessage=null;
+        if(active(requestSerial)){if(!input.value)input.value=body;drawMessages('bottom');}
+        throw error;
+      }
+      pending.saved=result.message;
+      if(!result.message||messages.some(message=>message.id===result.message)){
+        if(pendingMessage===pending)pendingMessage=null;
+        if(active(requestSerial))drawMessages('bottom');
+      }
+      if(result.reply){
+        const character=active(requestSerial)?detail?.chars?.find(item=>item.id===charId):null;
+        if(character){localTyping.set(result.reply,{...character,room:current.id});drawMessages('bottom');}
+        request('reply',{room:current.id,message:result.reply}).then(reply=>{
+          if(!active(requestSerial))return;
+          if(reply.notice)status(reply.notice);
+          return refresh();
+        }).catch(error=>{if(active(requestSerial))status(error.message);}).finally(()=>{
+          localTyping.delete(result.reply);
+          if(active(requestSerial)){
+            typingCharacters=typingCharacters.filter(item=>item.id!==charId);
+            drawMessages('keep');
+          }
+        });
+      }
       if(!active(requestSerial))return;
       if(!input.value)mentions.clear();
       if(result.notice)status(result.notice);
-      await refresh();
+      refresh().catch(error=>{if(active(requestSerial))status(error.message);});
     });
     refresh().catch(e=>{if(active(serial))status(e.message);});
-    later(serial,refresh,4500);
+    later(serial,refresh,2500);
   }
   async function members(current){
     clearTimeout(pollTimer);
@@ -467,16 +532,16 @@ const ledgerOnline = (() => {
       const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');
       link.searchParams.set('onlineInvite',info.invite||'');
       const owner=group&&info.owner===me.id, prefs=displayFor(current.id);
-      const person=(id,name,avatar,note,canEdit)=>{
+      const person=(id,name,avatar,note,canEdit,frame)=>{
         const tag=canEdit?'button':'div';
-        return '<'+tag+(canEdit?' type="button" data-online-manage="'+esc(id)+'"':'')+' class="group-settings-person">'+personAvatar(name,avatar)+'<span title="'+esc(name+note)+'">'+esc(name+note)+'</span></'+tag+'>';
+        return '<'+tag+(canEdit?' type="button" data-online-manage="'+esc(id)+'"':'')+' class="group-settings-person">'+personAvatar(name,avatar,frame)+'<span title="'+esc(name+note)+'">'+esc(name+note)+'</span></'+tag+'>';
       };
       const setting=(key,label)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" data-online-display="'+key+'" '+(prefs[key]!==false?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
       el('onlineMemberList').innerHTML=
         '<section class="group-settings-card"><div class="group-settings-profile">'+groupAvatar({name:current.name})+'<span><strong>'+esc(current.name)+'</strong><small>'+info.members.length+' 位成员'+(group?' · '+info.chars.length+' 位角色':'')+'</small></span><span></span></div></section>'+
         '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>会话成员</h3></div><div class="group-settings-members">'+
-        info.members.map(x=>person(x.id,x.name,x.avatar,x.id===me.id?(owner?' · 群主（你）':'（你）'):x.id===info.owner&&group?' · 群主':'',owner&&x.id!==me.id)).join('')+
-        info.chars.map(x=>person(x.id,x.name,'',' · AI',owner||x.owner===me.id)).join('')+
+        info.members.map(x=>person(x.id,x.name,x.avatar,x.id===me.id?(owner?' · 群主（你）':'（你）'):x.id===info.owner&&group?' · 群主':'',owner&&x.id!==me.id,x.frame)).join('')+
+        info.chars.map(x=>person(x.id,x.name,x.avatar_image,' · AI',owner||x.owner===me.id,x.frame)).join('')+
         (group?'<button type="button" class="group-settings-person" id="onlineAddChar"><b aria-hidden="true">＋</b><span>邀请角色</span></button>':'')+
         '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
         (info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请链接</h3><label><input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
@@ -520,9 +585,10 @@ const ledgerOnline = (() => {
         const id=button.dataset.onlineManage, char=info.chars.find(x=>x.id===id), user=info.members.find(x=>x.id===id);
         const panel=el('onlineManage');
         panel.innerHTML=char?
-          (char.owner===me.id?'<label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
+          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
           '<button id="onlineRemoveMember" type="button">移除角色</button>':
           '<button id="onlineRemoveMember" type="button">移出 '+esc(user?.name)+'</button>';
+        if(el('onlineEditLook'))el('onlineEditLook').onclick=()=>editCharLook(current,char);
         if(el('onlineRename'))el('onlineRename').onclick=event=>{
           const input=el('onlineCharName');
           if(input.reportValidity())managed('rename-char',{id,name:input.value.trim()},event.currentTarget);
@@ -534,6 +600,30 @@ const ledgerOnline = (() => {
         panel.scrollIntoView({block:'nearest'});
       });
     }catch(e){if(active(serial))status(e.message);}
+  }
+  function editCharLook(current,char){
+    const frame=storedFrame(char.frame);
+    let avatar=char.avatar_image||'', frameSrc=frame.src;
+    const serial=screen('角色头像与头像框','<div class="messages"><section class="group-settings-card group-settings-block"><div id="onlineLookPreview"></div><form id="onlineLookForm"><label>头像图片<input id="onlineAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" id="onlineAvatarClear">移除头像</button><label>头像框图片<input id="onlineFrameFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" id="onlineFrameClear">移除头像框图片</button><label><input type="checkbox" id="onlineFrameRing" '+(frame.ring?'checked':'')+'> 显示圆形边框</label><button type="submit" class="primary">保存</button></form></section></div>'+end,()=>members(current));
+    function preview(){
+      if(active(serial))el('onlineLookPreview').innerHTML=personAvatar(char.name,avatar,{...frame,src:frameSrc,ring:el('onlineFrameRing').checked});
+    }
+    const choose=async(event,set)=>{
+      const file=event.target.files[0];
+      if(!file)return;
+      try{set(await readLookFile(file));preview();}
+      catch(error){if(active(serial))status(error.message);}
+    };
+    el('onlineAvatarFile').onchange=e=>choose(e,value=>avatar=value);
+    el('onlineFrameFile').onchange=e=>choose(e,value=>frameSrc=value);
+    el('onlineAvatarClear').onclick=()=>{avatar='';el('onlineAvatarFile').value='';preview();};
+    el('onlineFrameClear').onclick=()=>{frameSrc='';el('onlineFrameFile').value='';preview();};
+    el('onlineFrameRing').onchange=preview;
+    form('onlineLookForm',async(data,requestSerial)=>{
+      await request('char-look',{room:current.id,id:char.id,avatar,frame:{...frame,src:frameSrc,ring:el('onlineFrameRing').checked}});
+      if(active(requestSerial))await members(current);
+    });
+    preview();
   }
   async function roomMemory(current,back){
     clearTimeout(pollTimer);
