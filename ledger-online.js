@@ -687,14 +687,28 @@ const ledgerOnline = (() => {
     room=current;messages=view.messages;older=view.older;detail=view.detail||null;typingCharacters=view.typing;
     const group=current.kind==='group';
     if(group&&detail?.name)Object.assign(current,{name:detail.name,avatar:detail.avatar});
+    const bulbIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4m-6-7a6 6 0 1 1 8 0c-.8.7-1 1.3-1 2H9c0-.7-.2-1.3-1-2Z"/></svg>';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
     const serial=screen(current.name,end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及成员" aria-controls="onlineChoices" aria-expanded="false">@ 成员</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
+      (group?'<button type="button" class="composer-tool composer-icon" id="onlineHumanOnly" aria-label="消息仅真人可读" title="消息仅真人可读" aria-pressed="false">'+bulbIcon+'</button>':'')+
       '<button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></div></form>',()=>{rememberChat(current.id);rooms();},header,group?'<span id="onlineGroupAvatar">'+groupAvatar(current)+'</span>':'');
     el('onlineMembers').onclick=()=>{rememberChat(current.id);members(current);};
+    const bulb=el('onlineHumanOnly');
+    if(bulb){
+      const paintBulb=()=>{
+        const enabled=view.humanOnly===true;
+        bulb.setAttribute('aria-pressed',String(enabled));
+        bulb.style.borderColor=enabled?'var(--gold)':'';
+        bulb.style.boxShadow=enabled?'0 0 0 1px var(--gold), inset 0 0 7px color-mix(in srgb,var(--gold) 30%,transparent)':'';
+        bulb.title=enabled?'已开启：发送的消息仅真人可读':'消息仅真人可读';
+      };
+      bulb.onclick=()=>{view.humanOnly=!view.humanOnly;paintBulb();};
+      paintBulb();
+    }
     const draft=el('onlineCompose').elements.body;
     draft.value=view.draft||'';
     const mentions=setupMentions(draft,group);
@@ -816,13 +830,14 @@ const ledgerOnline = (() => {
       const body=data.body.trim();
       if(!body)return;
       lastActivity=Date.now();
-      const charId=mentions.target(body);
+      const humanOnly=group&&view.humanOnly===true;
+      const charId=humanOnly?null:mentions.target(body);
       input.value='';
       const pending={room:current.id,body};
       pendingMessage=pending;
       drawMessages('bottom');
       let result;
-      try{result=await request('send',{room:current.id,body,charId,deferReply:true});}
+      try{result=humanOnly?await request('send-human-only',{room:current.id,body}):await request('send',{room:current.id,body,charId,deferReply:true});}
       catch(error){
         if(pendingMessage===pending)pendingMessage=null;
         if(active(requestSerial)){if(!input.value)input.value=body;drawMessages('bottom');}
