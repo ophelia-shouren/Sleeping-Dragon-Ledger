@@ -676,7 +676,7 @@ async function api(req, env, url, ledger, ctx) {
     await run('INSERT INTO ledger_room_reads VALUES (?,?,MIN(?,COALESCE((SELECT MAX(id) FROM messages WHERE room=?),0))) ON CONFLICT(room,uid) DO UPDATE SET cursor=MAX(cursor,excluded.cursor)',room.id,uid,cursor,room.id);
     return json({ok:true});
   }
-  if(ledger&&room.kind==='group'&&path==='announcement'){
+  if(ledger&&room.kind==='group'&&path==='announcement'&&['GET','POST'].includes(req.method)){
     if(req.method==='GET')return json(await one('SELECT body,updated FROM ledger_announcements WHERE room=?',room.id)||{body:'',updated:null});
     if(room.owner!==uid)throw fail('只有群主可以编辑群公告。',403);
     const body=field(data,'body',5000,false);
