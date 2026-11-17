@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
-<script src="./ledger-online.js?v=97ba7968"></script>
+<script src="./ledger-online.js?v=bff63106"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -980,7 +980,7 @@ function moonCard(card){
   const ready=card.componentReady!==false;
   storyDialog(card.title,'<form id="storyMoonRename" class="story-panel" data-id="'+esc(card.id)+'" hidden><label>卡片名称<input name="title" maxlength="120" required></label><div class="row"><button type="submit" class="primary">保存名称</button><button type="button" data-moon-rename-cancel>取消</button></div></form>'+
     '<div class="row">'+storyButton('moonBox','返回月匣')+
-    (ready?'':storyButton('moonBuild','生成 HTML 组件',card.id))+
+    (ready?'':storyButton('moonBuild','生成 HTML 组件',card.id))+storyButton('shareOnlineArchive','分享到在线群聊',card.id)+
     '<button type="button" class="archive-danger" data-story-action="moonDelete" data-story-id="'+esc(card.id)+'">删除</button></div>'+
     (ready?storyHtmlPreview(card.body,card.title):'<p class="muted">代码已收纳。生成组件后可在这里互动预览。</p>')+
     '<form id="storyMoonCategory" data-id="'+esc(card.id)+'" class="story-category-row">'+storyCategoryInput('卡片分类','category','moonCardCategories',storyCategoryKey(card.category),moonCategories())+'<button>保存分类</button></form>'+
@@ -1147,7 +1147,7 @@ function storyRead(x){
   storyDialog(x.title,(parent?'<div class="row">'+storyButton('read','阅读前文',parent.id)+'</div>':'')+
     '<div class="story-reader-bar"><strong>全文 '+storyCount(x.body)+' 字</strong><label>字号 <input id="storyFont" type="range" min="14" max="32" value="'+state.storyFont+'"> <output id="storyFontValue">'+state.storyFont+' px</output></label></div><article class="story-paper story-reader" id="storyReader" style="font-size:'+state.storyFont+'px">'+esc(x.body)+'</article>'+
     '<form id="storyCategory" data-id="'+esc(x.id)+'" class="story-category-row">'+storyCategoryInput('文章分类','category','storyCategoryOptions',storyCategoryKey(x.category))+'<button>保存分类</button></form>'+
-    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader',()=>storyLibrary(storyCategoryKey(x.category)));
+    '<div class="row story-panel story-reader-actions">'+storyButton('continue','一键续写',x.id)+storyButton('custom','一键续写（自定义版）',x.id)+storyButton('forward','转发给角色或群聊',x.id)+storyButton('shareOnlineArchive','分享到在线群聊',x.id)+storyButton('edit','编辑文章',x.id)+storyButton('copy','复制全文',x.id)+'<button type="button" class="archive-danger" data-story-action="delete" data-story-id="'+esc(x.id)+'">删除文章</button></div><footer class="story-reader-exit">'+storyButton('folder','退出阅读 · 返回分类',storyCategoryKey(x.category))+'</footer>','reader',()=>storyLibrary(storyCategoryKey(x.category)));
   bindStoryScrubber();
   $('storyFont').oninput=event=>{
     const size=Number(event.target.value);
@@ -1494,6 +1494,9 @@ async function storyAction(d){
       break;
     case 'custom':
       if(x)storyDialog('自定义续写','<form id="storyContinue" data-id="'+esc(x.id)+'" class="fields"><label>续写指令<textarea name="guide" rows="5" required></textarea></label>'+storyMemoryField()+storyStreamField()+'<button class="primary">开始续写</button></form>','compose');
+      break;
+    case 'shareOnlineArchive':
+      if(x)await ledgerOnline.shareArchive(x,()=>storyRead(x));
       break;
     case 'forward':
       if(x)storyDialog('转发番外','<form id="storyForward" data-id="'+esc(x.id)+'" class="fields"><label>接收方<select name="recipient" required><option value="">请选择角色或群聊</option><optgroup label="AI 角色">'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc('contact:'+c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</optgroup><optgroup label="群聊">'+state.groups.map(g=>'<option value="'+esc('group:'+g.id)+'">'+esc(g.name)+'</option>').join('')+'</optgroup></select></label><label>附言（可留空）<input name="note"></label><button>下一步</button></form>');
