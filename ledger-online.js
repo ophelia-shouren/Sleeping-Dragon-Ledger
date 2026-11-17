@@ -3,6 +3,51 @@ const ledgerOnline = (() => {
   const key='sleeping-dragon-online-identity';
   const displayKey='sleeping-dragon-online-display';
   const pictures=new Map();
+  const views=new Map(), feedsInFlight=new Map(), detailsInFlight=new Map();
+  const cardSyncs=new Map();
+  let onlineIdentity, syncedProfile, imageObserver, knownRooms=null;
+  function viewFor(id){
+    let view=views.get(id);
+    if(view)views.delete(id);
+    else view={messages:[],typing:[],older:false,loaded:false,top:null};
+    views.set(id,view);
+    if(views.size>6)views.delete(views.keys().next().value);
+    return view;
+  }
+  function roomFeed(id,cursor=0){
+    const key=id+':'+cursor;
+    if(!feedsInFlight.has(key)){
+      const promise=request('messages?live=1&room='+id+(cursor?'&after='+cursor:'')).finally(()=>feedsInFlight.delete(key));
+      feedsInFlight.set(key,promise);
+    }
+    return feedsInFlight.get(key);
+  }
+  function roomDetail(id){
+    if(!detailsInFlight.has(id)){
+      const promise=request('detail?room='+id).finally(()=>detailsInFlight.delete(id));
+      detailsInFlight.set(id,promise);
+    }
+    return detailsInFlight.get(id);
+  }
+  function prefetchRoom(id){
+    const view=viewFor(id);
+    if(!view.loaded)roomFeed(id).then(feed=>{
+      if(view.loaded || views.get(id)!==view)return;
+      const rows=Array.isArray(feed)?feed:feed.rows;
+      view.messages=rows.slice(-36);view.older=rows.length>36;
+      view.typing=feed.typing||[];view.loaded=true;
+    }).catch(()=>{});
+    if(!view.detail)roomDetail(id).then(info=>{
+      if(views.get(id)===view)view.detail=info;
+    }).catch(()=>{});
+  }
+  function rememberChat(id){
+    const box=el('onlineMessages'),view=views.get(id);
+    if(view&&box&&room?.id===id){
+      view.draft=el('onlineCompose')?.elements.body.value||'';
+      view.top=box.scrollHeight-box.clientHeight-box.scrollTop<120?null:box.scrollTop;
+    }
+  }
   let pendingMessage=null, typingCharacters=[];
   const localTyping=new Map();
   const hands=[['rock','✊ 石头'],['paper','✋ 布'],['scissors','✌️ 剪刀']];
@@ -28,7 +73,7 @@ const ledgerOnline = (() => {
     try{response=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined});}
     catch{throw Error('在线聊天服务连接失败，请稍后再试。');}
     const result=await response.json().catch(()=>null);
-    if(!response.ok||!result)throw Error(result?.error||'在线聊天服务暂时不可用。');
+    if(!response.ok||!result)throw Object.assign(Error(result?.error||'在线聊天服务暂时不可用。'),{status:response.status});
     return result;
   }
   function status(message){
@@ -37,6 +82,7 @@ const ledgerOnline = (() => {
   }
   function screen(title,body,back,headerAction=''){
     clearTimeout(pollTimer);
+    imageObserver?.disconnect();
     const serial=++generation;
     dialog('<section class="group-room" id="ledgerOnline"><div class="chat-top"><button id="onlineBack" type="button" aria-label="返回">‹</button><div class="chat-name"><h2>'+esc(title)+'</h2></div>'+headerAction+'</div>'+body+'</section>',true);
     el('onlineBack').onclick=back||(()=>el('dialog').close());
@@ -108,14 +154,25 @@ const ledgerOnline = (() => {
     };
   }
   async function activate(){
-    const serial=screen('在线聊天','<p class="muted">正在连接…</p>'+end);
+    const token=identity();
+    const look=appearance('user');
+    const snapshot={name:(look.name||'你').slice(0,30),persona:userPersona(),avatar:look.avatar,frame:look.frame};
+    if(onlineIdentity!==token){
+      onlineIdentity=token;me=null;syncedProfile=null;knownRooms=null;views.clear();pictures.clear();
+    }
+    const invite=inviteFromUrl();
+    if(me && !invite)rooms();
+    const serial=me&&!invite?generation:screen('在线聊天','<p class="muted">正在连接…</p>'+end);
     try{
-      const [avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(appearance('user').frame)]);
+      if(!me||JSON.stringify(snapshot)!==syncedProfile){
+        const [avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(snapshot.frame)]);
+        if(onlineIdentity!==token)return;
+        const user=await request('profile',{...snapshot,avatar,frame});
+        if(onlineIdentity!==token)return;
+        me=user;syncedProfile=JSON.stringify(snapshot);
+      }
       if(!active(serial))return;
-      me=await request('profile',{name:(appearance('user').name||'你').slice(0,30),persona:userPersona(),avatar,frame});
-      if(!active(serial))return;
-      const invite=inviteFromUrl();
-      if(invite)join(invite);else rooms();
+      if(invite)join(invite);else if(!el('onlineList'))rooms();
     }catch(error){if(active(serial))status(error.message);}
   }
   function open(){
@@ -138,14 +195,25 @@ const ledgerOnline = (() => {
     el('onlineNew').onclick=create;
     el('onlineJoin').onclick=()=>join('');
     let previous;
-    async function refresh(){
-      const list=await request('rooms');
+    function paint(list){
       if(!active(serial))return;
       const signature=JSON.stringify(list);
       if(signature===previous)return;
       previous=signature;
       el('onlineList').innerHTML=list.map(x=>'<button type="button" class="directory-item" data-online-room="'+esc(x.id)+'">'+personAvatar(x.kind==='group'?'群':x.name)+'<span><strong>'+esc(x.name)+'</strong><small>'+esc(x.preview||(x.kind==='group'?'群聊':'私聊'))+'</small></span><b>›</b></button>').join('')||'<div class="empty">还没有在线会话</div>';
-      el('onlineList').querySelectorAll('button').forEach(b=>b.onclick=()=>chatRoom(list.find(x=>x.id===b.dataset.onlineRoom)));
+      el('onlineList').querySelectorAll('button').forEach(b=>{
+        b.onclick=()=>chatRoom(list.find(x=>x.id===b.dataset.onlineRoom));
+        b.onpointerdown=()=>prefetchRoom(b.dataset.onlineRoom);
+      });
+    }
+    if(knownRooms)paint(knownRooms);
+    else el('onlineList').textContent='正在加载会话…';
+    async function refresh(){
+      const list=await request('rooms');
+      if(!active(serial))return;
+      const firstLoad=knownRooms===null;
+      knownRooms=list;paint(list);
+      if(firstLoad&&list[0])prefetchRoom(list[0].id);
     }
     refresh().catch(e=>{if(active(serial))status(e.message);});
     later(serial,refresh,12000);
@@ -208,7 +276,8 @@ const ledgerOnline = (() => {
   }
   function loadPictures(box){
     const serial=generation, currentRoom=room.id;
-    for(const image of box.querySelectorAll('[data-online-image]')){
+    imageObserver?.disconnect();
+    function loadImage(image){
       const id=image.dataset.onlineImage, key=currentRoom+':'+id;
       if(!pictures.has(key)){
         if(pictures.size>=30)pictures.delete(pictures.keys().next().value);
@@ -220,6 +289,20 @@ const ledgerOnline = (() => {
         if(src&&active(serial)&&image.isConnected)image.src=src;
       }).catch(()=>{if(active(serial)&&image.isConnected)image.alt='图片加载失败';});
     }
+    const images=box.querySelectorAll('[data-online-image]');
+    if(typeof IntersectionObserver!=='function'){
+      images.forEach(loadImage);
+      return;
+    }
+    imageObserver=new IntersectionObserver((entries,observer)=>{
+      for(const entry of entries){
+        if(entry.isIntersecting&&active(serial)){
+          observer.unobserve(entry.target);
+          loadImage(entry.target);
+        }
+      }
+    },{root:box,rootMargin:'180px 0px'});
+    images.forEach(image=>imageObserver.observe(image));
   }
   function drawMessages(mode){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
@@ -251,20 +334,33 @@ const ledgerOnline = (() => {
         }).join('');
       }).join('')||(!(pendingMessage?.room===room.id)?'<div class="empty">还没有消息，打声招呼吧。</div>':'')) +
       (pendingMessage?.room===room.id?'<div class="message-row user"><span class="avatar-button">'+personAvatar(me.name,people.get(me.id)?.avatar,people.get(me.id)?.frame)+'</span><article class="bubble user"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(pendingMessage.body)+'</p><small class="muted">'+(pendingMessage.saved?'已发送':'发送中…')+'</small></article></div>':'')+
-      [...new Map([...typingCharacters,...[...localTyping.values()].filter(x=>x.room===room.id)].map(char=>[char.id,char])).values()].map(char=>{
-        const look=cast.get(char.id)||char;
-        return typingBubble({...look,avatar:look.avatar_image||'',frame:storedFrame(look.frame)},display.showName!==false,true);
-      }).join('');
+      '<div id="onlineTyping"></div>';
+    drawTyping();
     box.scrollTop=mode==='bottom'?box.scrollHeight:mode==='prepend'?oldTop+box.scrollHeight-oldHeight:oldTop;
     loadPictures(box);
     if(el('onlineOlder'))el('onlineOlder').onclick=loadOlder;
+  }
+  function drawTyping(){
+    const target=el('onlineTyping');
+    if(!target)return;
+    const cast=new Map((detail?.chars||[]).map(x=>[x.id,x]));
+    const activeCharacters=new Map([...typingCharacters,...[...localTyping.values()].filter(x=>x.room===room.id)].map(char=>[char.id,char]));
+    const showName=displayFor(room.id).showName!==false;
+    const box=el('onlineMessages');
+    const stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
+    target.innerHTML=[...activeCharacters.values()].map(char=>{
+      const look=cast.get(char.id)||char;
+      return typingBubble({...look,avatar:look.avatar_image||'',frame:storedFrame(look.frame)},showName,true);
+    }).join('');
+    if(stick)box.scrollTop=box.scrollHeight;
   }
   async function loadOlder(){
     const serial=generation, first=messages[0]?.id;
     try{
       const rows=await request('messages?room='+room.id+'&before='+first);
       if(!active(serial)||messages[0]?.id!==first)return;
-      messages=[...rows,...messages];older=rows.length===60;drawMessages('prepend');
+      messages=[...rows,...messages];older=rows.length===60;
+      const view=viewFor(room.id);view.messages=messages;view.older=older;drawMessages('prepend');
     }catch(e){if(active(serial))status(e.message);}
   }
   function cardContext(card){
@@ -393,7 +489,9 @@ const ledgerOnline = (() => {
   }
   function chatRoom(current){
     if(!current)return rooms();
-    room=current;messages=[];older=false;detail=null;typingCharacters=[];
+    if(room?.id)rememberChat(room.id);
+    const view=viewFor(current.id);
+    room=current;messages=view.messages;older=view.older;detail=view.detail||null;typingCharacters=view.typing;
     const group=current.kind==='group';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
@@ -401,32 +499,57 @@ const ledgerOnline = (() => {
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及角色" aria-controls="onlineChoices" aria-expanded="false">@ 角色</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<form id="onlineCompose" class="row"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false">＋</button>'+
-      '<textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></form>',rooms,header);
-    el('onlineMembers').onclick=()=>members(current);
-    const mentions=setupMentions(el('onlineCompose').elements.body,group);
-    let refreshing=false, ticks=0;
+      '<textarea name="body" aria-label="聊天消息" required maxlength="4000" placeholder="写一条消息…"></textarea><button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></form>',()=>{rememberChat(current.id);rooms();},header);
+    el('onlineMembers').onclick=()=>{rememberChat(current.id);members(current);};
+    const draft=el('onlineCompose').elements.body;
+    draft.value=view.draft||'';
+    const mentions=setupMentions(draft,group);
+    if(view.loaded){
+      drawMessages(view.top===null?'bottom':'keep');
+      if(view.top!==null)el('onlineMessages').scrollTop=view.top;
+    }else el('onlineMessages').textContent='正在加载聊天记录…';
+    let refreshing=false,ticks=0;
+    function refreshDetail(){
+      roomDetail(current.id).then(info=>{
+        if(!active(serial))return;
+        const changed=detail!==info&&JSON.stringify(detail)!==JSON.stringify(info);
+        view.detail=info;detail=info;
+        if(changed&&view.loaded){
+          const box=el('onlineMessages');
+          drawMessages(box.scrollHeight-box.clientHeight-box.scrollTop<120?'bottom':'keep');
+        }
+        if(!cardSyncs.has(current.id)){
+          const work=syncCards(serial,current,info).catch(error=>{if(active(serial))status(error.message);});
+          cardSyncs.set(current.id,work);
+          work.finally(()=>{if(cardSyncs.get(current.id)===work)cardSyncs.delete(current.id);});
+        }
+      }).catch(error=>{if(active(serial)&&error.status===404){views.delete(current.id);rooms();status(error.message);}});
+    }
     async function refresh(){
       if(refreshing)return;
       refreshing=true;
+      if(ticks++%7===0)refreshDetail();
       try{
         const cursor=messages.at(-1)?.id||0;
-        const refreshDetail=ticks++%4===0;
-        const [feed,info]=await Promise.all([
-          request('messages?live=1&room='+current.id+(cursor?'&after='+cursor:'')),
-          refreshDetail?request('detail?room='+current.id):null
-        ]);
+        const feed=await roomFeed(current.id,cursor);
         if(!active(serial))return;
-        if(info)detail=info;
         const rows=Array.isArray(feed)?feed:feed.rows;
         const nextTyping=Array.isArray(feed)?[]:feed.typing||[];
         const typingChanged=JSON.stringify(typingCharacters)!==JSON.stringify(nextTyping);
-        typingCharacters=nextTyping;
-        const box=el('onlineMessages'), stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
-        if(!cursor)older=rows.length===60;
-        messages.push(...rows.filter(x=>x.id>(messages.at(-1)?.id||0)));
+        typingCharacters=nextTyping;view.typing=nextTyping;
+        const box=el('onlineMessages'),stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
+        const firstLoad=!view.loaded;
+        if(!cursor&&!messages.length){
+          older=rows.length>36;
+          messages=rows.slice(-36);
+        }else messages.push(...rows.filter(x=>x.id>(messages.at(-1)?.id||0)));
+        view.messages=messages;view.older=older;view.loaded=true;
         if(pendingMessage?.room===current.id&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
-        if(rows.length||info||!cursor||typingChanged)drawMessages(stick?'bottom':'keep');
-        if(info)await syncCards(serial,current,info);
+        if(rows.length||firstLoad)drawMessages(stick?'bottom':'keep');
+        else if(typingChanged)drawTyping();
+      }catch(error){
+        if(active(serial)&&error.status===404){views.delete(current.id);rooms();status(error.message);}
+        else throw error;
       }finally{refreshing=false;}
     }
     const menu=el('onlineComposerMenu'), more=el('onlineMore'), extra=el('onlineExtra'), file=el('onlineImageFile');
@@ -500,7 +623,7 @@ const ledgerOnline = (() => {
       }
       if(result.reply){
         const character=active(requestSerial)?detail?.chars?.find(item=>item.id===charId):null;
-        if(character){localTyping.set(result.reply,{...character,room:current.id});drawMessages('bottom');}
+        if(character){localTyping.set(result.reply,{...character,room:current.id});drawTyping();}
         request('reply',{room:current.id,message:result.reply}).then(reply=>{
           if(!active(requestSerial))return;
           if(reply.notice)status(reply.notice);
@@ -509,7 +632,7 @@ const ledgerOnline = (() => {
           localTyping.delete(result.reply);
           if(active(requestSerial)){
             typingCharacters=typingCharacters.filter(item=>item.id!==charId);
-            drawMessages('keep');
+            drawTyping();
           }
         });
       }
@@ -523,11 +646,12 @@ const ledgerOnline = (() => {
   }
   async function members(current){
     clearTimeout(pollTimer);
+    imageObserver?.disconnect();
     const serial=++generation, group=current.kind==='group';
+    const view=viewFor(current.id);
     dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>'+(group?'群聊设置':'成员与邀请')+'</h2><span></span></header><div id="onlineMemberList" style="display:grid;gap:14px"></div>'+end+'</div>',true);
     el('onlineBack').onclick=()=>chatRoom(current);
-    try{
-      const info=await request('detail?room='+current.id);
+    function paint(info){
       if(!active(serial))return;
       const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');
       link.searchParams.set('onlineInvite',info.invite||'');
@@ -554,17 +678,6 @@ const ledgerOnline = (() => {
           localStorage.setItem(displayKey,JSON.stringify(settings));
         }catch(error){input.checked=!input.checked;status('显示设置未能保存。');}
       });
-      if(group){
-        async function refreshQuota(){
-          const quota=await request('quota?room='+current.id);
-          if(!active(serial))return;
-          const count=new Intl.NumberFormat('zh-CN').format(quota.messages);
-          const date=new Date(quota.resetsAt).toLocaleString('zh-CN',{hour12:false});
-          el('onlineQuota').textContent='今日在线消息 '+count+' 条 · '+date+' 重置';
-        }
-        refreshQuota().catch(e=>{if(active(serial))el('onlineQuota').textContent=e.message;});
-        later(serial,refreshQuota,4500);
-      }
       if(el('onlineCopy'))el('onlineCopy').onclick=async()=>{
         try{await navigator.clipboard.writeText(link.href);status('已复制邀请链接。');}
         catch{el('onlineLink').select();status('已选中邀请链接，可以手动复制。');}
@@ -578,6 +691,7 @@ const ledgerOnline = (() => {
           if(path==='remove-char'){
             const map=mapping();delete map[data.id];localStorage.setItem(mappingKey,JSON.stringify(map));
           }
+          view.detail=null;
           if(active(serial))await members(current);
         }catch(e){if(active(serial))status(e.message);button.disabled=false;}
       }
@@ -599,7 +713,43 @@ const ledgerOnline = (() => {
         };
         panel.scrollIntoView({block:'nearest'});
       });
-    }catch(e){if(active(serial))status(e.message);}
+    }
+    let rendered=view.detail;
+    if(rendered)paint(rendered);
+    else el('onlineMemberList').textContent='正在加载群聊设置…';
+    async function refreshQuota(){
+      const quota=await request('quota?room='+current.id);
+      if(!active(serial)||!el('onlineQuota'))return;
+      view.quota=quota;
+      paintQuota();
+    }
+    function paintQuota(){
+      if(!view.quota||!el('onlineQuota'))return;
+      const count=new Intl.NumberFormat('zh-CN').format(view.quota.messages);
+      const date=new Date(view.quota.resetsAt).toLocaleString('zh-CN',{hour12:false});
+      el('onlineQuota').textContent='今日在线消息 '+count+' 条 · '+date+' 重置';
+    }
+    function requestQuota(){
+      refreshQuota().catch(error=>{if(active(serial)&&el('onlineQuota'))el('onlineQuota').textContent=error.message;});
+    }
+    if(group&&rendered){paintQuota();requestQuota();}
+    try{
+      const info=await roomDetail(current.id);
+      if(!active(serial))return;
+      view.detail=info;
+      if(!rendered||(!el('onlineManage')?.children.length&&JSON.stringify(rendered)!==JSON.stringify(info))){
+        paint(info);paintQuota();
+      }
+      if(group){
+        if(!rendered)requestQuota();
+        later(serial,refreshQuota,4500);
+      }
+    }catch(error){
+      if(active(serial)){
+        if(error.status===404){views.delete(current.id);rooms();}
+        status(error.message);
+      }
+    }
   }
   function editCharLook(current,char){
     const frame=storedFrame(char.frame);
@@ -621,17 +771,19 @@ const ledgerOnline = (() => {
     el('onlineFrameRing').onchange=preview;
     form('onlineLookForm',async(data,requestSerial)=>{
       await request('char-look',{room:current.id,id:char.id,avatar,frame:{...frame,src:frameSrc,ring:el('onlineFrameRing').checked}});
+      viewFor(current.id).detail=null;
       if(active(requestSerial))await members(current);
     });
     preview();
   }
   async function roomMemory(current,back){
     clearTimeout(pollTimer);
+    imageObserver?.disconnect();
     const serial=++generation;
     dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>群聊记忆</h2><span></span></header><div id="onlineMemoryWindow" style="display:grid;gap:14px"></div>'+end+'</div>',true);
     el('onlineBack').onclick=back;
     try{
-      const info=await request('detail?room='+current.id);
+      const info=viewFor(current.id).detail||await roomDetail(current.id);
       if(!active(serial))return;
       const owner=info.owner===me.id;
       const profiles=owner?state.profiles.filter(p=>p.url&&p.model&&p.key):[];
@@ -676,6 +828,7 @@ const ledgerOnline = (() => {
       const {id}=await request('chars',{room:current.id,name:displayName(card).replace(/[\s@＠]+/gu,'').slice(0,24),avatar:'✦',...context,endpoint:profile.url,model:profile.model,key:profile.key});
       const map=mapping();map[id]={card:card.id,signature:await contextSignature(context)};
       localStorage.setItem(mappingKey,JSON.stringify(map));
+      viewFor(current.id).detail=null;
       if(active(serial))members(current);
     });
   }
