@@ -620,13 +620,13 @@ const ledgerOnline = (() => {
       if(active(serial))status(error.status===403?'请先从通讯录进入在线聊天，完成在线身份设置。':error.message);
     }
   }
-  async function readOnlineArchive(current,id,serial,button){
+  async function readOnlineArchive(current,id,serial,button,forwardPosition=null){
     button.disabled=true;
     try{
-      const card=await request('archive-card?room='+current.id+'&id='+id);
+      const card=await request((forwardPosition===null?'archive-card':'forward-archive')+'?room='+current.id+'&id='+id+(forwardPosition===null?'':'&position='+forwardPosition));
       if(!active(serial))return;
       rememberChat(current.id);
-      const back=()=>chatRoom(current);
+      const back=()=>forwardPosition===null?chatRoom(current):readForwardCard(current,id);
       const body=card.type==='moon'
         ? storyHtmlPreview(card.body,card.title).replace('sandbox="allow-scripts"','sandbox=""')
         : '<article class="story-paper story-reader" style="font-size:'+state.storyFont+'px">'+esc(card.body)+'</article>';
@@ -683,7 +683,9 @@ const ledgerOnline = (() => {
     '[data-skin="dawn-frost"] #ledgerOnline .bubble.online-human-only{outline-color:#a35469;box-shadow:inset 0 0 0 1px #789db7}'+
     '[data-skin="obsidian-duet"] #ledgerOnline{--human-frame-color:#bca06a;--human-frame-style:double;--human-frame-width:3px;--human-frame-offset:-4px}'+
     '[data-skin="rose-graphite"] #ledgerOnline{--human-frame-color:#b57284;--human-frame-style:double;--human-frame-width:3px}'+
-    '[data-skin="baker-street"] #ledgerOnline{--human-frame-color:#ac8660;--human-frame-style:dotted;--human-frame-width:2px;--human-frame-offset:-4px}'+
+    '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only{position:relative;outline:none;border:1px solid color-mix(in srgb,var(--gold) 42%,var(--line));box-shadow:inset 3px 0 0 color-mix(in srgb,var(--gold) 58%,var(--panel)),0 2px 5px #0002;background-image:linear-gradient(90deg,color-mix(in srgb,var(--gold) 7%,transparent),transparent 28%)}'+
+    '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only:after{content:"";position:absolute;right:8px;top:8px;width:7px;height:7px;border-top:1px solid color-mix(in srgb,var(--gold) 65%,transparent);border-right:1px solid color-mix(in srgb,var(--gold) 65%,transparent);pointer-events:none}'+
+    '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only.message-picked{outline:2px solid var(--gold);outline-offset:2px}'+
     '</style>';
   function drawMessages(mode,added=null){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
@@ -709,12 +711,13 @@ const ledgerOnline = (() => {
         const date=new Date(m.created.replace(' ','T')+'Z');
         const time=display.showTime===false||Number.isNaN(date.getTime())?'':'<small class="muted">'+date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})+'</small>';
         const layout=chatMessageLayout(avatar,name,time);
-        const parts=m.char_id&&m.kind!=='red-packet'?chatBubbleParts({role:'assistant',content:stripCharacterPrefix(m.body,m.name)},{split:display.split!==false,limit:30}):[m.body];
+        const parts=m.char_id&&!['red-packet','forwarded-chat'].includes(m.kind)?chatBubbleParts({role:'assistant',content:stripCharacterPrefix(m.body,m.name)},{split:display.split!==false,limit:30}):[m.body];
         return parts.map((part,index)=>{
           const first=index===0;
           let content=(first?quoteMarkup(readOnlineMeta(m).quote):'')+'<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
           if(m.kind==='image'||m.kind==='human-image')content=imageInOnlineMessage(m.id);
           if(m.kind==='red-packet')content='<button type="button" class="forwarded-story-card" data-online-packet="'+esc(m.id)+'" style="display:grid;gap:4px;text-align:start;border:1px solid var(--gold);max-width:100%;overflow-wrap:anywhere"><small>红包 · 虚拟货币</small><strong>'+esc(m.body)+'</strong><span>查看红包 ›</span></button>';
+          if(m.kind==='forwarded-chat'){const card=readOnlineMeta(m);content='<button type="button" class="forwarded-story-card online-forward-card" data-online-forward="'+esc(m.id)+'" style="width:min(300px,65vw);max-width:100%;text-align:start"><small>聊天记录 · '+Number(card.count||0)+' 条</small><strong>'+esc(card.title||m.body)+'</strong>'+((card.preview||[]).map(item=>'<span style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(item.speaker+'：'+item.body)+'</span>').join(''))+'<small>点开查看 ›</small></button>';}
           if(m.kind==='archive-card')content='<button type="button" class="forwarded-story-card" data-online-archive="'+esc(m.id)+'" style="display:grid;text-align:start;max-width:100%;overflow-wrap:anywhere"><small>✦ 群聊分享</small><strong>'+esc(m.body)+'</strong><span>点开阅读 ›</span></button>';
           if(m.kind==='rps'){
             const closed=m.resolved||resolved.has(m.id);
@@ -928,14 +931,51 @@ const ledgerOnline = (() => {
       if(owner)form('onlineAnnouncementForm',async data=>{await request('announcement',{room:current.id,body:data.body});if(active(shown))await members(current);});
     }catch(error){if(active(serial))status(error.message);}
   }
-  async function forwardOnline(current,message){
+  async function readForwardCard(current,id){
+    const serial=screen('聊天记录',humanMessageFrame+'<div class="messages" id="onlineForwardEntries"></div><button type="button" id="onlineForwardMore" hidden>加载更多记录</button>'+end,()=>chatRoom(current));
+    const box=el('onlineForwardEntries'),more=el('onlineForwardMore');
+    let last=-1,loading=false;
+    function imageFor(image){
+      const position=image.dataset.forwardImage;
+      request('forward-image?room='+current.id+'&id='+id+'&position='+position).then(value=>{if(active(serial)&&image.isConnected)image.src=safePicture(value.image);}).catch(()=>{if(active(serial)&&image.isConnected)image.alt='图片载入失败';});
+    }
+    if(typeof IntersectionObserver==='function')imageObserver=new IntersectionObserver((entries,observer)=>{for(const entry of entries)if(entry.isIntersecting){observer.unobserve(entry.target);imageFor(entry.target);}},{root:box,rootMargin:'150px'});
+    async function next(){
+      if(loading||!active(serial))return;
+      loading=true;more.disabled=true;
+      try{
+        const card=await request('forward-card?room='+current.id+'&id='+id+'&after='+last);
+        if(!active(serial))return;
+        el('onlineTitle').textContent=card.title;
+        const fragment=document.createDocumentFragment();
+        for(const entry of card.entries){
+          const row=document.createElement('div');row.className='message-row assistant';
+          let quote;try{quote=typeof entry.quote==='string'?JSON.parse(entry.quote):entry.quote;}catch{}
+          const date=Date.parse(entry.created?.replace(' ','T')+(entry.created&&!/[zZ]|[+-]\d\d:\d\d$/.test(entry.created)?'Z':''));
+          const stamp=Number.isFinite(date)?new Date(date).toLocaleString('zh-CN'):entry.created||'';
+          row.innerHTML='<article class="bubble assistant'+(entry.humanOnly?' online-human-only':'')+'" style="max-width:100%;min-width:0;overflow-wrap:anywhere"><small>'+esc(entry.speaker)+'</small>'+quoteMarkup(quote)+'<p style="white-space:pre-wrap">'+esc(entry.body)+'</p>'+(entry.archive?'<button type="button" data-forward-archive="'+entry.position+'">阅读分享内容 ›</button>':'')+(entry.image?'<img class="message-image" data-forward-image="'+entry.position+'" alt="聊天图片" decoding="async">':'')+'<small class="muted">'+esc(stamp)+'</small></article>';
+          fragment.append(row);
+        }
+        box.append(fragment);
+        for(const image of box.querySelectorAll('img[data-forward-image]:not([data-observed])')){image.dataset.observed='1';if(imageObserver)imageObserver.observe(image);else imageFor(image);}
+        if(card.entries.length)last=card.entries.at(-1).position;
+        more.hidden=!card.more;
+      }catch(error){if(active(serial)){status(error.message);more.hidden=false;more.textContent='重试加载';}}
+      finally{loading=false;more.disabled=false;}
+    }
+    box.addEventListener('click',event=>{const button=event.target.closest('[data-forward-archive]');if(button)void readOnlineArchive(current,id,serial,button,Number(button.dataset.forwardArchive));});
+    more.onclick=next;
+    await next();
+  }
+  async function forwardOnline(current,chosen){
+    const selected=Array.isArray(chosen)?chosen:[chosen];
     const back=()=>chatRoom(current);
     const serial=screen('转发到在线群聊','<p class="muted">正在读取…</p>'+end,back);
     try{
       const groups=(await readRooms(true)).filter(item=>item.kind==='group'&&item.id!==current.id);
       if(!active(serial))return;
       screen('转发到在线群聊','<form id="onlineForwardForm"><label>接收群聊<select name="target" required><option value="">请选择</option>'+groups.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
-      form('onlineForwardForm',async(data,serial)=>{await request('forward-message',{room:data.target,sourceRoom:current.id,id:message.id});if(active(serial)){back();toast('已转发');}});
+      form('onlineForwardForm',async(data,serial)=>{await request('forward-message',{room:data.target,sourceRoom:current.id,ids:selected.map(message=>message.id)});if(active(serial)){back();toast('已转发聊天记录卡片');}});
     }catch(error){if(active(serial))status(error.message);}
   }
   function toggleOnlineSelection(id,current){
@@ -945,11 +985,12 @@ const ledgerOnline = (() => {
   }
   function paintOnlineSelection(current){
     const bar=el('onlineSelectionBar');if(!bar)return;
-    bar.innerHTML=onlineSelection?'<div class="message-selection bulk-tools"><strong>已选 '+onlineSelected.size+' 条</strong><div class="row"><button type="button" id="onlineSelectAll">全选已加载消息</button><button type="button" id="onlineExportTxt">导出 TXT</button><button type="button" id="onlineScreenshot">截图</button><button type="button" id="onlineSelectDone">完成</button></div></div>':'';
+    bar.innerHTML=onlineSelection?'<div class="message-selection bulk-tools"><strong>已选 '+onlineSelected.size+' 条</strong><div class="row"><button type="button" id="onlineSelectAll">全选已加载消息</button><button type="button" id="onlineForwardSelected">转发</button><button type="button" id="onlineExportTxt">导出 TXT</button><button type="button" id="onlineScreenshot">截图</button><button type="button" id="onlineSelectDone">完成</button></div></div>':'';
     if(!onlineSelection)return;
     el('onlineSelectDone').onclick=()=>{onlineSelection=false;onlineSelected.clear();chatRoom(current);};
     el('onlineSelectAll').onclick=()=>{for(const message of messages)if(!['deleted','message-deleted','member-joined'].includes(message.kind))onlineSelected.add(message.id);for(const node of el('onlineMessages').querySelectorAll('[data-online-message]')){node.classList.add('message-picked');node.setAttribute('aria-checked','true');}paintOnlineSelection(current);};
     const selected=()=>{const removed=new Set(messages.filter(event=>event.kind==='message-deleted').map(event=>Number(event.body)));return messages.filter(message=>onlineSelected.has(message.id)&&!['deleted','message-deleted'].includes(message.kind)&&!removed.has(message.id));};
+    el('onlineForwardSelected').onclick=()=>{const list=selected();if(!list.length)return;rememberChat(current.id);void forwardOnline(current,list);};
     el('onlineExportTxt').onclick=()=>{
       const text=selected().map(message=>message.name+' · '+message.created+' UTC\n'+[quoteText(readOnlineMeta(message).quote),message.body,['image','human-image'].includes(message.kind)?'[图片]':''].filter(Boolean).join('\n')).join('\n\n');
       if(!text)return;
@@ -989,7 +1030,7 @@ const ledgerOnline = (() => {
         remote.push(enabled.id);
       }
       screen('转发到在线群聊','<form id="onlineExternalForward"><label>接收群聊<select name="target" required><option value="">请选择</option>'+groups.filter(x=>x.kind==='group').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
-      form('onlineExternalForward',async(data,serial)=>{await request('external-forward',{room:data.target,charIds:remote,body:(message.speaker||(message.role==='user'?state.userName:displayName(scope.c)))+'：'+[quoteText(message.quote),message.content].filter(Boolean).join('\n'),image:message.image||''});if(active(serial)){back();toast('已转发');}});
+      form('onlineExternalForward',async(data,serial)=>{await request('external-forward',{room:data.target,charIds:remote,speaker:message.speaker||(message.role==='user'?state.userName:displayName(scope.c)),body:[quoteText(message.quote),message.content].filter(Boolean).join('\n'),created:message.sentAt?new Date(message.sentAt).toISOString():'',image:message.image||''});if(active(serial)){back();toast('已转发');}});
     }catch(error){toast(error.message);}
   }
   function chatRoom(current){
@@ -1191,6 +1232,8 @@ const ledgerOnline = (() => {
     feedNode.addEventListener('keydown',event=>{const node=event.target.closest('[data-online-message]');if(node&&onlineSelection&&['Enter',' '].includes(event.key)){event.preventDefault();toggleOnlineSelection(Number(node.dataset.onlineMessage),current);}});
     el('onlineMessages').addEventListener('click',event=>{
       if(onlineSelection){const node=event.target.closest('[data-online-message]');if(node){toggleOnlineSelection(Number(node.dataset.onlineMessage),current);event.preventDefault();event.stopImmediatePropagation();}return;}
+      const forward=event.target.closest('[data-online-forward]');
+      if(forward){rememberChat(current.id);void readForwardCard(current,Number(forward.dataset.onlineForward));return;}
       const packet=event.target.closest('[data-online-packet]');
       if(packet){rememberChat(current.id);openPacket(current,packet.dataset.onlinePacket);return;}
       const card=event.target.closest('[data-online-archive]');
@@ -1689,4 +1732,5 @@ const ledgerOnline = (() => {
   }
   return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal};
 })();
+
 
