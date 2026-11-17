@@ -340,14 +340,17 @@ async function sendPacket(env,ctx,room,uid,char,data){
   const target=data.mode==='exclusive'?field(data,'target',120):null;
   if(target&&(target===sender||!people.some(p=>p.id===target)))throw fail('请选择群里其他成员。');
   const total=packetCents(data.amount,currency.rates);
-  const shares=packetShares(total,target?1:Number(data.count),data.mode);
+  const count=target?1:Number(data.count);
+  if(count>people.length)throw fail('红包份数不能超过当前群人数（含 Char）。');
+  const shares=packetShares(total,count,data.mode);
   const packet={sender,target,targetName:people.find(p=>p.id===target)?.name||'',unit:currency.units[0],mode:data.mode,total,count:shares.length,shares,claims:[]};
   const label={normal:'普通红包',lucky:'拼手气红包',exclusive:'专属红包'}[data.mode];
   const sent=await db.prepare(`INSERT INTO messages (room,sender,char_id,body,kind,attachment) SELECT ?,?,?,?,'red-packet',?
     WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)
     AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)
-    AND (? IS NULL OR EXISTS(SELECT 1 FROM chars WHERE room=? AND id=? AND active=1))`).bind(room,uid,char?.id||null,label+' · '+formatPacket(total,packet.unit),JSON.stringify(packet),room,uid,room,char?.id||null,room,char?.id||null).run();
-  if(!sent.meta.changes)throw fail('发送者已离开群聊。',404);
+    AND (? IS NULL OR EXISTS(SELECT 1 FROM chars WHERE room=? AND id=? AND active=1))
+    AND ?<=(SELECT COUNT(*) FROM members WHERE room=?)+(SELECT COUNT(*) FROM chars WHERE room=? AND active=1)`).bind(room,uid,char?.id||null,label+' · '+formatPacket(total,packet.unit),JSON.stringify(packet),room,uid,room,char?.id||null,room,char?.id||null,count,room,room).run();
+  if(!sent.meta.changes)throw fail('群成员已变化，请重新打开红包界面后发送。',409);
   const id=sent.meta.last_row_id;
   const bots=people.filter(p=>p.id.startsWith('char:')&&p.id!==sender&&(!target||p.id===target));
   if(bots.length&&ctx)ctx.waitUntil(Promise.allSettled(bots.map(person=>new Promise(resolve=>setTimeout(resolve,3500+Math.random()*17000))
@@ -943,7 +946,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-red-packets-19'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-red-packet-count-20'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
