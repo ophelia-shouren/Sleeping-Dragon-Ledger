@@ -593,12 +593,15 @@ async function api(req, env, url, ledger, ctx) {
   if(ledger&&req.method==='POST'&&path==='kindroid-send'){
     const key=field(data,'key',512),ai_id=field(data,'ai_id',160),message=field(data,'message',16000);
     if(!/^kn_[A-Za-z0-9_-]+$/.test(key))throw fail('Kindroid API Key 格式无效。');
-    const upstream=await fetch('https://api.kindroid.ai/v1/send-message',{
+    let upstream;
+    try{upstream=await fetch('https://api.kindroid.ai/v1/send-message',{
       method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
-      body:JSON.stringify({ai_id,message,stream:true}),redirect:'error',signal:AbortSignal.timeout(240000)
-    });
+      body:JSON.stringify({ai_id,message,stream:true}),redirect:'manual',signal:AbortSignal.timeout(240000)
+    });}catch(error){throw fail(error.name==='TimeoutError'||error.name==='AbortError'?'Kindroid 等待回复超时，请先在 Kindroid 核对本轮记录。':'Kindroid 服务暂时无法连接，请稍后检查网络。',502);}
+    if(upstream.status>=300&&upstream.status<400)throw fail('Kindroid 接口返回了重定向，已停止转发以保护密钥。',502);
     if(!upstream.ok)throw fail('Kindroid 返回 HTTP '+upstream.status+'，请核对 Key、角色 ID 和订阅状态。',upstream.status);
-    const reply=await upstream.text();
+    let reply;
+    try{reply=await upstream.text();}catch{throw fail('Kindroid 回复传输中断，请先在 Kindroid 核对本轮记录。',502);}
     if(/<<HTTP_ERROR>>|<<ERROR>>/.test(reply)||!reply.trim())throw fail('Kindroid 本次未能完成回复，请先在 Kindroid 核对会话，勿重复发送。',502);
     return json({reply});
   }
@@ -1169,7 +1172,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'kindroid-private-bridge-30'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'kindroid-private-bridge-31'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
