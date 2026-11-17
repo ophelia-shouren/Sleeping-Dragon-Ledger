@@ -7,6 +7,78 @@ const ledgerOnline = (() => {
   const views=new Map(), feedsInFlight=new Map(), detailsInFlight=new Map();
   const cardSyncs=new Map();
   let onlineIdentity, syncedProfile, imageObserver, knownRooms=null;
+  let roomsAt=0, roomsRequest, noticeSession, noticeTimer, bannerTimer, queuedNotice;
+  const noticeDisplayKey='sleeping-dragon-online-muted';
+  function groupMuted(id,value){
+    const storageKey=noticeDisplayKey+':'+me.id+':'+id;
+    if(value!==undefined)localStorage.setItem(storageKey,value?'1':'0');
+    return localStorage.getItem(storageKey)==='1';
+  }
+  function showNotice(message){
+    if(groupMuted(message.room)||typeof deviceLocked!=='undefined'&&deviceLocked)return;
+    if(document.hidden){queuedNotice=message;return;}
+    let banner=el('onlineNotice');
+    const sheet=Array.from(document.querySelectorAll('dialog[open]')).at(-1);
+    if(!banner){
+      banner=document.createElement('div');
+      banner.id='onlineNotice';
+      banner.setAttribute('role','status');
+      banner.style.cssText='position:fixed;inset:max(8px,env(safe-area-inset-top)) 12px auto;margin:0 auto;box-sizing:border-box;width:auto;max-width:40rem;padding:.65em 1em;border:1px solid var(--line);border-inline-start:3px solid var(--gold);border-radius:.55em;background:var(--panel);color:var(--ink);font:inherit;box-shadow:0 4px 16px #0004;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;z-index:2147483647';
+      if(banner.showPopover)banner.setAttribute('popover','manual');
+      (banner.showPopover?document.body:sheet||document.body).append(banner);
+    }
+    if(!banner.showPopover&&banner.parentElement!==(sheet||document.body))(sheet||document.body).append(banner);
+    banner.dataset.room=message.room;
+    banner.textContent=message.group_name+' · '+(message.kind==='member-joined'?'':message.name+'：')+message.body.replace(/\s+/g,' ');
+    if(banner.showPopover){
+      if(banner.matches(':popover-open'))banner.hidePopover();
+      banner.showPopover();
+    }
+    clearTimeout(bannerTimer);
+    bannerTimer=setTimeout(()=>banner.remove(),3000);
+  }
+  async function pollNotices(){
+    const session=noticeSession;
+    if(!session||session.loading)return;
+    clearTimeout(noticeTimer);
+    session.loading=true;
+    try{
+      const signal=AbortSignal.timeout(12000);
+      const feed=await request('notifications'+(session.cursor===null?'':'?after='+session.cursor),undefined,signal);
+      if(noticeSession!==session)return;
+      session.cursor=feed.cursor;
+      session.failures=0;
+      const latest=feed.rows.findLast(message=>!groupMuted(message.room));
+      if(latest)showNotice(latest);
+    }catch{
+      session.failures++;
+    }finally{
+      session.loading=false;
+      if(noticeSession===session)noticeTimer=setTimeout(pollNotices,Math.min(30000,3500*2**Math.min(session.failures,4)));
+    }
+  }
+  function startNotices(){
+    if(noticeSession)return;
+    noticeSession={cursor:null,loading:false,failures:0};
+    pollNotices();
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)return;
+    if(queuedNotice){showNotice(queuedNotice);queuedNotice=null;}
+    pollNotices();
+  });
+  window.addEventListener('online',pollNotices);
+  function readRooms(force=false){
+    if(!force&&knownRooms&&Date.now()-roomsAt<12000)return Promise.resolve(knownRooms);
+    if(roomsRequest)return roomsRequest;
+    const token=onlineIdentity;
+    const work=request('rooms').then(list=>{
+      if(onlineIdentity===token){knownRooms=list;roomsAt=Date.now();}
+      return list;
+    }).finally(()=>{if(roomsRequest===work)roomsRequest=null;});
+    roomsRequest=work;
+    return work;
+  }
   function viewFor(id){
     let view=views.get(id);
     if(view)views.delete(id);
@@ -36,7 +108,7 @@ const ledgerOnline = (() => {
       if(view.loaded || views.get(id)!==view)return;
       const rows=Array.isArray(feed)?feed:feed.rows;
       view.messages=rows.slice(-36);view.older=rows.length>36;
-      view.typing=feed.typing||[];view.loaded=true;
+      view.typing=feed.typing||[];view.loaded=true;view.updated=Date.now();
     }).catch(()=>{});
     if(!view.detail)roomDetail(id).then(info=>{
       if(views.get(id)===view)view.detail=info;
@@ -175,7 +247,8 @@ const ledgerOnline = (() => {
     const look=appearance('user');
     const snapshot={name:fitText(look.name,30)||'你',persona:fitText(userPersona(),18000),avatar:look.avatar,frame:look.frame};
     if(onlineIdentity!==token){
-      onlineIdentity=token;me=null;syncedProfile=null;knownRooms=null;views.clear();pictures.clear();
+      clearTimeout(noticeTimer);noticeSession=null;queuedNotice=null;el('onlineNotice')?.remove();
+      roomsRequest=null;roomsAt=0;onlineIdentity=token;me=null;syncedProfile=null;knownRooms=null;views.clear();pictures.clear();
     }
     const invite=inviteFromUrl();
     if(me && !invite)rooms();
@@ -195,6 +268,7 @@ const ledgerOnline = (() => {
         localStorage.setItem(profileReadyKey,'1');
       }
       if(!active(serial))return;
+      startNotices();
       if(invite)join(invite);else if(!el('onlineList'))rooms();
     }catch(error){
       if(!active(serial))return;
@@ -247,10 +321,10 @@ const ledgerOnline = (() => {
     if(knownRooms)paint(knownRooms);
     else el('onlineList').textContent='正在加载会话…';
     async function refresh(){
-      const list=await request('rooms');
-      if(!active(serial))return;
       const firstLoad=knownRooms===null;
-      knownRooms=list;paint(list);
+      const list=await readRooms();
+      if(!active(serial))return;
+      paint(list);
       if(firstLoad&&list[0])prefetchRoom(list[0].id);
     }
     refresh().catch(e=>{if(active(serial))status(e.message);});
@@ -265,6 +339,7 @@ const ledgerOnline = (() => {
     };
     form('onlineCreate',async(data,serial)=>{
       const {id}=await request('rooms',data);
+      roomsAt=0;
       if(active(serial))chatRoom({id,name:data.kind==='dm'?'好友私聊':data.name,kind:data.kind});
     });
   }
@@ -278,7 +353,7 @@ const ledgerOnline = (() => {
       const {id}=await request('join',{invite});
       if(!active(serial))return;
       const url=new URL(location.href);url.searchParams.delete('onlineInvite');history.replaceState(null,'',url);
-      const list=await request('rooms');
+      const list=await readRooms(true);
       if(active(serial))chatRoom(list.find(x=>x.id===id));
     });
   }
@@ -602,7 +677,7 @@ const ledgerOnline = (() => {
           older=rows.length>36;
           messages=rows.slice(-36);
         }else messages.push(...rows.filter(x=>x.id>(messages.at(-1)?.id||0)));
-        view.messages=messages;view.older=older;view.loaded=true;
+        view.messages=messages;view.older=older;view.loaded=true;view.updated=Date.now();
         if(pendingMessage?.room===current.id&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
         if(rows.length||firstLoad)drawMessages(stick?'bottom':'keep');
         else if(typingChanged)drawTyping();
@@ -700,7 +775,7 @@ const ledgerOnline = (() => {
       if(result.notice)status(result.notice);
       refresh().catch(error=>{if(active(requestSerial))status(error.message);});
     });
-    refresh().catch(e=>{if(active(serial))status(e.message);});
+    if(!view.updated||Date.now()-view.updated>=2500)refresh().catch(e=>{if(active(serial))status(e.message);});
     later(serial,refresh,2500);
   }
   async function members(current){
@@ -732,8 +807,17 @@ const ledgerOnline = (() => {
           (info.inviteCode?'<label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode)+'"></label><button id="onlineCopyCode" type="button">复制邀请码</button>':'')+
           '<label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
+        (group?'<section class="group-settings-card group-settings-block"><h3>消息通知</h3><label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" id="onlineMute" '+(groupMuted(current.id)?'checked':'')+'><span aria-hidden="true"></span>消息免打扰</label></section>':'')+
         (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><p class="muted">当前可读取在线消息数。Cloudflare 账户剩余额度需要账户级统计授权。</p></section>':'');
       if(group){
+        el('onlineMute').onchange=event=>{
+          const input=event.currentTarget;
+          try{
+            groupMuted(current.id,input.checked);
+            if(input.checked&&el('onlineNotice')?.dataset.room===current.id)el('onlineNotice').remove();
+            if(input.checked&&queuedNotice?.room===current.id)queuedNotice=null;
+          }catch{input.checked=!input.checked;status('免打扰设置未能保存。');}
+        };
         el('onlineMemberList').insertAdjacentHTML('beforeend',
           '<div class="clear-chat-row"><button type="button" class="archive-danger" id="onlineQuitGroup">'+(owner?'解散群聊':'退出群聊')+'</button></div>');
         el('onlineQuitGroup').onclick=()=>confirmGroupExit(current,owner);
@@ -868,6 +952,7 @@ const ledgerOnline = (() => {
       try{
         await request(owner?'dissolve-group':'leave-group',{room:current.id});
         views.delete(current.id);
+        roomsAt=0;
         if(knownRooms)knownRooms=knownRooms.filter(item=>item.id!==current.id);
         if(active(serial)){rooms();status(owner?'群聊已解散。':'已退出群聊。');}
       }catch(error){
