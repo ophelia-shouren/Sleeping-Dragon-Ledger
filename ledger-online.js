@@ -392,7 +392,7 @@ const ledgerOnline = (() => {
       const signature=JSON.stringify(list);
       if(signature===previous)return;
       previous=signature;
-      el('onlineList').innerHTML=list.map(x=>'<button type="button" class="directory-item" data-online-room="'+esc(x.id)+'">'+(x.kind==='group'?groupAvatar(x):personAvatar(x.name))+'<span><strong>'+esc(x.name)+'</strong><small>'+esc(x.preview||(x.kind==='group'?'群聊':'私聊'))+'</small></span><b>›</b></button>').join('')||'<div class="empty">还没有在线会话</div>';
+      el('onlineList').innerHTML=list.map(x=>'<button type="button" class="directory-item" data-online-room="'+esc(x.id)+'">'+(x.kind==='group'?groupAvatar(x):personAvatar(x.name))+'<span><strong>'+esc(x.name)+'</strong><small>'+esc(x.preview||(x.kind==='group'?'群聊':'私聊'))+'</small></span>'+(x.unread?'<b aria-label="'+Number(x.unread)+' 条未读消息" style="display:inline-grid;place-items:center;min-width:1.7em;height:1.7em;border:1px solid var(--gold);border-radius:50%;font:inherit;font-size:.82em;color:var(--gold);background:var(--panel)">'+(x.unread>99?'99+':Number(x.unread))+'</b>':'<b>›</b>')+'</button>').join('')||'<div class="empty">还没有在线会话</div>';
       el('onlineList').querySelectorAll('button').forEach(b=>{
         b.onclick=()=>chatRoom(list.find(x=>x.id===b.dataset.onlineRoom));
         b.onpointerdown=()=>prefetchRoom(b.dataset.onlineRoom);
@@ -712,7 +712,7 @@ const ledgerOnline = (() => {
         const parts=m.char_id&&m.kind!=='red-packet'?chatBubbleParts({role:'assistant',content:stripCharacterPrefix(m.body,m.name)},{split:display.split!==false,limit:30}):[m.body];
         return parts.map((part,index)=>{
           const first=index===0;
-          let content='<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
+          let content=(first?quoteMarkup(readOnlineMeta(m).quote):'')+'<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
           if(m.kind==='image'||m.kind==='human-image')content=imageInOnlineMessage(m.id);
           if(m.kind==='red-packet')content='<button type="button" class="forwarded-story-card" data-online-packet="'+esc(m.id)+'" style="display:grid;gap:4px;text-align:start;border:1px solid var(--gold);max-width:100%;overflow-wrap:anywhere"><small>红包 · 虚拟货币</small><strong>'+esc(m.body)+'</strong><span>查看红包 ›</span></button>';
           if(m.kind==='archive-card')content='<button type="button" class="forwarded-story-card" data-online-archive="'+esc(m.id)+'" style="display:grid;text-align:start;max-width:100%;overflow-wrap:anywhere"><small>✦ 群聊分享</small><strong>'+esc(m.body)+'</strong><span>点开阅读 ›</span></button>';
@@ -723,7 +723,7 @@ const ledgerOnline = (() => {
           }
           // Mist uses the metadata sibling to theme the bubble. Keep it without a layout box.
           const leading=first?layout.before:state.skin==='mist'?'<div class="mist-chat-meta" hidden style="display:none"></div>':'<span class="avatar-button" aria-hidden="true" style="visibility:hidden;flex:none">'+personAvatar(m.name)+'</span>';
-          return '<div class="message-row '+role+'">'+leading+'<article data-online-message="'+esc(m.id)+'" class="bubble '+role+frame+'">'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
+          return '<div class="message-row '+role+'">'+leading+'<article data-online-message="'+esc(m.id)+'" class="bubble '+role+frame+(onlineSelected.has(m.id)?' message-picked':'')+'" '+(onlineSelection?'role="checkbox" tabindex="0" aria-checked="'+onlineSelected.has(m.id)+'"':'')+'>'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
         }).join('');
       }).join('');
     if(added){
@@ -903,19 +903,107 @@ const ledgerOnline = (() => {
       clear(){selected.clear();close();}
     };
   }
+  function readOnlineMeta(message){try{return JSON.parse(message.meta||'{}');}catch{return {};}}
+  let onlineSelection=false;
+  const onlineSelected=new Set();
+  function paintOnlineQuote(id){
+    const node=el('onlineQuoteDraft'),quote=viewFor(id).quote;
+    if(!node)return;
+    node.innerHTML=quote?'<div class="chat-quote-draft">'+quoteMarkup(quote)+'<button type="button" aria-label="取消引用">×</button></div>':'';
+    if(quote)node.querySelector('button').onclick=()=>{viewFor(id).quote=null;paintOnlineQuote(id);};
+  }
+  async function markRead(current,cursor){
+    const view=viewFor(current.id);
+    if(!cursor||document.hidden||cursor<=(view.readCursor||0))return;
+    view.readCursor=cursor;
+    try{await request('read-room',{room:current.id,cursor});roomsAt=0;if(knownRooms)knownRooms=knownRooms.map(item=>item.id===current.id?{...item,unread:0}:item);}
+    catch{view.readCursor=0;}
+  }
+  async function announcement(current,owner){
+    const serial=screen('群公告','<p class="muted">正在读取…</p>'+end,()=>members(current));
+    try{
+      const value=await request('announcement?room='+current.id);
+      if(!active(serial))return;
+      const shown=screen('群公告',owner?'<form id="onlineAnnouncementForm"><label>公告内容<textarea name="body" rows="10" maxlength="5000">'+esc(value.body)+'</textarea></label><button type="submit" class="primary">保存公告</button></form>'+end:'<section class="group-settings-card"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(value.body||'暂无群公告')+'</p></section>'+end,()=>members(current));
+      if(owner)form('onlineAnnouncementForm',async data=>{await request('announcement',{room:current.id,body:data.body});if(active(shown))await members(current);});
+    }catch(error){if(active(serial))status(error.message);}
+  }
+  async function forwardOnline(current,message){
+    const back=()=>chatRoom(current);
+    const serial=screen('转发到在线群聊','<p class="muted">正在读取…</p>'+end,back);
+    try{
+      const groups=(await readRooms(true)).filter(item=>item.kind==='group'&&item.id!==current.id);
+      if(!active(serial))return;
+      screen('转发到在线群聊','<form id="onlineForwardForm"><label>接收群聊<select name="target" required><option value="">请选择</option>'+groups.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
+      form('onlineForwardForm',async(data,serial)=>{await request('forward-message',{room:data.target,sourceRoom:current.id,id:message.id});if(active(serial)){back();toast('已转发');}});
+    }catch(error){if(active(serial))status(error.message);}
+  }
+  function toggleOnlineSelection(id,current){
+    if(onlineSelected.has(id))onlineSelected.delete(id);else onlineSelected.add(id);
+    for(const node of el('onlineMessages').querySelectorAll('[data-online-message="'+id+'"]')){node.classList.toggle('message-picked',onlineSelected.has(id));node.setAttribute('aria-checked',String(onlineSelected.has(id)));}
+    paintOnlineSelection(current);
+  }
+  function paintOnlineSelection(current){
+    const bar=el('onlineSelectionBar');if(!bar)return;
+    bar.innerHTML=onlineSelection?'<div class="message-selection bulk-tools"><strong>已选 '+onlineSelected.size+' 条</strong><div class="row"><button type="button" id="onlineSelectAll">全选已加载消息</button><button type="button" id="onlineExportTxt">导出 TXT</button><button type="button" id="onlineScreenshot">截图</button><button type="button" id="onlineSelectDone">完成</button></div></div>':'';
+    if(!onlineSelection)return;
+    el('onlineSelectDone').onclick=()=>{onlineSelection=false;onlineSelected.clear();chatRoom(current);};
+    el('onlineSelectAll').onclick=()=>{for(const message of messages)if(!['deleted','message-deleted','member-joined'].includes(message.kind))onlineSelected.add(message.id);for(const node of el('onlineMessages').querySelectorAll('[data-online-message]')){node.classList.add('message-picked');node.setAttribute('aria-checked','true');}paintOnlineSelection(current);};
+    const selected=()=>{const removed=new Set(messages.filter(event=>event.kind==='message-deleted').map(event=>Number(event.body)));return messages.filter(message=>onlineSelected.has(message.id)&&!['deleted','message-deleted'].includes(message.kind)&&!removed.has(message.id));};
+    el('onlineExportTxt').onclick=()=>{
+      const text=selected().map(message=>message.name+' · '+message.created+' UTC\n'+[quoteText(readOnlineMeta(message).quote),message.body,['image','human-image'].includes(message.kind)?'[图片]':''].filter(Boolean).join('\n')).join('\n\n');
+      if(!text)return;
+      const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='眠龙-在线群聊-'+dateString()+'.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),15000);
+    };
+    el('onlineScreenshot').onclick=async event=>{
+      const button=event.currentTarget,list=selected();if(!list.length)return;
+      button.disabled=true;
+      try{
+        const converted=[];
+        for(const message of list){
+          let image='';if(['image','human-image'].includes(message.kind)){const cache=current.id+':'+message.id;if(!pictures.has(cache))pictures.set(cache,request('image?room='+current.id+'&id='+message.id).then(result=>safePicture(result.image)));try{image=await pictures.get(cache);}catch{pictures.delete(cache);throw Error('图片载入失败，请重试截图。');}}
+          const person=message.char_id?detail?.chars.find(x=>x.id===message.char_id):detail?.members.find(x=>x.id===message.sender);
+          const mine=!message.char_id&&message.sender===me.id;
+          converted.push({content:message.body,speaker:message.name,roleId:mine?'':'online:'+message.id,role:mine?'user':'assistant',quote:readOnlineMeta(message).quote,image,sentAt:Date.parse(message.created.replace(' ','T')+'Z'),onlinePerson:{name:message.name,avatar:person?.avatar_image||person?.avatar||'',frame:storedFrame(person?.frame)}});
+        }
+        await screenshotSelectedMessages(button,{c:{name:current.name},group:{...current,...displayFor(current.id),split:displayFor(current.id).split!==false},messages:converted,indices:new Set(converted.map((_,i)=>i))});
+      }catch(error){status(error.message);}finally{button.disabled=false;}
+    };
+  }
+  async function forwardExternal(scope,message){
+    const back=()=>{if(scope.group)openGroup(scope.group.id);else{el('dialog').close();render();}};
+    try{
+      if(!me)throw Error('请先进入在线聊天完成身份同步。');
+      const localIds=scope.group?(message.roleId?[message.roleId]:(message.audience||scope.group.members)):[scope.c.id];
+      const groups=await readRooms(true),map=mapping(),remote=[];
+      for(const localId of localIds){
+        let enabled=null;
+        for(const group of groups.filter(x=>x.kind==='group')){
+          const info=await roomDetail(group.id);
+          enabled=info.chars.find(char=>char.owner===me.id&&char.personal_enabled&&map[char.id]?.card===localId);
+          if(enabled)break;
+        }
+        if(!enabled)throw Error('涉及角色须先开启在线群聊内读取个人记忆与私聊记录。');
+        remote.push(enabled.id);
+      }
+      screen('转发到在线群聊','<form id="onlineExternalForward"><label>接收群聊<select name="target" required><option value="">请选择</option>'+groups.filter(x=>x.kind==='group').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
+      form('onlineExternalForward',async(data,serial)=>{await request('external-forward',{room:data.target,charIds:remote,body:(message.speaker||(message.role==='user'?state.userName:displayName(scope.c)))+'：'+[quoteText(message.quote),message.content].filter(Boolean).join('\n'),image:message.image||''});if(active(serial)){back();toast('已转发');}});
+    }catch(error){toast(error.message);}
+  }
   function chatRoom(current){
     if(!current)return rooms();
     if(el('onlineNotice')?.dataset.room===current.id)el('onlineNotice').remove();
     if(queuedNotice?.room===current.id)queuedNotice=null;
     if(room?.id)rememberChat(room.id);
     const view=viewFor(current.id);
+    if(room?.id!==current.id){onlineSelected.clear();onlineSelection=false;}
     room=current;messages=view.messages;older=view.older;detail=view.detail||null;typingCharacters=view.typing;
     const group=current.kind==='group';
     if(group&&detail?.name)Object.assign(current,{name:detail.name,avatar:detail.avatar});
     const bulbIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4m-6-7a6 6 0 1 1 8 0c-.8.7-1 1.3-1 2H9c0-.7-.2-1.3-1-2Z"/></svg>';
     const sendIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 15H3L12 2Zm0 20L3 7h18l-9 15Z"/></svg>';
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
-    const serial=screen(current.name,humanMessageFrame+end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
+    const serial=screen(current.name,humanMessageFrame+end+'<div id="onlineSelectionBar"></div><div id="onlineMessages" class="messages"></div><form id="onlineCompose"><div id="onlineQuoteDraft"></div><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及成员" aria-controls="onlineChoices" aria-expanded="false">@ 成员</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
       '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button>'+(group?'<button type="button" id="onlineRedPacket">发红包</button>':'')+'</div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
@@ -934,6 +1022,7 @@ const ledgerOnline = (() => {
       bulb.onclick=()=>{view.humanOnly=!view.humanOnly;paintBulb();};
       paintBulb();
     }
+    paintOnlineQuote(current.id);
     const draft=el('onlineCompose').elements.body;
     draft.value=view.draft||'';
     const mentions=setupMentions(draft,group);
@@ -989,6 +1078,7 @@ const ledgerOnline = (() => {
           messages=rows.slice(-36);
         }else messages.push(...added);
         view.messages=messages;view.older=older;view.loaded=true;view.updated=Date.now();
+        if(cursor||messages.length)void markRead(current,messages.at(-1)?.id||0);
         const hadPending=pendingMessage?.room===current.id;
         if(hadPending&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
         if(added.length||nextTyping.length)lastActivity=Date.now();
@@ -1052,27 +1142,34 @@ const ledgerOnline = (() => {
     let messagePress=null,pressOrigin=null,suppressMessageClick=false;
     const cancelMessagePress=()=>{clearTimeout(messagePress);messagePress=null;};
     function manageMessage(target){
-      if(!group||detail?.owner!==me.id)return;
+      if(!group)return;
       const message=messages.find(item=>String(item.id)===target.dataset.onlineMessage);
       if(!message||['deleted','message-deleted'].includes(message.kind))return;
       rememberChat(current.id);
-      screen('管理消息','<section class="group-settings-card group-settings-block"><strong>'+esc(message.name)+'</strong><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(message.body.slice(0,500))+'</p><button type="button" class="archive-danger" id="onlineDeleteMessage">删除这条消息</button><button type="button" id="onlineCancelMessage">返回聊天</button></section>'+end,()=>chatRoom(current));
+      const actions=[['quote','❝','引用回复','附在下一条消息里'],['forward','↗','转发','转发到其他在线群聊'],['select','☷','多选消息','导出 TXT 或截图'],...(detail?.owner===me.id?[['delete','×','删除消息','从当前群聊删除']]:[])];
+      screen('消息操作','<div class="message-menu">'+actions.map(([key,icon,title,desc])=>'<button type="button" data-online-command="'+key+'"><span class="message-menu-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+desc+'</small></span></button>').join('')+'</div><div class="row actions"><button type="button" id="onlineCancelMessage">取消</button></div>'+end,()=>chatRoom(current));
       el('onlineCancelMessage').onclick=()=>chatRoom(current);
-      el('onlineDeleteMessage').onclick=async event=>{
+      el('ledgerOnline').querySelectorAll('[data-online-command]').forEach(button=>button.onclick=async()=>{
+        const command=button.dataset.onlineCommand;
+        if(command==='quote'){
+          view.quote={id:message.id,speaker:message.name,content:['image','human-image'].includes(message.kind)?'[图片]':message.body.slice(0,300)};
+          chatRoom(current);el('onlineCompose').elements.body.focus();return;
+        }
+        if(command==='forward'){await forwardOnline(current,message);return;}
+        if(command==='select'){onlineSelection=true;onlineSelected.add(message.id);chatRoom(current);return;}
         if(!confirm('删除这条消息？群内所有成员都将无法再查看，分句回复会整条删除。'))return;
-        const button=event.currentTarget;button.disabled=true;
+        button.disabled=true;
         try{
           await request('delete-message',{room:current.id,id:message.id});
-          const cached=viewFor(current.id);
-          const original=cached.messages.find(item=>item.id===message.id);
+          const original=view.messages.find(item=>item.id===message.id);
           if(original)Object.assign(original,{kind:'deleted',body:''});
           chatRoom(current);
         }catch(error){status(error.message);button.disabled=false;}
-      };
+      });
     }
     feedNode.addEventListener('pointerdown',event=>{
       const target=event.target.closest('[data-online-message]');
-      if(!target||event.button!==0||!group||detail?.owner!==me.id)return;
+      if(!target||event.button!==0||!group||onlineSelection)return;
       cancelMessagePress();pressOrigin=[event.clientX,event.clientY];
       messagePress=setTimeout(()=>{messagePress=null;suppressMessageClick=true;manageMessage(target);},550);
     });
@@ -1082,12 +1179,15 @@ const ledgerOnline = (() => {
     for(const type of ['pointerup','pointercancel','pointerleave','scroll'])feedNode.addEventListener(type,cancelMessagePress);
     feedNode.addEventListener('contextmenu',event=>{
       const target=event.target.closest('[data-online-message]');
-      if(target&&group&&detail?.owner===me.id){event.preventDefault();cancelMessagePress();if(!suppressMessageClick)manageMessage(target);}
+      if(target&&group){event.preventDefault();cancelMessagePress();if(!suppressMessageClick)manageMessage(target);}
     });
     feedNode.addEventListener('click',event=>{
       if(suppressMessageClick){suppressMessageClick=false;event.preventDefault();event.stopImmediatePropagation();}
     },true);
+    paintOnlineSelection(current);
+    feedNode.addEventListener('keydown',event=>{const node=event.target.closest('[data-online-message]');if(node&&onlineSelection&&['Enter',' '].includes(event.key)){event.preventDefault();toggleOnlineSelection(Number(node.dataset.onlineMessage),current);}});
     el('onlineMessages').addEventListener('click',event=>{
+      if(onlineSelection){const node=event.target.closest('[data-online-message]');if(node){toggleOnlineSelection(Number(node.dataset.onlineMessage),current);event.preventDefault();event.stopImmediatePropagation();}return;}
       const packet=event.target.closest('[data-online-packet]');
       if(packet){rememberChat(current.id);openPacket(current,packet.dataset.onlinePacket);return;}
       const card=event.target.closest('[data-online-archive]');
@@ -1109,7 +1209,8 @@ const ledgerOnline = (() => {
       pendingMessage=pending;
       drawMessages('bottom');
       let result;
-      try{result=await request(path,{room:current.id,body,charId,deferReply:true});}
+      const quoteId=view.quote?.id;
+      try{result=await request(path,{room:current.id,body,charId,deferReply:true,quoteId});view.quote=null;if(active(requestSerial))paintOnlineQuote(current.id);}
       catch(error){
         if(pendingMessage===pending)pendingMessage=null;
         if(active(requestSerial)){if(!input.value)input.value=body;drawMessages('bottom');}
@@ -1178,10 +1279,12 @@ const ledgerOnline = (() => {
         (owner?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode||'')+'"></label><div class="row"><button id="onlineCopyCode" type="button">复制邀请码</button><button id="onlineRotateCode" type="button">重新生成邀请码</button></div></section>':
           !group&&info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         (owner?'<section class="group-settings-card group-settings-block"><h3>群聊货币</h3><button type="button" id="onlineCurrencySettings">设置货币单位</button></section>':'')+
+        (group?'<section class="group-settings-card group-settings-block"><h3>群公告</h3><button type="button" id="onlineAnnouncement">查看'+(owner?'／编辑':'')+'群公告</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
         (group?'<section class="group-settings-card group-settings-block"><h3>消息通知</h3><label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" id="onlineMute" '+(groupMuted(current.id)?'checked':'')+'><span aria-hidden="true"></span>消息免打扰</label></section>':'')+
         (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><div id="onlineD1Quota" class="muted"></div></section>':'');
       if(group){
+        el('onlineAnnouncement').onclick=()=>announcement(current,owner);
         el('onlineMute').onchange=event=>{
           const input=event.currentTarget;
           try{
@@ -1441,10 +1544,11 @@ const ledgerOnline = (() => {
       const formSerial=screen('AI 活人感','<section class="group-settings-card group-settings-block"><h3>'+esc(char.name)+'</h3><form id="onlineAliveForm">'+
         '<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="enabled" '+(config.minutes?'checked':'')+'><span aria-hidden="true"></span>定时主动发言</label>'+
         '<label>发言间隔（分钟）<input type="number" name="minutes" min="1" max="1440" step="1" required value="'+(config.minutes||15)+'"></label>'+
+        '<label><input type="checkbox" name="quietEnabled" '+(config.quiet?'checked':'')+'> 启用静默时间</label><div class="fields"><label>开始<input type="time" name="quietStart" required value="'+(config.quiet?.start||'23:00')+'"></label><label>结束<input type="time" name="quietEnd" required value="'+(config.quiet?.end||'08:00')+'"></label></div><p class="muted">静默时间按保存时的本机时区执行，支持跨午夜。</p>'+
         '<p class="muted">开启后，角色按设定间隔读取最近 10 条文字消息，并使用你为该角色配置的 API 主动发一条群消息。离线时也会运行。</p>'+
         '<button type="submit" class="primary">保存设置</button></form></section>'+end,back);
       form('onlineAliveForm',async data=>{
-        await request('char-autopost',{room:current.id,id:char.id,minutes:data.enabled?Number(data.minutes):0});
+        await request('char-autopost',{room:current.id,id:char.id,minutes:data.enabled?Number(data.minutes):0,quiet:data.quietEnabled?{start:data.quietStart,end:data.quietEnd,offset:new Date().getTimezoneOffset()}:null});
         if(active(formSerial)){await members(current);status('AI 活人感设置已保存。');}
       });
     }catch(error){if(active(serial))status(error.message);}
@@ -1580,5 +1684,6 @@ const ledgerOnline = (() => {
       if(active(serial))members(current);
     });
   }
-  return {directory,open,inviteFromUrl,shareArchive,syncVision};
+  return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal};
 })();
+
