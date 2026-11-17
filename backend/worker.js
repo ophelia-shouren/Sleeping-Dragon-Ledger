@@ -300,6 +300,42 @@ async function runAutoPosts(env,ctx){
   for(const outcome of outcomes)if(outcome.status==='rejected')console.error('Scheduled character reply could not run',outcome.reason?.name);
 }
 
+let cachedD1Usage;
+async function accountD1Usage(env){
+  const account=env.CF_ANALYTICS_ACCOUNT_ID?.trim();
+  if(!env.CF_ANALYTICS_TOKEN||!/^[a-f0-9]{32}$/i.test(account||''))return {status:'unconfigured'};
+  const now=Date.now(), day=new Date(now).toISOString().slice(0,10);
+  if(cachedD1Usage?.account===account&&cachedD1Usage.day===day&&cachedD1Usage.expires>now)return cachedD1Usage.value;
+  let value;
+  try{
+    const response=await fetch('https://api.cloudflare.com/client/v4/graphql',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+env.CF_ANALYTICS_TOKEN,'Content-Type':'application/json'},
+      signal:AbortSignal.timeout(5000),
+      body:JSON.stringify({
+        query:`query LedgerD1Usage($account: String!, $day: Date!) {
+          viewer { accounts(filter: {accountTag: $account}) {
+            d1AnalyticsAdaptiveGroups(limit: 1, filter: {date_geq: $day, date_leq: $day}) {
+              sum { rowsRead rowsWritten }
+            }
+          } }
+        }`,
+        variables:{account,day}
+      })
+    });
+    if(!response.ok)throw Error('Analytics request failed');
+    const result=await response.json();
+    const groups=result.data?.viewer?.accounts?.[0]?.d1AnalyticsAdaptiveGroups;
+    if(result.errors?.length||!Array.isArray(groups))throw Error('Analytics data unavailable');
+    const reads=groups.length?groups[0].sum?.rowsRead:0;
+    const writes=groups.length?groups[0].sum?.rowsWritten:0;
+    if(![reads,writes].every(value=>Number.isFinite(value)&&value>=0))throw Error('Invalid analytics row count');
+    value={status:'ready',reads,writes,readLimit:5000000,writeLimit:100000,checkedAt:new Date(now).toISOString()};
+  }catch{value={status:'unavailable'};}
+  cachedD1Usage={account,day,value,expires:now+(value.status==='ready'?60000:20000)};
+  return value;
+}
+
 async function api(req, env, url, ledger, ctx) {
   const uid = ledger ? await ledgerIdentity(req) : req.headers.get('oai-authenticated-user-id');
   if (!uid) throw fail('请先登录。',401);
@@ -393,7 +429,7 @@ async function api(req, env, url, ledger, ctx) {
   const room = await requireRoom(req.method === 'POST' ? field(data,'room',36) : url.searchParams.get('room') || '');
   if (ledger && req.method === 'GET' && path === 'quota' && room.kind === 'group') {
     const usage = await one("SELECT COALESCE((SELECT messages FROM ledger_daily_usage WHERE day=date('now')),0) messages, strftime('%Y-%m-%dT00:00:00Z','now','start of day','+1 day') resets");
-    return json({messages:usage.messages,resetsAt:usage.resets});
+    return json({messages:usage.messages,resetsAt:usage.resets,d1:await accountD1Usage(env)});
   }
   if (ledger && req.method==='POST' && path==='group-look') {
     if(room.kind!=='group'||room.owner!==uid)throw fail('只有群主可以修改群名称和头像。',403);
@@ -669,7 +705,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-character-speech-11'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-d1-usage-12'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
