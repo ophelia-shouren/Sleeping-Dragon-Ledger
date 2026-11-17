@@ -412,6 +412,13 @@ const ledgerOnline = (() => {
       worldFront:worldContext('front',card.id),worldEnd:worldContext('end',card.id)
     };
   }
+  function personalContext(card){
+    const recent=(card.messages||[]).filter(m=>!m.tea&&['user','assistant'].includes(m.role)&&!replyPending(m)).slice(-10);
+    return {
+      memories:fitText(memoryContext(card),100000),
+      dialogue:recent.map(m=>(m.role==='user'?'邀请者':'角色')+'：'+fitText(chatTextRecord(m).content,2300)).join('\n')
+    };
+  }
   function mapping(){
     try{return JSON.parse(localStorage.getItem(mappingKey)||'{}');}catch{return {};}
   }
@@ -423,6 +430,7 @@ const ledgerOnline = (() => {
       const entry=map[member.id],card=entry&&contact(entry.card);
       if(!card)continue;
       const context=cardContext(card);
+      if(member.personal_enabled)context.personal=personalContext(card);
       const signature=await contextSignature(context);
       if(entry.signature===signature)continue;
       await request('sync-card',{room:current.id,id:member.id,...context});
@@ -763,10 +771,11 @@ const ledgerOnline = (() => {
         const id=button.dataset.onlineManage, char=info.chars.find(x=>x.id===id), user=info.members.find(x=>x.id===id);
         const panel=el('onlineManage');
         panel.innerHTML=char?
-          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button> <button id="onlineEditCharApi" type="button">更换角色 API</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
+          (char.owner===me.id?'<button id="onlineEditLook" type="button">头像与头像框</button> <button id="onlineEditCharApi" type="button">更换角色 API</button> <button id="onlinePersonalContext" type="button">个人记忆与私聊'+(char.personal_enabled?'（已开启）':'')+'</button><label>角色群昵称<input id="onlineCharName" value="'+esc(char.name)+'" maxlength="24" required></label><button id="onlineRename" type="button">保存群昵称</button> ':'')+
           '<button id="onlineRemoveMember" type="button">移除角色</button>':
           '<button id="onlineRemoveMember" type="button">移出 '+esc(user?.name)+'</button>';
         if(el('onlineEditLook'))el('onlineEditLook').onclick=()=>editCharLook(current,char);
+        if(el('onlinePersonalContext'))el('onlinePersonalContext').onclick=()=>editPersonalContext(current,char);
         if(el('onlineEditCharApi'))el('onlineEditCharApi').onclick=()=>editOnlineCharApi(current,char);
         if(el('onlineRename'))el('onlineRename').onclick=event=>{
           const input=el('onlineCharName');
@@ -864,6 +873,24 @@ const ledgerOnline = (() => {
       }catch(error){
         if(active(serial)){status(error.message);button.disabled=false;el('onlineExitCancel').disabled=false;}
       }
+    };
+  }
+  function editPersonalContext(current,char){
+    const card=contact(mapping()[char.id]?.card);
+    const enabled=Boolean(char.personal_enabled);
+    const serial=screen('个人记忆与私聊','<section class="group-settings-card group-settings-block"><h3>'+esc(char.name)+'</h3>'+
+      '<p>开启后，该角色回复本群时可参考它自己的同心圆，以及和你最近 10 条私聊。角色可能在群里提到这些内容。</p>'+
+      '<p>群聊内容不会写入同心圆。关闭会清除这个在线角色已同步的个人资料。</p>'+
+      (!card&&!enabled?'<p>请在最初邀请该角色、保存有原角色卡的设备上开启。</p>':'<button type="button" id="onlineTogglePersonalContext" class="primary">'+(enabled?'关闭读取':'开启读取')+'</button>')+'</section>'+end,()=>members(current));
+    const button=el('onlineTogglePersonalContext');
+    if(!button)return;
+    button.onclick=async()=>{
+      button.disabled=true;
+      try{
+        await request('char-personal-context',{room:current.id,id:char.id,enabled:!enabled,...(enabled?{}:personalContext(card))});
+        viewFor(current.id).detail=null;
+        if(active(serial))await members(current);
+      }catch(error){if(active(serial)){status(error.message);button.disabled=false;}}
     };
   }
   async function editOnlineCharApi(current,char){
