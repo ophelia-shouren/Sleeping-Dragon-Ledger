@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
-<script src="./ledger-online.js?v=ba5a25ce"></script>
+<script src="./ledger-online.js?v=ac896886"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -4172,9 +4172,9 @@ function openChatPicture(source){
 }
 document.addEventListener('click',event=>{
   const image=event.target.closest?.('img.message-image');
-  if(!image||!image.src||!image.closest('#onlineMessages,#groupMessages,#messages'))return;
+  if(!image||!image.src||!image.closest('#onlineMessages,#onlineForwardEntries,#groupMessages,#messages'))return;
   if(image.closest('#onlineMessages')&&document.querySelector('#onlineSelectionBar .message-selection'))return;
-  if(!image.closest('#onlineMessages')&&typeof selection!=='undefined'&&selection)return;
+  if(image.closest('#groupMessages,#messages')&&typeof selection!=='undefined'&&selection)return;
   event.preventDefault();event.stopImmediatePropagation();openChatPicture(image.src);
 },true);
 
@@ -6107,4 +6107,5 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
