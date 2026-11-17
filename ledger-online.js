@@ -974,7 +974,9 @@ const ledgerOnline = (() => {
     const back=()=>{if(scope.group)openGroup(scope.group.id);else{el('dialog').close();render();}};
     try{
       if(!me)throw Error('请先进入在线聊天完成身份同步。');
-      const localIds=scope.group?(message.roleId?[message.roleId]:(message.audience||scope.group.members)):[scope.c.id];
+      const authors=scope.group?(message.roleId?[message.roleId]:(message.audience||scope.group.members)):[scope.c.id];
+      const quoted=scope.group&&message.quote?scope.group.members.filter(id=>{const card=contact(id);return card&&[card.name,displayName(card)].includes(message.quote.speaker);}):[];
+      const localIds=[...new Set([...authors,...quoted])];
       const groups=await readRooms(true),map=mapping(),remote=[];
       for(const localId of localIds){
         let enabled=null;
@@ -1147,7 +1149,8 @@ const ledgerOnline = (() => {
       if(!message||['deleted','message-deleted'].includes(message.kind))return;
       rememberChat(current.id);
       const actions=[['quote','❝','引用回复','附在下一条消息里'],['forward','↗','转发','转发到其他在线群聊'],['select','☷','多选消息','导出 TXT 或截图'],...(detail?.owner===me.id?[['delete','×','删除消息','从当前群聊删除']]:[])];
-      screen('消息操作','<div class="message-menu">'+actions.map(([key,icon,title,desc])=>'<button type="button" data-online-command="'+key+'"><span class="message-menu-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+desc+'</small></span></button>').join('')+'</div><div class="row actions"><button type="button" id="onlineCancelMessage">取消</button></div>'+end,()=>chatRoom(current));
+      clearTimeout(pollTimer);resumeChat=null;imageObserver?.disconnect();generation++;
+      dialog('<section id="ledgerOnline"><h2>消息操作</h2><div class="message-menu">'+actions.map(([key,icon,title,desc])=>'<button type="button" data-online-command="'+key+'"><span class="message-menu-icon" aria-hidden="true">'+icon+'</span><span><strong>'+title+'</strong><small>'+desc+'</small></span></button>').join('')+'</div><div class="row actions"><button type="button" id="onlineCancelMessage">取消</button></div>'+end+'</section>');
       el('onlineCancelMessage').onclick=()=>chatRoom(current);
       el('ledgerOnline').querySelectorAll('[data-online-command]').forEach(button=>button.onclick=async()=>{
         const command=button.dataset.onlineCommand;
