@@ -685,7 +685,7 @@ const ledgerOnline = (() => {
     '[data-skin="rose-graphite"] #ledgerOnline{--human-frame-color:#b57284;--human-frame-style:double;--human-frame-width:3px}'+
     '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only{position:relative;outline:none;border:1px solid color-mix(in srgb,var(--gold) 42%,var(--line));box-shadow:inset 3px 0 0 color-mix(in srgb,var(--gold) 58%,var(--panel)),0 2px 5px #0002;background-image:linear-gradient(90deg,color-mix(in srgb,var(--gold) 7%,transparent),transparent 28%)}'+
     '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only:after{content:"";position:absolute;right:8px;top:8px;width:7px;height:7px;border-top:1px solid color-mix(in srgb,var(--gold) 65%,transparent);border-right:1px solid color-mix(in srgb,var(--gold) 65%,transparent);pointer-events:none}'+
-    '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only.message-picked{outline:2px solid var(--gold);outline-offset:2px}'+
+    '#ledgerOnline .bubble.online-message-picked{outline:4px solid var(--gold)!important;outline-offset:2px!important}'+
     '</style>';
   function drawMessages(mode,added=null){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
@@ -726,7 +726,7 @@ const ledgerOnline = (() => {
           }
           // Mist uses the metadata sibling to theme the bubble. Keep it without a layout box.
           const leading=first?layout.before:state.skin==='mist'?'<div class="mist-chat-meta" hidden style="display:none"></div>':'<span class="avatar-button" aria-hidden="true" style="visibility:hidden;flex:none">'+personAvatar(m.name)+'</span>';
-          return '<div class="message-row '+role+'">'+leading+'<article data-online-message="'+esc(m.id)+'" class="bubble '+role+frame+(onlineSelected.has(m.id)?' message-picked':'')+'" '+(onlineSelection?'role="checkbox" tabindex="0" aria-checked="'+onlineSelected.has(m.id)+'"':'')+'>'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
+          return '<div class="message-row '+role+'">'+leading+'<article data-online-message="'+esc(m.id)+'" class="bubble '+role+frame+(onlineSelected.has(m.id)?' online-message-picked':'')+'" '+(onlineSelection?'role="checkbox" tabindex="0" aria-checked="'+onlineSelected.has(m.id)+'"':'')+'>'+(first?layout.name:'')+content+(first?layout.time:'')+'</article></div>';
         }).join('');
       }).join('');
     if(added){
@@ -980,7 +980,7 @@ const ledgerOnline = (() => {
   }
   function toggleOnlineSelection(id,current){
     if(onlineSelected.has(id))onlineSelected.delete(id);else onlineSelected.add(id);
-    for(const node of el('onlineMessages').querySelectorAll('[data-online-message="'+id+'"]')){node.classList.toggle('message-picked',onlineSelected.has(id));node.setAttribute('aria-checked',String(onlineSelected.has(id)));}
+    for(const node of el('onlineMessages').querySelectorAll('[data-online-message="'+id+'"]')){node.classList.toggle('online-message-picked',onlineSelected.has(id));node.setAttribute('aria-checked',String(onlineSelected.has(id)));}
     paintOnlineSelection(current);
   }
   function paintOnlineSelection(current){
@@ -988,7 +988,7 @@ const ledgerOnline = (() => {
     bar.innerHTML=onlineSelection?'<div class="message-selection bulk-tools"><strong>已选 '+onlineSelected.size+' 条</strong><div class="row"><button type="button" id="onlineSelectAll">全选已加载消息</button><button type="button" id="onlineForwardSelected">转发</button><button type="button" id="onlineExportTxt">导出 TXT</button><button type="button" id="onlineScreenshot">截图</button><button type="button" id="onlineSelectDone">完成</button></div></div>':'';
     if(!onlineSelection)return;
     el('onlineSelectDone').onclick=()=>{onlineSelection=false;onlineSelected.clear();chatRoom(current);};
-    el('onlineSelectAll').onclick=()=>{for(const message of messages)if(!['deleted','message-deleted','member-joined'].includes(message.kind))onlineSelected.add(message.id);for(const node of el('onlineMessages').querySelectorAll('[data-online-message]')){node.classList.add('message-picked');node.setAttribute('aria-checked','true');}paintOnlineSelection(current);};
+    el('onlineSelectAll').onclick=()=>{for(const message of messages)if(!['deleted','message-deleted','member-joined'].includes(message.kind))onlineSelected.add(message.id);for(const node of el('onlineMessages').querySelectorAll('[data-online-message]')){node.classList.add('online-message-picked');node.setAttribute('aria-checked','true');}paintOnlineSelection(current);};
     const selected=()=>{const removed=new Set(messages.filter(event=>event.kind==='message-deleted').map(event=>Number(event.body)));return messages.filter(message=>onlineSelected.has(message.id)&&!['deleted','message-deleted'].includes(message.kind)&&!removed.has(message.id));};
     el('onlineForwardSelected').onclick=()=>{const list=selected();if(!list.length)return;rememberChat(current.id);void forwardOnline(current,list);};
     el('onlineExportTxt').onclick=()=>{
