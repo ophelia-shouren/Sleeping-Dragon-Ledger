@@ -567,6 +567,7 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 :root[data-ledger-font="mincho"] body{font-synthesis-weight:none}
 :root[data-skin="mist"][data-ledger-font]{--mist-font:var(--ledger-font)}
 .font-choice-row{display:flex;flex-wrap:wrap;gap:8px}
+.rose-dashboard>.bill-preset-panel{grid-column:1/-1}
 #minchoProgress{position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));width:min(360px,calc(100% - 32px));padding:12px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);box-shadow:0 6px 20px #0004}
 #minchoProgressBar{width:calc(100% - 4em);accent-color:var(--gold);margin-inline-end:8px;vertical-align:middle}
 #minchoPercent{font-variant-numeric:tabular-nums}
@@ -5060,8 +5061,8 @@ function heroCrest(skin){
 }
 function home(){
   const all=total(state.bills),m=summary('month',dateString());
-  if(state.skin==='rose-graphite')return roseHome(all,m)+billPresetPanel();
-  if(state.skin==='baker-street')return bakerHome(all,m)+billPresetPanel();
+  if(state.skin==='rose-graphite')return roseHome(all,m);
+  if(state.skin==='baker-street')return bakerHome(all,m);
   const dawnFrost=state.skin==='dawn-frost';
   const title=dawnFrost&&state.heroTitle==='格兰芬多账本'?'晨曦酒庄账本':state.heroTitle;
   const subtitle=dawnFrost&&state.heroSubtitle==='壁炉旁留着一卷羊皮纸，等你记下今天的收支。'
@@ -5083,7 +5084,7 @@ function roseHome(all,month){
     '<div class="rose-month">'+metrics([['本月收入',month.income,'in'],['本月支出',month.expense,'out']])+'</div>'+
     '<section class="panel rose-distribution"><h2>本月支出分布</h2>'+breakdown(month.bills)+'</section>'+
     '<section class="panel rose-recent"><div class="row between"><h2>近期账目</h2><button data-page="ledger">查看明细 ↗</button></div>'+table(state.bills,6)+'</section>'+
-    '<section class="panel rose-mail"><h2>魔法通信</h2><button data-page="chat">打开通讯录</button></section></div>';
+    '<section class="panel rose-mail"><h2>魔法通信</h2><button data-page="chat">打开通讯录</button></section>'+billPresetPanel()+'</div>';
 }
 function bakerHome(all,month){
   const balance=state.opening+all.income-all.expense;
@@ -5094,7 +5095,7 @@ function bakerHome(all,month){
     '<div class="row baker-actions">'+recordButtons+'</div></section>'+
     '<div class="columns"><section class="panel"><div class="row between"><h2>近期账目</h2><button data-page="ledger">查看明细 ↗</button></div>'+table(state.bills,6)+'</section>'+
     '<section class="panel"><h2>本月支出分布</h2>'+breakdown(month.bills)+'</section></div>'+
-    '<section class="panel"><div class="row between"><h2>魔法通信</h2><button data-page="chat">打开通讯录</button></div></section></div>';
+    '<section class="panel"><div class="row between"><h2>魔法通信</h2><button data-page="chat">打开通讯录</button></div></section>'+billPresetPanel()+'</div>';
 }
 function report(){
   const s=summary(period);
@@ -5326,7 +5327,7 @@ function handleLedgerAndroidBack(){
   return true;
 }
 function billPresetPanel(){
-  return '<section class="panel"><div class="row between"><h2>快捷记账</h2><button type="button" data-action="newBillPreset">＋ 新建预设</button></div>'+
+  return '<section class="panel bill-preset-panel"><div class="row between"><h2>快捷记账</h2><button type="button" data-action="newBillPreset">＋ 新建预设</button></div>'+
     '<p class="muted">每点一次，按预设金额记一笔到今天。</p><div class="row">'+state.billPresets.map(p=>
       '<div class="row" role="group" aria-label="'+esc(p.title)+'"><button type="button" data-use-bill-preset="'+esc(p.id)+'">'+esc(p.title)+' <span class="'+(p.type==='income'?'in':'out')+'">'+(p.type==='income'?'+':'−')+money(p.cents)+'</span></button>'+
       '<button type="button" data-remove-bill-preset="'+esc(p.id)+'" aria-label="'+esc('删除预设 '+p.title)+'" title="删除预设">×</button></div>'
