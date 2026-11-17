@@ -240,7 +240,7 @@ async function api(req, env, url, ledger, ctx) {
   const one = (sql,...args) => stmt(sql,...args).first();
   const run = (sql,...args) => stmt(sql,...args).run();
   const requireRoom = async id => {
-    const room = await one('SELECT r.* FROM rooms r JOIN members m ON r.id=m.room WHERE r.id=? AND m.uid=?',id,uid);
+    const room = await one('SELECT r.* FROM rooms r JOIN members m ON r.id=m.room WHERE r.id=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)',id,uid);
     if (!room) throw fail('你没有加入这个会话。',404);
     return room;
   };
@@ -277,7 +277,7 @@ async function api(req, env, url, ledger, ctx) {
       CASE WHEN r.kind='dm' THEN COALESCE((SELECT p.name FROM members m2 JOIN profiles p ON p.id=m2.uid WHERE m2.room=r.id AND p.id<>? LIMIT 1),r.name) ELSE r.name END name,
       (SELECT body FROM messages WHERE room=r.id ORDER BY id DESC LIMIT 1) preview,
       (SELECT created FROM messages WHERE room=r.id ORDER BY id DESC LIMIT 1) updated
-      FROM rooms r JOIN members m ON r.id=m.room WHERE m.uid=? ORDER BY updated DESC, r.name`,uid,uid));
+      FROM rooms r JOIN members m ON r.id=m.room WHERE m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id) ORDER BY updated DESC, r.name`,uid,uid));
   }
   if (req.method === 'POST' && path === 'rooms') {
     const kind = data.kind === 'dm' ? 'dm' : 'group';
@@ -294,14 +294,14 @@ async function api(req, env, url, ledger, ctx) {
     if(byCode){
       const joined=await one(`INSERT INTO members (room,uid)
         SELECT r.id,? FROM ledger_invite_codes c JOIN rooms r ON r.id=c.room
-        WHERE c.code=? AND r.kind='group' AND r.owner GLOB 'ledger:*'
+        WHERE c.code=? AND r.kind='group' AND r.owner GLOB 'ledger:*' AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)
         ON CONFLICT(room,uid) DO UPDATE SET uid=excluded.uid RETURNING room`,uid,invite);
       if(!joined)throw fail('邀请码无效或已换发。',404);
       return json({id:joined.room});
     }
-    const room = await one('SELECT id,kind,owner FROM rooms WHERE invite=?',invite);
+    const room = await one('SELECT id,kind,owner FROM rooms WHERE invite=? AND id NOT IN (SELECT room FROM ledger_dissolved_groups)',invite);
     if (!room || isLedgerId(room.owner)!==ledger) throw fail('邀请码无效。',404);
-    await run(`INSERT OR IGNORE INTO members SELECT id,? FROM rooms WHERE id=? AND invite=? AND (kind='group' OR (SELECT COUNT(*) FROM members WHERE room=?) < 2)`,uid,room.id,invite,room.id);
+    await run(`INSERT OR IGNORE INTO members SELECT id,? FROM rooms WHERE id=? AND invite=? AND id NOT IN (SELECT room FROM ledger_dissolved_groups) AND (kind='group' OR (SELECT COUNT(*) FROM members WHERE room=?) < 2)`,uid,room.id,invite,room.id);
     await requireRoom(room.id).catch(() => {throw fail('这个私聊已经有两位成员。',409);});
     return json({id:room.id});
   }
@@ -309,6 +309,24 @@ async function api(req, env, url, ledger, ctx) {
   if (ledger && req.method === 'GET' && path === 'quota' && room.kind === 'group') {
     const usage = await one("SELECT COALESCE((SELECT messages FROM ledger_daily_usage WHERE day=date('now')),0) messages, strftime('%Y-%m-%dT00:00:00Z','now','start of day','+1 day') resets");
     return json({messages:usage.messages,resetsAt:usage.resets});
+  }
+  if (ledger && req.method==='POST' && path==='dissolve-group') {
+    if(room.kind!=='group')throw fail('只能解散群聊。',400);
+    if(room.owner!==uid)throw fail('只有群主可以解散群聊。',403);
+    await db.batch([
+      stmt('INSERT OR IGNORE INTO ledger_dissolved_groups (room) VALUES (?)',room.id),
+      stmt('UPDATE chars SET active=0,busy_until=0 WHERE room=? AND active=1',room.id)
+    ]);
+    return json({ok:true});
+  }
+  if (ledger && req.method==='POST' && path==='leave-group') {
+    if(room.kind!=='group')throw fail('只能退出在线群聊。',400);
+    if(room.owner===uid)throw fail('群主可以使用解散群聊。',403);
+    await db.batch([
+      stmt("UPDATE chars SET active=0,busy_until=0,secret='' WHERE room=? AND owner=? AND active=1",room.id,uid),
+      stmt('DELETE FROM members WHERE room=? AND uid=?',room.id,uid)
+    ]);
+    return json({ok:true});
   }
   if (ledger && req.method === 'POST' && path === 'kick-member') {
     if (room.kind !== 'group' || room.owner !== uid) throw fail('只有群主可以移除群成员。',403);
@@ -353,7 +371,7 @@ async function api(req, env, url, ledger, ctx) {
     const key = field(data,'key',2000);
     const base = endpoint(field(data,'endpoint',400),url.origin);
     const secret = await encrypt(env,key,id);
-    const insert = stmt('INSERT OR IGNORE INTO chars (id,room,owner,name,avatar,persona,endpoint,model,secret) VALUES (?,?,?,?,?,?,?,?,?)',id,room.id,uid,name,avatar,persona,base,model,secret);
+    const insert = stmt('INSERT OR IGNORE INTO chars (id,room,owner,name,avatar,persona,endpoint,model,secret) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))',id,room.id,uid,name,avatar,persona,base,model,secret,room.id,uid);
     const result = ledger ? (await db.batch([insert,stmt('INSERT INTO ledger_cast (char_id,world_front,world_end) SELECT id,?,? FROM chars WHERE id=?',...ledgerWorld(data),id)]))[0] : await insert.run();
     if (!result.meta.changes) throw fail('群内已有同名角色。',409);
     return json({id});
@@ -443,7 +461,7 @@ async function api(req, env, url, ledger, ctx) {
     const choice = kind==='rps' ? rpsChoice(data) : null;
     const image = kind==='image' ? imageAttachment(data) : null;
     const body = kind==='image' ? '[图片]' : kind==='dice' ? '🎲 掷出了 '+rollDie()+' 点' : '✊ 发起了一局猜拳';
-    const insert = stmt('INSERT INTO messages (room,sender,body,kind,attachment) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)',room.id,uid,body,kind,image,room.id,uid);
+    const insert = stmt('INSERT INTO messages (room,sender,body,kind,attachment) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))',room.id,uid,body,kind,image,room.id,uid);
     const results = kind==='rps' ? await db.batch([
       insert,
       stmt('INSERT INTO ledger_rps (message_id,choice) SELECT last_insert_rowid(),? WHERE changes()=1',choice)
@@ -510,7 +528,7 @@ async function api(req, env, url, ledger, ctx) {
       const match = body.match(/^[@＠]([^\s@＠]+)(?:\s|$)/u);
       if (match) char = await one('SELECT * FROM chars WHERE room=? AND name=? AND active=1',room.id,match[1]);
     }
-    const insert=stmt('INSERT INTO messages (room,sender,body) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)',room.id,uid,body,room.id,uid);
+    const insert=stmt('INSERT INTO messages (room,sender,body) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))',room.id,uid,body,room.id,uid);
     const deferred=ledger&&char&&data.deferReply===true;
     const [sent]=deferred?await db.batch([
       insert,stmt('INSERT INTO ledger_reply_jobs (message,char_id) SELECT last_insert_rowid(),? WHERE changes()=1',char.id)
@@ -542,11 +560,11 @@ export default {
     if (request.method==='GET' && ['/', '/health'].includes(url.pathname)) {
       try {
         if (!env.DB) return json({service:'sleeping-dragon-ledger',status:'missing_database'},503);
-        await env.DB.prepare('SELECT code FROM ledger_invite_codes LIMIT 0').all();
+        await env.DB.prepare('SELECT room FROM ledger_dissolved_groups LIMIT 0').all();
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-invite-code-4'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-lifecycle-5'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
