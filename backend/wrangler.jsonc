@@ -9,5 +9,10 @@
       "database_name": "sleeping-dragon-ledger-online",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }
