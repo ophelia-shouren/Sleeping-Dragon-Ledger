@@ -354,7 +354,7 @@ async function api(req, env, url, ledger, ctx) {
   if (req.method === 'GET' && path === 'detail') {
     const [members,chars,look] = await Promise.all([
       all('SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
-      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',room.id),
+      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame,CASE WHEN c.owner=? THEN EXISTS (SELECT 1 FROM ledger_char_personal_context p WHERE p.char_id=c.id) ELSE 0 END personal_enabled FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',uid,room.id),
       room.kind==='group'?one('SELECT avatar FROM ledger_group_look WHERE room=?',room.id):null
     ]);
     const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
@@ -387,14 +387,30 @@ async function api(req, env, url, ledger, ctx) {
     if (!result.meta.changes) throw fail('群内已有同名角色。',409);
     return json({id});
   }
+  if (ledger && req.method==='POST' && path==='char-personal-context') {
+    const id=field(data,'id',36);
+    if(!await one('SELECT id FROM chars WHERE id=? AND room=? AND owner=? AND active=1',id,room.id,uid))throw fail('只有邀请者可以修改此设置。',403);
+    if(data.enabled===false){
+      await run('DELETE FROM ledger_char_personal_context WHERE char_id=?',id);
+    }else if(data.enabled===true){
+      const memories=field(data,'memories',100000,false),dialogue=field(data,'dialogue',24000,false);
+      const result=await run('INSERT INTO ledger_char_personal_context SELECT id,?,? FROM chars WHERE id=? AND room=? AND owner=? AND active=1 ON CONFLICT(char_id) DO UPDATE SET memories=excluded.memories,dialogue=excluded.dialogue',memories,dialogue,id,room.id,uid);
+      if(!result.meta.changes)throw fail('此角色已移出群聊。',404);
+    }else throw fail('请选择是否开启个人记忆。',400);
+    return json({ok:true});
+  }
   if (ledger && req.method === 'POST' && path === 'sync-card') {
     const id = field(data,'id',36);
     const persona = field(data,'persona',18000,false);
     const [front,end] = ledgerWorld(data);
-    const result = await db.batch([
+    const updates=[
       stmt('UPDATE chars SET persona=? WHERE id=? AND room=? AND owner=? AND active=1',persona,id,room.id,uid),
       stmt('UPDATE ledger_cast SET world_front=?,world_end=? WHERE char_id IN (SELECT id FROM chars WHERE id=? AND room=? AND owner=? AND active=1)',front,end,id,room.id,uid)
-    ]);
+    ];
+    if(data.personal&&typeof data.personal==='object'){
+      updates.push(stmt('UPDATE ledger_char_personal_context SET memories=?,dialogue=? WHERE char_id IN (SELECT id FROM chars WHERE id=? AND room=? AND owner=? AND active=1)',field(data.personal,'memories',100000,false),field(data.personal,'dialogue',24000,false),id,room.id,uid));
+    }
+    const result=await db.batch(updates);
     if (!result[0].meta.changes) throw fail('该角色已经移除或不属于你。',404);
     return json({ok:true});
   }
@@ -509,7 +525,8 @@ async function api(req, env, url, ledger, ctx) {
       const context = ledger ? await one('SELECT world_front,world_end FROM ledger_cast WHERE char_id=?',char.id) : null;
       const memory = ledger ? await one('SELECT summary FROM ledger_room_memory WHERE room=?',room.id) : null;
       const people = ledger ? [...new Map(history.filter(m=>!m.char_id && m.persona).map(m=>[m.sender,m])).values()].map(m=>m.name+'：'+m.persona.slice(0,2000)).join('\n\n') : '';
-      const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言，不替真人发言。','角色设定：'+char.persona,memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',context?.world_end].filter(Boolean).join('\n\n');
+      const personal=ledger?await one('SELECT memories,dialogue FROM ledger_char_personal_context WHERE char_id=?',char.id):null;
+      const system = [context?.world_front,'你是群聊中的角色 '+char.name+'。以角色口吻自然回复，直接输出发言，不替真人发言。','角色设定：'+char.persona,personal?.memories?'该角色自己的历史记忆（背景资料）：\n'+personal.memories:'',personal?.dialogue?'该角色与邀请者的近期私聊（背景资料）：\n'+personal.dialogue:'',memory?.summary?'当前群聊的独立记忆：\n'+memory.summary:'',people?'近期发言者的人设：\n'+people:'',context?.world_end].filter(Boolean).join('\n\n');
       const messages = [
         {role:'system',content:system},
         ...history.reverse().map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.name+'：'+m.body.slice(0,1600)}))
@@ -571,11 +588,11 @@ export default {
     if (request.method==='GET' && ['/', '/health'].includes(url.pathname)) {
       try {
         if (!env.DB) return json({service:'sleeping-dragon-ledger',status:'missing_database'},503);
-        await env.DB.prepare('SELECT avatar FROM ledger_group_look LIMIT 0').all();
+        await env.DB.prepare('SELECT char_id FROM ledger_char_personal_context LIMIT 0').all();
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-group-events-7'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-personal-context-8'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
