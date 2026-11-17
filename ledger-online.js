@@ -867,7 +867,8 @@ const ledgerOnline = (() => {
     imageObserver?.disconnect();
     const serial=++generation, group=current.kind==='group';
     const view=viewFor(current.id);
-    dialog('<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>'+(group?'群聊设置':'成员与邀请')+'</h2><span></span></header><div id="onlineMemberList" style="display:grid;gap:14px"></div>'+end+'</div>',true);
+    dialog('<style>#dialog.story-fullscreen:has(>#ledgerOnline.group-settings-page){overflow:hidden}#dialog>#ledgerOnline.group-settings-page{height:100%;overflow:auto;overscroll-behavior:contain}</style>'+
+      '<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>'+(group?'群聊设置':'成员与邀请')+'</h2><span></span></header><div id="onlineMemberList" style="display:grid;gap:14px"></div>'+end+'</div>',true);
     el('onlineBack').onclick=()=>chatRoom(current);
     function paint(info){
       if(!active(serial))return;
