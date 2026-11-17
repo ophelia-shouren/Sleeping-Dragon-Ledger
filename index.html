@@ -510,6 +510,8 @@ aside .brand{margin-bottom:0}
 }
 
 .group-settings-page{width:min(100%,680px);margin:0 auto;padding-bottom:52px}
+#dialog.story-fullscreen:has(>.group-create-page){overflow:hidden}
+.group-settings-page.group-create-page{height:100%;overflow:auto;overscroll-behavior:contain}
 .group-settings-page form{display:grid;gap:14px}
 .group-settings-header{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin:0 0 14px;padding:8px 0;background:var(--bg)}
 .group-settings-header h2{margin:0;font-size:1.25rem;color:var(--ink)}
@@ -1706,7 +1708,7 @@ function editGroup(id){
   const g=groupById(id);
   if(groupJobs.has(id))return;
   const toggle=(name,label,checked)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="'+name+'" '+(checked?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
-  dialog('<div class="group-settings-page"><header class="group-settings-header"><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+' aria-label="返回">‹</button><h2>'+(g?'群聊设置':'新建群聊')+'</h2><button type="submit" form="groupSettings">保存</button></header>'+
+  dialog('<div class="group-settings-page'+(g?'':' group-create-page')+'"><header class="group-settings-header"><button type="button" '+(g?'data-group-open="'+esc(id)+'"':'data-action="close"')+' aria-label="返回">‹</button><h2>'+(g?'群聊设置':'新建群聊')+'</h2><button type="submit" form="groupSettings">保存</button></header>'+
     '<form id="groupSettings" data-id="'+esc(id)+'"><details class="group-settings-card" '+(g?'':'open')+'><summary class="group-settings-profile"><span id="groupAvatarPreview">'+groupAvatar(g)+'</span><span><strong id="groupSettingsName">'+esc(g?.name||'设置群聊名称')+'</strong><small>编辑群聊名称与头像</small></span><span aria-hidden="true">›</span></summary>'+
     '<div class="group-settings-edit"><label>群聊名称<input name="name" required maxlength="80" value="'+esc(g?.name||'')+'"></label><div class="row"><label>更换群聊头像<input id="groupAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" data-action="removeGroupAvatar">移除头像</button></div></div></details>'+
     '<section class="group-settings-card group-settings-block"><div class="group-settings-section-head"><h3>群成员</h3><span id="groupSettingsCount" class="muted" aria-live="polite"></span></div><div id="groupSettingsMembers" class="group-settings-members"></div><div id="groupSettingsPicker" hidden></div></section>'+
