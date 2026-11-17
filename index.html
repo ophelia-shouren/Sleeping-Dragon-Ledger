@@ -659,6 +659,7 @@ const personaLabels={
   name:['姓名','名字','角色名','name'],
   gender:['性别','gender','sex'],
   personality:['性格','personality'],
+  speechRules:['发言规则','speechrules','speechRules','speech_rules'],
   description:['人设','设定','描述','简介','description','persona','profile']
 };
 function personaFromText(text){
@@ -701,7 +702,7 @@ async function readPersona(file){
 
 const frameDefaults=()=>({src:'',scale:1.15,x:0,y:0,ring:true});
 const userDefaults=()=>({avatar:'',frame:frameDefaults()});
-const contactDefaults=(id,name='')=>({id,name,nickname:'',gender:'',personality:'',description:'',relationship:'',charRelations:[],preset:'',...userDefaults(),messages:[],draft:'',...memoryDefaults()});
+const contactDefaults=(id,name='')=>({id,name,nickname:'',gender:'',personality:'',description:'',speechRules:'',relationship:'',charRelations:[],preset:'',...userDefaults(),messages:[],draft:'',...memoryDefaults()});
 const threads=new Map();
 const replyErrors=new Map();
 let activeContact='', pendingShare='';
@@ -1182,7 +1183,7 @@ async function generateStory({parent,cast,title,guide,stream,target,pov,style,st
   const p=state.profiles.find(x=>x.id===state.profile);
   if(!p?.url||!p.model)throw Error('请在 API 连接中设置可用的全局默认预设。');
   let article={id:crypto.randomUUID(),title:title||(html?'未命名 HTML 卡片':parent?parent.title+' · 续篇':'未题番外'),body:'',...(html?{htmlCard:true,componentReady:false}:{}),category:parent?.category||'',cast,castNames:parent?.castNames||people.map(displayName),styleNames:styleNames??parent?.styleNames,parent:parent?.id||''};
-  const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
+  const roles=people.map(c=>({姓名:c.name,昵称:c.nickname,性格:c.personality,设定:c.description,...(c.speechRules?{必须遵守的发言规则:c.speechRules}:{}),性别:c.gender,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
   const context=[
     worldContext('front'),
     (html?htmlCardRule:'写一篇中文番外，遵守以下约束。')+storySafety,
@@ -1799,7 +1800,7 @@ async function groupReply(g,c,guide=''){
   const system=[
     worldContext('front',c.id),chatTimeContext(),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
     '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
-    '人设：'+c.description,'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
+    '人设：'+c.description,...(c.speechRules?['该角色必须遵守的发言规则：'+c.speechRules]:[]),'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
     g.shared&&profileFor(c)?.id===p.id?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
     guide?'重新生成这条回复。用户给出的改写提示：'+guide:'',
     g.scene?'【当前场景】\n'+g.scene:'',
@@ -1841,7 +1842,7 @@ async function groupRoundReply(g,roles){
     .slice(-24).map(m=>Array.isArray(m.quote?.audience)&&roles.some(c=>!m.quote.audience.includes(c.id))?{...m,quote:undefined}:m);
   const latest=visible.findLast(m=>!m.roleId),gameResult=latest?.gameResult;
   const people=roles.map(c=>({
-    roleId:c.id,姓名:displayName(c),性别:c.gender,性格:c.personality,人设:c.description,与用户的关系:c.relationship,
+    roleId:c.id,姓名:displayName(c),性别:c.gender,性格:c.personality,人设:c.description,...(c.speechRules?{必须遵守的发言规则:c.speechRules}:{}),与用户的关系:c.relationship,
     角色关系:charRelationContext(c),世界书:[worldContext('front',c.id),worldContext('end',c.id)].filter(Boolean),
     ...(g.shared&&profileFor(c)?.id===p.id?{个人记忆:memoryContext(c),近期私聊:recentDialogue(c.messages).slice(-8)}:{})
   }));
@@ -1992,9 +1993,9 @@ function openCard(id){
   const isUser=id==='user';
   const c=isUser?{name:state.userName,gender:state.userGender,personality:state.userPersonality,description:state.user}:contact(id)||contactDefaults('');
   const fields=[['姓名','name'],['性别','gender'],['性格','personality'],['人设','description']];
-  if(!isUser){fields.splice(1,0,['昵称','nickname']);fields.push(['Char 与 User 的关系','relationship']);}
+  if(!isUser){fields.splice(1,0,['昵称','nickname']);fields.push(['发言规则（选填）','speechRules'],['Char 与 User 的关系','relationship']);}
   const locked=isMysteryBound(id);
-  const labels=fields.filter(([,key])=>!locked||key==='relationship').map(([label,k])=>'<label>'+label+(['description','personality'].includes(k)?'<textarea name="'+k+'">'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
+  const labels=fields.filter(([,key])=>!locked||['relationship','speechRules'].includes(key)).map(([label,k])=>'<label>'+label+(['description','personality','speechRules'].includes(k)?'<textarea name="'+k+'"'+(k==='speechRules'?' maxlength="2000" placeholder="填写此角色必须遵守的发言规则，例如只用简短口语、禁止代替 User 发言"':'')+'>'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===c.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
   if(locked){
     dialog('<h2>人设卡</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label><div class="row"><button class="primary">保存</button><button type="button" data-look="'+esc(id)+'">头像与头像框</button><button type="button" data-action="close">关闭</button></div></form>');
@@ -2002,7 +2003,7 @@ function openCard(id){
   }
   dialog('<h2>'+(isUser?'User 人设卡':id?'编辑角色':'新建角色')+'</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+
     (isUser?'':'<section class="panel"><h3>Char 与 Char 的关系</h3><p class="muted">选填。可添加多条，每条选择一位通讯录角色并填写关系。</p><div data-char-relations>'+charRelations(c).filter(r=>contact(r.roleId)&&r.roleId!==id).map(r=>charRelationRow(id,r)).join('')+'</div><button type="button" data-add-char-relation '+(state.contacts.some(other=>other.id!==id)?'':'disabled')+'>＋ 添加角色关系</button></section><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label>')+
-    '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对四栏内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+(!isUser&&id?'<button type="button" data-delete-contact="'+esc(id)+'">删除角色</button>':'')+'</div></form>');
+    '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+(!isUser&&id?'<button type="button" data-delete-contact="'+esc(id)+'">删除角色</button>':'')+'</div></form>');
 }
 function selectContacts(){
   dialog('<h2>批量管理人设卡</h2><form id="contactSelection">'+selectionTools('<button class="message-danger" data-needs-selection disabled>删除所选</button>')+
@@ -2037,10 +2038,11 @@ function saveCard(form){
   const v=k=>String(data.get(k)||'').trim();
   const name=v('name'),gender=v('gender'),personality=v('personality'),description=v('description');
   if(id==='user')return commit({...state,userName:name,userGender:gender,userPersonality:personality,user:description});
-  const nickname=v('nickname'),preset=v('preset');
+  const nickname=v('nickname'),preset=v('preset'),speechRules=v('speechRules');
+  if(speechRules.length>2000)throw Error('发言规则最多 2000 字。');
   if(isMysteryBound(id)){
     if(!contact(id)||preset&&!state.profiles.some(p=>p.id===preset))throw Error('模型预设无效。');
-    return replaceContact(id,{relationship:v('relationship').slice(0,80),preset});
+    return replaceContact(id,{relationship:v('relationship').slice(0,80),preset,speechRules});
   }
   if(!name&&!nickname)throw Error('请填写姓名或昵称。');
   const descriptions=data.getAll('relationDescription');
@@ -2048,7 +2050,7 @@ function saveCard(form){
     const description=String(descriptions[index]||'').trim();
     return roleId!==id&&contact(roleId)&&description?[{roleId,description}]:[];
   });
-  const patch={name,gender,personality,description,nickname,preset,relationship:v('relationship'),charRelations};
+  const patch={name,gender,personality,description,nickname,preset,speechRules,relationship:v('relationship'),charRelations};
   if(id)return !!contact(id)&&replaceContact(id,patch);
   return commit({...state,contacts:[...state.contacts,{...contactDefaults(crypto.randomUUID()),...patch}]});
 }
@@ -2159,7 +2161,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
   if(!retry&&!reroll&&!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
   if(!retry&&!reroll&&!gameTurn){chatImages.delete(key);chatQuotes.delete(qKey);}
   const name=c.name||displayName(c);
-  const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,
+  const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,...(c.speechRules?['该角色必须遵守的发言规则：'+c.speechRules]:[]),
     'Char 与 User 的关系：'+c.relationship,...charRelationContext(c).map(line=>'Char 与 Char 的关系：'+line),'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
   const front=worldContext('front',c.id),end=worldContext('end',c.id);
   threads.set(c.id,true);replyErrors.delete(c.id);render();
@@ -3036,7 +3038,7 @@ async function generateTea(id,input,rerollIndex,guide='',draft){
   teaPartial.delete(id);teaBusy.add(id);renderTea(id);
   let saved=false;
   try{
-    const roles=cast.map(c=>({姓名:displayName(c),人设:c.description,性格:c.personality,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
+    const roles=cast.map(c=>({姓名:displayName(c),人设:c.description,...(c.speechRules?{必须遵守的发言规则:c.speechRules}:{}),性格:c.personality,与用户关系:c.relationship,与其他角色关系:charRelationContext(c)}));
     const context=group?groupTranscript(group.messages.filter(m=>cast.every(c=>(!m.audience||m.audience.includes(c.id))&&(!Array.isArray(m.quote?.audience)||m.quote.audience.includes(c.id)))).slice(-10)).slice(-6000):
       JSON.stringify(recentDialogue((x.mode==='ai'?cast[0]:localConfig(cast[0])[x.mode]).messages)).slice(-6000);
     const roleId=cast.length===1?cast[0].id:undefined;
@@ -4775,7 +4777,7 @@ function validate(data){
     ['id','name','nickname','gender','personality','description','preset','draft'].every(k=>string(c[k]))&&c.id&&c.id!=='user'&&
     Array.isArray(c.messages)&&c.messages.every(x=>x&&['user','assistant','system'].includes(x.role)&&string(x.content)))||!unique(result.contacts)||
     !Array.isArray(result.worlds)||!result.worlds.every(x=>x&&['id','title','group','content'].every(k=>string(x[k]))&&typeof x.enabled==='boolean')||!unique(result.worlds))throw Error('通讯录或世界书存档无效');
-  result.contacts=result.contacts.map(c=>({...memoryDefaults(),...c,relationship:string(c.relationship)?c.relationship:''}));
+  result.contacts=result.contacts.map(c=>({...memoryDefaults(),...c,speechRules:string(c.speechRules)?c.speechRules.slice(0,2000):'',relationship:string(c.relationship)?c.relationship:''}));
   if(typeof result.streamReplies!=='boolean'||!result.contacts.every(c=>validateChatModes(localConfig(c))))throw Error('聊天模式存档无效');
   if(!result.contacts.every(validMemories))throw Error('记忆档案存档无效');
   result.contacts=result.contacts.map(c=>{
@@ -5716,7 +5718,9 @@ document.addEventListener('change',async e=>{
     if(t.hasAttribute('data-persona-file')&&t.files[0]){
       const form=t.form,card=await readPersona(t.files[0]);
       if(form.isConnected&&$('dialog').open){
-        for(const [k,v] of Object.entries(card))form.elements[k].value=v;
+        for(const [k,v] of Object.entries(card)){
+          if(form.elements[k])form.elements[k].value=v;
+        }
         toast('已填入人设卡，请核对并保存。');
       }
     }
