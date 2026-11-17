@@ -454,6 +454,79 @@ const ledgerOnline = (() => {
       throw Error('图片过大，压缩后仍无法发送。');
     }finally{URL.revokeObjectURL(url);}
   }
+  async function packetSettings(current,back){
+    const serial=screen('群聊货币','<p class="muted">正在读取货币单位…</p>'+end,back);
+    try{
+      const {currency}=await request('red-packet-options?room='+current.id);
+      if(!active(serial))return;
+      const [main,middle,small]=currency.units;
+      const name=(field,label,value)=>'<label>'+label+'<input name="'+field+'" required maxlength="16" value="'+esc(value)+'"></label>';
+      const rate=(field,label,value)=>'<label>'+label+'<input type="number" name="'+field+'" required min="2" max="10000" step="1" value="'+value+'"></label>';
+      screen('群聊货币','<form id="onlineCurrency" class="group-settings-card group-settings-block">'+name('main','最大单位',main)+name('middle','中间单位',middle)+name('small','最小单位',small)+
+        rate('mainRate','1 个最大单位等于几个中间单位',currency.rates[0])+rate('smallRate','1 个中间单位等于几个最小单位',currency.rates[1])+
+        '<button type="submit" class="primary">保存</button></form>'+end,back);
+      form('onlineCurrency',async(data,requestSerial)=>{
+        await request('red-packet-currency',{...data,room:current.id});
+        if(active(requestSerial)){back();toast('群聊货币已保存');}
+      });
+    }catch(error){if(active(serial))status(error.message);}
+  }
+  async function composePacket(current){
+    const back=()=>chatRoom(current);
+    const serial=screen('发红包','<p class="muted">正在读取群聊货币…</p>'+end,back);
+    try{
+      const {currency,people}=await request('red-packet-options?room='+current.id);
+      if(!active(serial))return;
+      const amount=['main','middle','small'].map((name,i)=>'<label>'+esc(currency.units[i])+'<input type="number" name="'+name+'" min="0" step="'+(i?'1':'0.01')+'" placeholder="0"></label>').join('');
+      screen('发红包','<form id="onlinePacket" class="group-settings-card group-settings-block"><label>发送方式<select name="mode"><option value="normal">普通红包</option><option value="lucky">拼手气红包</option><option value="exclusive">专属红包</option></select></label>'+
+        '<div class="fields">'+amount+'</div><p class="muted" id="onlinePacketAmount"></p>'+
+        '<label id="onlinePacketCount">红包数量<input name="count" type="number" min="1" max="100" required value="1"></label>'+
+        '<label id="onlinePacketTarget" hidden>专属收件人<select name="target"><option value="">请选择</option>'+people.filter(person=>person.id!=='user:'+me.id).map(person=>'<option value="'+esc(person.id)+'">'+esc(person.name)+(person.id.startsWith('char:')?' · Char':'')+'</option>').join('')+'</select></label>'+
+        '<button type="submit" class="primary">发送红包</button></form>'+end,back);
+      const node=el('onlinePacket');
+      const update=()=>{
+        const {mode,count,target,main,middle,small}=node.elements, exclusive=mode.value==='exclusive';
+        el('onlinePacketCount').hidden=exclusive;count.disabled=exclusive;
+        el('onlinePacketTarget').hidden=!exclusive;target.required=exclusive;target.disabled=!exclusive;
+        const total=Number(main.value)+Number(middle.value)/currency.rates[0]+Number(small.value)/(currency.rates[0]*currency.rates[1]);
+        el('onlinePacketAmount').textContent='合计 '+(Number.isFinite(total)?total.toFixed(2):'—')+' '+currency.units[0]+' · 虚拟货币';
+      };
+      node.addEventListener('input',update);update();
+      form('onlinePacket',async(data,requestSerial)=>{
+        await request('red-packet',{room:current.id,mode:data.mode,count:data.count,target:data.target,amount:{main:data.main,middle:data.middle,small:data.small}});
+        if(active(requestSerial))back();
+      });
+    }catch(error){if(active(serial))status(error.message);}
+  }
+  function openPacket(current,id){
+    const serial=screen('群聊红包','<section class="group-settings-card group-settings-block" id="onlinePacketDetails"></section><button id="onlineClaimPacket" type="button" class="primary" hidden>领取红包</button>'+end,()=>chatRoom(current));
+    const button=el('onlineClaimPacket');
+    let previous, claiming=false;
+    async function refresh(){
+      const packet=await request('red-packet-detail?room='+current.id+'&id='+id);
+      if(!active(serial))return;
+      button.hidden=!packet.canClaim;
+      const signature=JSON.stringify(packet);
+      if(previous===signature)return;
+      previous=signature;
+      const labels={normal:'普通红包',lucky:'拼手气红包',exclusive:'专属红包'};
+      const amount=cents=>esc((cents/100).toFixed(2)+' '+packet.unit);
+      el('onlinePacketDetails').innerHTML='<h3>'+esc(labels[packet.mode])+'</h3><p>'+amount(packet.total)+'</p><p class="muted">'+(packet.targetName?'专属给 '+esc(packet.targetName)+' · ':'')+
+        (packet.declined?esc(packet.declined)+' 已拒收':'已领取 '+packet.claims.length+' / '+packet.count)+'</p>'+
+        packet.claims.map(claim=>'<div class="row between"><span>'+esc(claim.name)+'</span><strong>'+amount(claim.cents)+'</strong></div>').join('');
+    }
+    button.onclick=async()=>{
+      if(claiming)return;
+      claiming=true;button.disabled=true;
+      try{
+        await request('red-packet-claim',{room:current.id,id:Number(id)});
+        if(active(serial)){await refresh();status('已领取红包。');}
+      }catch(error){if(active(serial))status(error.message);}
+      finally{claiming=false;button.disabled=false;}
+    };
+    refresh().catch(error=>{if(active(serial))status(error.message);});
+    later(serial,refresh,2500);
+  }
   async function shareArchive(card,back){
     const type=card.htmlCard?'moon':'story';
     const serial=screen('分享到在线群聊','<p class="muted">正在读取在线群聊…</p>'+end,back);
@@ -561,11 +634,12 @@ const ledgerOnline = (() => {
         const date=new Date(m.created.replace(' ','T')+'Z');
         const time=display.showTime===false||Number.isNaN(date.getTime())?'':'<small class="muted">'+date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})+'</small>';
         const layout=chatMessageLayout(avatar,name,time);
-        const parts=m.char_id?chatBubbleParts({role:'assistant',content:stripCharacterPrefix(m.body,m.name)},{split:display.split!==false,limit:30}):[m.body];
+        const parts=m.char_id&&m.kind!=='red-packet'?chatBubbleParts({role:'assistant',content:stripCharacterPrefix(m.body,m.name)},{split:display.split!==false,limit:30}):[m.body];
         return parts.map((part,index)=>{
           const first=index===0;
           let content='<p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(part)+'</p>';
           if(m.kind==='image'||m.kind==='human-image')content=imageInOnlineMessage(m.id);
+          if(m.kind==='red-packet')content='<button type="button" class="forwarded-story-card" data-online-packet="'+esc(m.id)+'" style="display:grid;gap:4px;text-align:start;border:1px solid var(--gold);max-width:100%;overflow-wrap:anywhere"><small>红包 · 虚拟货币</small><strong>'+esc(m.body)+'</strong><span>查看红包 ›</span></button>';
           if(m.kind==='archive-card')content='<button type="button" class="forwarded-story-card" data-online-archive="'+esc(m.id)+'" style="display:grid;text-align:start;max-width:100%;overflow-wrap:anywhere"><small>✦ 群聊分享</small><strong>'+esc(m.body)+'</strong><span>点开阅读 ›</span></button>';
           if(m.kind==='rps'){
             const closed=m.resolved||resolved.has(m.id);
@@ -768,7 +842,7 @@ const ledgerOnline = (() => {
     const header='<button type="button" class="star-button" id="onlineMembers" style="margin-inline-start:auto" aria-label="'+(group?'群聊设置':'成员与邀请')+'">★</button>';
     const serial=screen(current.name,humanMessageFrame+end+'<div id="onlineMessages" class="messages"></div><form id="onlineCompose"><textarea name="body" aria-label="聊天消息" required maxlength="4000" style="width:100%;box-sizing:border-box" placeholder="'+(group?'写一条群消息…':'写一条消息…')+'"></textarea><div class="composer-tools" id="onlineChoices" aria-label="可提及的成员" style="display:none;max-height:26vh;overflow:auto" hidden></div>'+
       '<div class="composer-menu" id="onlineComposerMenu" hidden><div class="composer-tools">'+(group?'<button type="button" id="onlineMention" aria-label="提及成员" aria-controls="onlineChoices" aria-expanded="false">@ 成员</button><button type="button" id="onlineChatMemory">群记忆</button>':'')+
-      '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button></div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
+      '<button type="button" id="onlinePickImage">图片／表情包</button><button type="button" id="onlineEmoji">表情</button><button type="button" id="onlineDice">🎲 骰子</button><button type="button" id="onlineRps">✊ 猜拳</button>'+(group?'<button type="button" id="onlineRedPacket">发红包</button>':'')+'</div><div id="onlineExtra" class="composer-tools" style="margin-top:6px"></div><input id="onlineImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>'+
       '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" id="onlineMore" aria-label="聊天工具" aria-controls="onlineComposerMenu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg></button>'+
       (group?'<button type="button" class="composer-tool composer-icon" id="onlineHumanOnly" aria-label="消息仅真人可读" title="消息仅真人可读" aria-pressed="false">'+bulbIcon+'</button>':'')+
       '<button type="submit" class="composer-send composer-icon" aria-label="发送" title="发送">'+sendIcon+'</button></div></form>',()=>{rememberChat(current.id);rooms();},header,group?'<span id="onlineGroupAvatar">'+groupAvatar(current)+'</span>':'');
@@ -896,9 +970,12 @@ const ledgerOnline = (() => {
       if(input.value.length+emoji.length<=input.maxLength)input.setRangeText(emoji,input.selectionStart,input.selectionEnd,'end');
       closeTools();input.focus();
     });
+    if(el('onlineRedPacket'))el('onlineRedPacket').onclick=()=>{rememberChat(current.id);void composePacket(current);};
     el('onlineDice').onclick=event=>activity('activity',{kind:'dice'},event.currentTarget);
     el('onlineRps').onclick=()=>toolOptions(hands,(choice,button)=>activity('activity',{kind:'rps',choice},button));
     el('onlineMessages').addEventListener('click',event=>{
+      const packet=event.target.closest('[data-online-packet]');
+      if(packet){rememberChat(current.id);openPacket(current,packet.dataset.onlinePacket);return;}
       const card=event.target.closest('[data-online-archive]');
       if(card){void readOnlineArchive(current,card.dataset.onlineArchive,serial,card);return;}
       const button=event.target.closest('[data-rps-id]');
@@ -986,6 +1063,7 @@ const ledgerOnline = (() => {
         '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
         (owner?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode||'')+'"></label><div class="row"><button id="onlineCopyCode" type="button">复制邀请码</button><button id="onlineRotateCode" type="button">重新生成邀请码</button></div></section>':
           !group&&info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
+        (owner?'<section class="group-settings-card group-settings-block"><h3>群聊货币</h3><button type="button" id="onlineCurrencySettings">设置货币单位</button></section>':'')+
         '<section class="group-settings-card group-settings-block"><h3>聊天显示</h3>'+setting('showTime','显示消息时间戳')+setting('showName','显示发言者名称')+setting('split','AI 回复分句显示')+'</section>'+
         (group?'<section class="group-settings-card group-settings-block"><h3>消息通知</h3><label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" id="onlineMute" '+(groupMuted(current.id)?'checked':'')+'><span aria-hidden="true"></span>消息免打扰</label></section>':'')+
         (group?'<section class="group-settings-card group-settings-block"><h3>群聊记忆</h3><p class="muted">仅用于当前群，独立于记忆同心圆。</p><button type="button" id="onlineOpenMemory" style="margin-top:8px">打开群记忆</button></section><section class="group-settings-card group-settings-block"><h3>服务器每日用量</h3><p id="onlineQuota" class="muted" role="status">正在读取用量…</p><div id="onlineD1Quota" class="muted"></div></section>':'');
@@ -1034,6 +1112,7 @@ const ledgerOnline = (() => {
       };
       if(el('onlineOpenMemory'))el('onlineOpenMemory').onclick=()=>roomMemory(current,()=>members(current));
       if(el('onlineAddChar'))el('onlineAddChar').onclick=()=>inviteCard(current);
+      if(el('onlineCurrencySettings'))el('onlineCurrencySettings').onclick=()=>packetSettings(current,()=>members(current));
       if(el('onlineEditGroupLook'))el('onlineEditGroupLook').onclick=()=>editOnlineGroup(current);
       async function managed(path,data,button){
         button.disabled=true;
