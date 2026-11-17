@@ -477,10 +477,11 @@ const ledgerOnline = (() => {
     try{
       const {currency,people}=await request('red-packet-options?room='+current.id);
       if(!active(serial))return;
+      const maxCount=Math.min(100,people.length);
       const amount=['main','middle','small'].map((name,i)=>'<label>'+esc(currency.units[i])+'<input type="number" name="'+name+'" min="0" step="'+(i?'1':'0.01')+'" placeholder="0"></label>').join('');
       screen('发红包','<form id="onlinePacket" class="group-settings-card group-settings-block"><label>发送方式<select name="mode"><option value="normal">普通红包</option><option value="lucky">拼手气红包</option><option value="exclusive">专属红包</option></select></label>'+
         '<div class="fields">'+amount+'</div><p class="muted" id="onlinePacketAmount"></p>'+
-        '<label id="onlinePacketCount">红包数量<input name="count" type="number" min="1" max="100" required value="1"></label>'+
+        '<label id="onlinePacketCount">红包数量（最多 '+maxCount+' 份）<input name="count" type="number" min="1" max="'+maxCount+'" required value="1"></label>'+
         '<label id="onlinePacketTarget" hidden>专属收件人<select name="target"><option value="">请选择</option>'+people.filter(person=>person.id!=='user:'+me.id).map(person=>'<option value="'+esc(person.id)+'">'+esc(person.name)+(person.id.startsWith('char:')?' · Char':'')+'</option>').join('')+'</select></label>'+
         '<button type="submit" class="primary">发送红包</button></form>'+end,back);
       const node=el('onlinePacket');
