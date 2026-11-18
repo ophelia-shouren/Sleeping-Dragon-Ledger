@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
 <script src="./ledger-online.js?v=light-members-20261119"></script>
+<script src="./native-selection-guard.js?v=20261118"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -755,6 +756,16 @@ html #dialog.reader-polished:not(.reader-immersive) .story-header{background:var
 .online-account-emblem{display:block;color:var(--gold);font-size:30px;text-align:center;margin-bottom:10px}#ledgerOnline .online-account-card h3{text-align:center;color:var(--gold);font-size:20px;margin-bottom:10px}#ledgerOnline .online-account-card p{font-size:12px;line-height:1.8;margin-bottom:16px}#ledgerOnline .online-account-card form{display:grid;gap:14px}#ledgerOnline .online-account-card input{border-radius:12px;padding:11px 12px;margin-top:5px}#ledgerOnline .online-account-card button[type=submit]{width:100%;border-radius:14px;padding:11px;margin-top:4px}#ledgerOnline .online-account-link{display:block;margin:18px auto 0;border:0;background:transparent;color:var(--gold);font-size:13px;text-decoration:underline;text-underline-offset:4px}
 
 #ledgerOnline .online-typing-task{display:grid;gap:4px}#ledgerOnline .online-cancel-reply{justify-self:start;margin:0 0 8px 52px;padding:4px 10px;min-height:26px;font-size:11px;line-height:1.4;border-radius:999px;border:1px solid var(--line);color:var(--gold);background:var(--panel);box-shadow:none}
+
+/* Keep native text actions out of home, contacts and chat display areas. */
+:is(body[data-native-selection="off"] #view,aside .brand,#dialog .group-room,#dialog #ledgerOnline,#dialog .chat-top),
+:is(body[data-native-selection="off"] #view,aside .brand,#dialog .group-room,#dialog #ledgerOnline,#dialog .chat-top) *{
+  -webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;
+}
+:is(body[data-native-selection="off"] #view,#dialog .group-room,#dialog #ledgerOnline) :is(input,textarea,[contenteditable]:not([contenteditable="false"])),
+:is(body[data-native-selection="off"] #view,#dialog .group-room,#dialog #ledgerOnline) [contenteditable]:not([contenteditable="false"]) *{
+  -webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default!important;
+}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <time id="ledgerPageTime" hidden aria-label="当前时间"></time><main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -6041,6 +6052,7 @@ function formatArchive(){
   location.reload();
 }
 function render(){
+  document.body.dataset.nativeSelection=['home','chat'].includes(page)?'off':'on';
   const fullChat=page==='chat'&&!!contact(activeContact)&&!deviceLocked;
   document.body.classList.toggle('full-chat',fullChat);
   $('homeOrb').hidden=deviceLocked;
