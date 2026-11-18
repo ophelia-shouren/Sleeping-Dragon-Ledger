@@ -1077,12 +1077,25 @@ async function api(req, env, url, ledger, ctx) {
     ]);
     return json({ok:true});
   }
+  if (req.method === 'GET' && path === 'member-look') {
+    const kind=url.searchParams.get('kind'),id=url.searchParams.get('id');
+    let look;
+    if(kind==='user')look=await one('SELECT l.avatar,f.frame FROM members m LEFT JOIN ledger_people l ON l.uid=m.uid LEFT JOIN ledger_person_look f ON f.uid=m.uid WHERE m.room=? AND m.uid=?',room.id,id);
+    else if(kind==='char')look=await one('SELECT l.avatar_image avatar,l.frame FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.id=? AND c.active=1',room.id,id);
+    if(!look)throw fail('成员已不在当前会话。',404);
+    return json({avatar:look.avatar||'',frame:look.frame||''});
+  }
   if (req.method === 'GET' && path === 'detail') {
+    const compact=url.searchParams.get('compact')==='1';
     const [members,chars,look] = await Promise.all([
-      all('SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
-      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,l.avatar_image,l.frame,CASE WHEN c.owner=? THEN EXISTS (SELECT 1 FROM ledger_char_personal_context p WHERE p.char_id=c.id) ELSE 0 END personal_enabled FROM chars c LEFT JOIN ledger_char_look l ON l.char_id=c.id WHERE c.room=? AND c.active=1 ORDER BY c.name',uid,room.id),
+      all(compact?'SELECT p.id,p.name FROM members m JOIN profiles p ON p.id=m.uid WHERE m.room=? ORDER BY p.name':'SELECT p.id,p.name,l.avatar,f.frame FROM members m JOIN profiles p ON p.id=m.uid LEFT JOIN ledger_people l ON l.uid=p.id LEFT JOIN ledger_person_look f ON f.uid=p.id WHERE m.room=? ORDER BY p.name',room.id),
+      all('SELECT c.id,c.name,c.avatar,c.owner,c.model,'+(compact?"NULL avatar_image,NULL frame":"l.avatar_image,l.frame")+',CASE WHEN c.owner=? THEN EXISTS (SELECT 1 FROM ledger_char_personal_context p WHERE p.char_id=c.id) ELSE 0 END personal_enabled FROM chars c '+(compact?'':'LEFT JOIN ledger_char_look l ON l.char_id=c.id ')+'WHERE c.room=? AND c.active=1 ORDER BY c.name',uid,room.id),
       room.kind==='group'?one('SELECT avatar FROM ledger_group_look WHERE room=?',room.id):null
     ]);
+    if(compact){
+      for(const member of members)member.avatar='online-look:user:'+member.id;
+      for(const char of chars)char.avatar_image='online-look:char:'+char.id;
+    }
     const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
     for(const char of chars)char.can_configure_api=char.owner===uid;
     return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid&&(!ledger||room.kind==='dm') ? room.invite : null,inviteCode});
@@ -1385,7 +1398,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-generation-cancel-35'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-light-members-36'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
