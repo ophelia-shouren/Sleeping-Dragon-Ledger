@@ -110,7 +110,7 @@ const ledgerOnline = (() => {
   }
   function roomDetail(id){
     if(!detailsInFlight.has(id)){
-      const promise=request('detail?room='+id,undefined,AbortSignal.timeout(12000)).finally(()=>detailsInFlight.delete(id));
+      const promise=request('detail?compact=1&room='+id,undefined,AbortSignal.timeout(12000)).finally(()=>detailsInFlight.delete(id));
       detailsInFlight.set(id,promise);
     }
     return detailsInFlight.get(id);
@@ -160,6 +160,7 @@ const ledgerOnline = (() => {
     return Error(signal?.aborted?operation+'超时，请重试。':'在线聊天服务连接失败，请稍后再试。');
   }
   async function request(path,data,signal){
+    if(!data&&!signal)signal=AbortSignal.timeout(12000);
     const headers={Authorization:'Bearer '+accessToken()};
     if(data)headers['Content-Type']='application/json';
     let response;
@@ -231,7 +232,53 @@ const ledgerOnline = (() => {
     if(typeof value==='string')try{value=JSON.parse(value);}catch{value=null;}
     return {...frameDefaults(),ring:false,...(value||{})};
   }
-  const personAvatar=(name,src,frame)=>avatarMarkup({name,avatar:src||'',frame:storedFrame(frame)});
+  const lookCache=new Map(),lookJobs=new Map(),lookQueue=[];
+  let lookRunning=0;
+  const lookRef=source=>/^online-look:(user|char):(.+)$/.exec(source||'');
+  function cachedLook(currentRoom,source){
+    const entry=lookCache.get(accessToken()+':'+currentRoom+':'+source);
+    return entry&&Date.now()-entry.at<60000?entry.value:null;
+  }
+  function fetchLook(currentRoom,source){
+    const ref=lookRef(source);
+    if(!ref)return Promise.resolve({avatar:source||'',frame:''});
+    const cached=cachedLook(currentRoom,source);
+    if(cached)return Promise.resolve(cached);
+    const token=accessToken(),key=token+':'+currentRoom+':'+source;
+    if(lookJobs.has(key))return lookJobs.get(key);
+    const job=new Promise((resolve,reject)=>{lookQueue.push({run:async()=>{
+      if(accessToken()!==token)throw Error('账号已切换。');
+      const value=await request('member-look?room='+encodeURIComponent(currentRoom)+'&kind='+ref[1]+'&id='+encodeURIComponent(ref[2]),undefined,AbortSignal.timeout(12000));
+      if(accessToken()===token){lookCache.set(key,{value,at:Date.now()});if(lookCache.size>80)lookCache.delete(lookCache.keys().next().value);}
+      return value;
+    },resolve,reject});});
+    lookJobs.set(key,job);
+    job.finally(()=>{if(lookJobs.get(key)===job)lookJobs.delete(key);}).catch(()=>{});
+    drainLooks();
+    return job;
+  }
+  function drainLooks(){
+    while(lookRunning<2&&lookQueue.length){
+      const work=lookQueue.shift();lookRunning++;
+      work.run().then(work.resolve,work.reject).finally(()=>{lookRunning--;drainLooks();});
+    }
+  }
+  function loadLooks(){
+    const root=el('ledgerOnline');if(!root)return;
+    for(const node of root.querySelectorAll('[data-online-look]:not([data-loading])')){
+      node.dataset.loading='1';
+      const serial=generation;
+      fetchLook(node.dataset.lookRoom,node.dataset.onlineLook).then(look=>{
+        if(active(serial)&&node.isConnected)node.innerHTML=avatarMarkup({name:node.dataset.lookName,avatar:look.avatar,frame:storedFrame(look.frame)});
+      }).catch(()=>{if(node.isConnected)node.dataset.loading='failed';});
+    }
+  }
+  const personAvatar=(name,src,frame)=>{
+    if(!lookRef(src))return avatarMarkup({name,avatar:src||'',frame:storedFrame(frame)});
+    const currentRoom=room?.id,look=cachedLook(currentRoom,src);
+    queueMicrotask(loadLooks);
+    return '<span data-online-look="'+esc(src)+'" data-look-room="'+esc(currentRoom)+'" data-look-name="'+esc(name)+'" style="display:contents">'+avatarMarkup({name,avatar:look?.avatar||'',frame:storedFrame(look?.frame)})+'</span>';
+  };
   function fitText(value,limit){
     return String(value??'').trim().slice(0,limit).replace(/[\uD800-\uDBFF]$/u,'');
   }
@@ -327,7 +374,7 @@ const ledgerOnline = (() => {
   function resetAccountView(){
     clearTimeout(noticeTimer);clearTimeout(pollTimer);noticeSession=null;queuedNotice=null;resumeChat=null;
     el('onlineNotice')?.remove();roomsRequest=null;roomsAt=0;onlineIdentity=null;me=null;onlineUserProfile=null;syncedProfile=null;knownRooms=null;
-    views.clear();pictures.clear();detailsInFlight.clear();feedsInFlight.clear();localTyping.clear();
+    views.clear();pictures.clear();lookCache.clear();detailsInFlight.clear();feedsInFlight.clear();localTyping.clear();
   }
   async function initialOnlineProfile(){
     const look=appearance('user'),[avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(look.frame)]);
@@ -837,7 +884,9 @@ const ledgerOnline = (() => {
     const box=el('onlineMessages');
     const stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
     target.innerHTML=[...activeCharacters.values()].map(char=>{
-      const look=cast.get(char.id)||char;
+      const originalLook=cast.get(char.id)||char;
+      const cached=cachedLook(room.id,originalLook.avatar_image);
+      const look=lookRef(originalLook.avatar_image)?{...originalLook,avatar_image:cached?.avatar||'',frame:cached?.frame||''}:originalLook;
       const task=typingCharacters.find(item=>item.id===char.id)||char;
       const stop=task.job_id&&task.can_cancel?'<button type="button" class="online-cancel-reply" data-cancel-online-reply="'+esc(task.job_id)+'">中断回复</button>':'';
       return '<div class="online-typing-task">'+typingBubble({...look,avatar:look.avatar_image||'',frame:storedFrame(look.frame)},showName,true)+stop+'</div>';
@@ -1107,7 +1156,9 @@ const ledgerOnline = (() => {
           let image='';if(['image','human-image'].includes(message.kind)){const cache=current.id+':'+message.id;if(!pictures.has(cache))pictures.set(cache,request('image?room='+current.id+'&id='+message.id).then(result=>safePicture(result.image)));try{image=await pictures.get(cache);}catch{pictures.delete(cache);throw Error('图片载入失败，请重试截图。');}}
           const person=message.char_id?detail?.chars.find(x=>x.id===message.char_id):detail?.members.find(x=>x.id===message.sender);
           const mine=!message.char_id&&message.sender===me.id;
-          converted.push({content:message.body,speaker:message.name,roleId:mine?'':'online:'+message.id,role:mine?'user':'assistant',quote:readOnlineMeta(message).quote,image,sentAt:Date.parse(message.created.replace(' ','T')+'Z'),onlinePerson:{name:message.name,avatar:person?.avatar_image||person?.avatar||'',frame:storedFrame(person?.frame)}});
+          const source=person?.avatar_image||person?.avatar||'';
+          const screenshotLook=lookRef(source)?await fetchLook(current.id,source):{avatar:source,frame:person?.frame};
+          converted.push({content:message.body,speaker:message.name,roleId:mine?'':'online:'+message.id,role:mine?'user':'assistant',quote:readOnlineMeta(message).quote,image,sentAt:Date.parse(message.created.replace(' ','T')+'Z'),onlinePerson:{name:message.name,avatar:screenshotLook.avatar,frame:storedFrame(screenshotLook.frame)}});
         }
         await screenshotSelectedMessages(button,{c:{name:current.name},group:{...current,...displayFor(current.id),split:displayFor(current.id).split!==false},messages:converted,indices:new Set(converted.map((_,i)=>i))});
       }catch(error){status(error.message);}finally{button.disabled=false;}
@@ -1402,10 +1453,12 @@ const ledgerOnline = (() => {
     later(serial,refresh,()=>Date.now()-lastActivity<45000?1200:2500);
   }
   async function members(current){
+    retryRead=null;
     clearTimeout(pollTimer);
     resumeChat=null;
     imageObserver?.disconnect();
     const serial=++generation, group=current.kind==='group';
+    retryRead=()=>active(serial)?members(current):Promise.resolve();
     const view=viewFor(current.id);
     dialog('<style>#dialog.story-fullscreen:has(>#ledgerOnline.group-settings-page){overflow:hidden}#dialog>#ledgerOnline.group-settings-page{height:100%;overflow:auto;overscroll-behavior:contain}</style>'+
       '<div class="group-settings-page" id="ledgerOnline"><header class="group-settings-header"><button id="onlineBack" type="button" aria-label="返回">‹</button><h2>'+(group?'群聊设置':'成员与邀请')+'</h2><span></span></header><div id="onlineMemberList" style="display:grid;gap:14px"></div>'+end+'</div>',true);
@@ -1726,7 +1779,12 @@ const ledgerOnline = (() => {
       });
     }catch(error){if(active(serial))status(error.message);}
   }
-  function editCharLook(current,char){
+  async function editCharLook(current,char){
+    if(lookRef(char.avatar_image)){
+      const serial=generation;
+      try{const look=await fetchLook(current.id,char.avatar_image);if(!active(serial))return;char={...char,avatar_image:look.avatar,frame:look.frame};}
+      catch(error){if(active(serial))status(error.message);return;}
+    }
     const frame=storedFrame(char.frame);
     let avatar=char.avatar_image||'', frameSrc=frame.src;
     const serial=screen('角色头像与头像框','<div class="messages"><section class="group-settings-card group-settings-block"><div id="onlineLookPreview"></div><form id="onlineLookForm"><label>头像图片<input id="onlineAvatarFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" id="onlineAvatarClear">移除头像</button><label>头像框图片<input id="onlineFrameFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label><button type="button" id="onlineFrameClear">移除头像框图片</button><label><input type="checkbox" id="onlineFrameRing" '+(frame.ring?'checked':'')+'> 显示圆形边框</label><button type="submit" class="primary">保存</button></form></section></div>'+end,()=>members(current));
@@ -1747,6 +1805,7 @@ const ledgerOnline = (() => {
     form('onlineLookForm',async(data,requestSerial)=>{
       await request('char-look',{room:current.id,id:char.id,avatar,frame:{...frame,src:frameSrc,ring:el('onlineFrameRing').checked}});
       viewFor(current.id).detail=null;
+      lookCache.clear();
       if(active(requestSerial))await members(current);
     });
     preview();
