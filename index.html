@@ -2185,6 +2185,7 @@ function characterLanguageFields(c){
 function translationModelCard(){
   return '<section class="panel"><h2>翻译模型</h2><form id="translationModelForm"><label>使用主 API 已保存的预设<select name="preset"><option value="">不启用</option>'+state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===state.kindroidTranslation.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('')+'</select></label><label>译文语言<input name="language" maxlength="40" value="'+esc(state.kindroidTranslation.language)+'"></label><button class="primary">保存翻译模型</button><p class="muted">接口、Key 与模型来自所选预设。请先在上方保存 API 预设，再为角色开启翻译卡片。</p></form></section>';
 }
+const chatHistoryWithoutTranslations=messages=>JSON.stringify(messages.map(({kindroidTranslation,...message})=>message));
 function autoTranslateMessage(id,index){
   const c=contact(id);if(!c?.autoTranslate||!translationAvailable(c)||c.messages[index]?.role!=='assistant')return;
   kindroidTranslationOpen.add(kindroidTranslationViewKey(c,c.messages[index],index));
@@ -2261,7 +2262,7 @@ async function sendKindroid(c,retry,reroll,gameTurn){
   try{
     const {reply}=await ledgerOnline.kindroid({key:state.kindroid.key,ai_id:c.kindroidId,message});
     const latest=contact(c.id);if(!latest)throw Error('原角色已移除。');
-    if(JSON.stringify(latest.messages)!==JSON.stringify(history))throw Error('本地会话已变化，回复已保存在 Kindroid，请在原站核对。');
+    if(chatHistoryWithoutTranslations(latest.messages)!==chatHistoryWithoutTranslations(history))throw Error('本地会话已变化，回复已保存在 Kindroid，请在原站核对。');
     if(!replaceContact(c.id,{messages:[...latest.messages,{role:'assistant',content:reply.trim(),sentAt:Date.now(),name:displayName(latest)}]}))throw Error('回复已在 Kindroid 保存，本机写入失败。');
     autoTranslateMessage(c.id,contact(c.id).messages.length-1);
   }catch(error){
@@ -2297,7 +2298,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
   try{
     if(image&&!history.at(-1).caption){
       const caption=await describeChatImage(image),latest=contact(c.id);
-      if(!latest||JSON.stringify(latest.messages)!==JSON.stringify(history))return;
+      if(!latest||chatHistoryWithoutTranslations(latest.messages)!==chatHistoryWithoutTranslations(history))return;
       const updated=[...history.slice(0,-1),{...history.at(-1),caption}];
       if(!replaceContact(c.id,{messages:updated}))throw Error('图片描述写入失败。');
       history=updated;
@@ -2330,7 +2331,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
     if(!card&&!allowActions&&/低吼|骨血里/.test(reply))throw Error('回复包含仅台词模式的禁用词，请点「重试回信」。');
     if(typeof reply!=='string'||!reply.trim())throw Error(allowActions?'模型返回了空回复或不兼容的回复格式。':'模型没有按台词格式返回，请点「重试回信」。');
     const latest=contact(c.id);
-    if(!latest||JSON.stringify(latest.messages)!==JSON.stringify(reroll?c.messages:history))throw Error('会话记录已在另一标签页更新，请核对后再发送。');
+    if(!latest||chatHistoryWithoutTranslations(latest.messages)!==chatHistoryWithoutTranslations(reroll?c.messages:history))throw Error('会话记录已在另一标签页更新，请核对后再发送。');
     const message={role:'assistant',sentAt:reroll?c.messages[reroll.index]?.sentAt:Date.now(),content:typeof gameResult==='string'?gameResult+'\n'+reply:reply,name,chatCard:card||undefined};
     const update=reroll?{messages:latest.messages.map((m,i)=>i===reroll.index?{...m,...message}:m),...memoryAfterMessageChange(latest,reroll.index)}:{messages:[...latest.messages,message]};
     if(!replaceContact(c.id,update))throw Error('收到回复，但写入本机存档失败。');
