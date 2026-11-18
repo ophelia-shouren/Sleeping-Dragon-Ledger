@@ -1884,7 +1884,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     const marks=exists?state.readerMarks.filter(m=>!(m.key===key&&m.start===start&&m.end===end)):[...state.readerMarks,{key,start,end,quote}];
     if(commit({...state,readerMarks:marks})){window.getSelection()?.removeAllRanges();drawMarks();close();}
   };
-  $('readerShareExcerpt').onclick=()=>{if(!selectionData)return;form.hidden=!form.hidden;};
+  $('readerShareExcerpt').onclick=()=>{if(!selectionData)return;form.hidden=!form.hidden;tools.style.top=Math.max(38,Math.min(parseFloat(tools.style.top)||38,dialog.clientHeight-tools.offsetHeight-110))+'px';};
   form.onsubmit=async event=>{
     event.preventDefault();if(!selectionData)return;
     const c=contact(form.elements.recipient.value);if(!c||localConfig(c).mode!=='ai'){toast('请选择角色。');return;}
