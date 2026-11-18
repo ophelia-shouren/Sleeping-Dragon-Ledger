@@ -588,6 +588,7 @@ async function ensureAccountSchema(db){
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_accounts (username TEXT PRIMARY KEY COLLATE NOCASE, uid TEXT NOT NULL UNIQUE REFERENCES profiles(id), salt TEXT NOT NULL, password_hash TEXT NOT NULL, iterations INTEGER NOT NULL, created INTEGER NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_sessions (token_hash TEXT PRIMARY KEY, uid TEXT NOT NULL REFERENCES profiles(id), created INTEGER NOT NULL)'),
       db.prepare('CREATE INDEX IF NOT EXISTS ledger_sessions_uid ON ledger_sessions(uid)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_online_user_presets (uid TEXT NOT NULL REFERENCES profiles(id),id TEXT NOT NULL,name TEXT NOT NULL,snapshot TEXT NOT NULL,updated INTEGER NOT NULL,PRIMARY KEY(uid,id))'),
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_online_profiles (uid TEXT PRIMARY KEY REFERENCES profiles(id), snapshot TEXT NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_auth_limits (id TEXT PRIMARY KEY, attempts INTEGER NOT NULL, until_at INTEGER NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_user_codes (uid TEXT PRIMARY KEY REFERENCES profiles(id),code TEXT NOT NULL UNIQUE)')
@@ -713,6 +714,22 @@ async function api(req, env, url, ledger, ctx) {
     return json({reply});
   }
   let me = await one('SELECT id,name FROM profiles WHERE id=?',uid);
+  if(ledger&&path==='online-profile-presets'){
+    if(req.method==='GET')return json({presets:await all('SELECT id,name,updated FROM ledger_online_user_presets WHERE uid=? ORDER BY updated DESC',uid)});
+    if(req.method==='POST'){
+      const action=field(data,'action',10);
+      if(action==='save'){
+        const id=field(data,'id',36,false)||uuid(),name=field(data,'name',60);
+        const row=data.profile?{snapshot:JSON.stringify(onlineProfileData(data.profile))}:await one('SELECT snapshot FROM ledger_online_profiles WHERE uid=?',uid);if(!row)throw fail('请先保存在线人设。',409);
+        await run('INSERT INTO ledger_online_user_presets (uid,id,name,snapshot,updated) VALUES (?,?,?,?,?) ON CONFLICT(uid,id) DO UPDATE SET name=excluded.name,snapshot=excluded.snapshot,updated=excluded.updated',uid,id,name,row.snapshot,Date.now());return json({ok:true,id});
+      }
+      const id=field(data,'id',36),row=await one('SELECT snapshot FROM ledger_online_user_presets WHERE uid=? AND id=?',uid,id);
+      if(!row)throw fail('预设不存在或不属于当前账号。',404);
+      if(action==='delete'){await run('DELETE FROM ledger_online_user_presets WHERE uid=? AND id=?',uid,id);return json({ok:true});}
+      if(action==='apply'){const profile=onlineProfileData(JSON.parse(row.snapshot));await db.batch(onlineProfileStatements(db,uid,profile));return json({ok:true,profile});}
+      throw fail('无法识别预设操作。');
+    }
+  }
   if(ledger&&path==='online-profile'){
     if(req.method==='POST'){
       const snapshot=onlineProfileData(data);await db.batch(onlineProfileStatements(db,uid,snapshot));return json({ok:true,profile:snapshot});
@@ -1293,7 +1310,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-accounts-profile-33'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-profile-presets-34'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
@@ -1314,6 +1331,7 @@ export default {
     return response;
   }
 };
+
 
 
 

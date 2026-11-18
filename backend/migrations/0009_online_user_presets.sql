@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS ledger_online_user_presets (uid TEXT NOT NULL REFERENCES profiles(id),id TEXT NOT NULL,name TEXT NOT NULL,snapshot TEXT NOT NULL,updated INTEGER NOT NULL,PRIMARY KEY(uid,id));

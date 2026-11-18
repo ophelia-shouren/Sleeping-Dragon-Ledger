@@ -26,6 +26,14 @@ const seed='a'.repeat(64),other='b'.repeat(64),fresh='d'.repeat(64),password='co
  r=await call(fresh,'auth/register',{username:'NewUser2',password,confirmPassword:password,profile});assert.equal(r.status,200);const newuid=await context.ledgerIdentity(new Request('https://e.test',{headers:{authorization:'Bearer '+fresh}}));assert.notEqual(newuid,uid);assert(sqlite.prepare('SELECT code FROM ledger_user_codes WHERE uid=?').get(newuid));assert.equal((await call(fresh,'rooms')).status,401);
  assert.equal((await call(fresh,'auth/register',{username:'不能中文',password,confirmPassword:password,profile})).status,400);
  const account=sqlite.prepare('SELECT * FROM ledger_accounts WHERE uid=?').get(uid);assert.notEqual(account.password_hash,password);assert(!sqlite.prepare('SELECT * FROM ledger_sessions WHERE token_hash=?').get(session));
+ const savedPreset=await call(session,'online-profile-presets',{action:'save',name:'校园',profile});assert.equal(savedPreset.status,200);const presetId=savedPreset.data.id;
+ assert.equal((await call(session,'online-profile-presets')).data.presets[0].name,'校园');
+ assert.equal((await call(session,'online-profile')).data.profile.name,'在线新名字');
+ assert.equal((await call(session,'online-profile-presets',{action:'apply',id:presetId})).data.profile.name,'原用户');
+ assert.equal((await call(session,'online-profile')).data.profile.frame.src,profile.frame.src);
+ const newLogin=await call(fresh,'auth/login',{username:'NewUser2',password});assert.equal((await call(newLogin.data.token,'online-profile-presets',{action:'apply',id:presetId})).status,404);
+ assert.equal((await call(session,'rooms')).data[0].id,'existing-group');
+ await call(session,'online-profile-presets',{action:'delete',id:presetId});assert.equal((await call(session,'online-profile-presets')).data.presets.length,0);
  await call(session,'auth/logout',{});assert.equal((await call(session,'rooms')).status,401);
  console.log('PASS: legacy migration preserves UID/code/groups/messages; new account one-to-one identity; duplicate/case/mismatch rejection; cross-browser login; independent persona/avatar/frame; protected endpoints; hashed passwords/sessions; logout');
 })().catch(e=>{console.error(e);process.exitCode=1});
