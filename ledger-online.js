@@ -823,8 +823,24 @@ const ledgerOnline = (() => {
     const stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
     target.innerHTML=[...activeCharacters.values()].map(char=>{
       const look=cast.get(char.id)||char;
-      return typingBubble({...look,avatar:look.avatar_image||'',frame:storedFrame(look.frame)},showName,true);
+      const task=typingCharacters.find(item=>item.id===char.id)||char;
+      const stop=task.job_id&&task.can_cancel?'<button type="button" class="online-cancel-reply" data-cancel-online-reply="'+esc(task.job_id)+'">中断回复</button>':'';
+      return '<div class="online-typing-task">'+typingBubble({...look,avatar:look.avatar_image||'',frame:storedFrame(look.frame)},showName,true)+stop+'</div>';
     }).join('');
+    target.onclick=async event=>{
+      const button=event.target.closest('[data-cancel-online-reply]');if(!button)return;
+      const id=button.dataset.cancelOnlineReply,currentRoom=room.id,serial=generation;
+      const stopped=typingCharacters.find(char=>char.job_id===id);
+      button.disabled=true;button.textContent='中断中…';
+      try{
+        const result=await request('cancel-reply',{room:currentRoom,id});
+        if(!active(serial)||room?.id!==currentRoom)return;
+        typingCharacters=typingCharacters.filter(char=>char.job_id!==id);viewFor(currentRoom).typing=typingCharacters;
+        if(stopped)for(const [key,value] of localTyping)if(value.id===stopped.id&&value.room===currentRoom)localTyping.delete(key);
+        drawTyping();toast(result.cancelled?'已中断本次回复':result.notice||'这条回复已经结束');
+      }catch(error){if(active(serial))status(error.message);}
+      finally{if(button.isConnected){button.disabled=false;button.textContent='中断回复';}}
+    };
     if(stick)box.scrollTop=box.scrollHeight;
   }
   async function loadOlder(){
@@ -1808,6 +1824,7 @@ const ledgerOnline = (() => {
   }
   return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal,kindroid:data=>request('kindroid-send',data)};
 })();
+
 
 
 
