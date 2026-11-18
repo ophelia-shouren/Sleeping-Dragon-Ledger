@@ -626,6 +626,35 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #view .bubble button.kin-translation-star:focus-visible{outline:1px solid var(--gold);outline-offset:2px}
 #view .bubble .kin-translation-text{border-top:1px solid var(--line);margin-top:7px;padding-top:7px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
 #view .bubble .kin-translation-text p{margin:0}
+/* Shared reader surfaces inherit every theme's paper, ink and accent colors. */
+#dialog.reader-hub .reader-intro{color:var(--muted);letter-spacing:.12em;margin:10px 0 24px}
+#dialog.reader-hub .reader-bookshelf{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 15px;padding:8px 0 28px;align-items:start}
+#dialog.reader-hub .reader-book{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;padding:0;border:0;background:none;box-shadow:none;color:var(--ink);text-align:center}
+#dialog.reader-hub .reader-book strong{font-size:clamp(13px,3.5vw,19px);font-family:var(--ledger-font);font-weight:600;line-height:1.5}
+#dialog.reader-hub .reader-book small{font-size:10px;line-height:1.7;color:var(--muted);max-width:100%;overflow-wrap:anywhere}
+#dialog.reader-hub .reader-book-cover{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:3/4;max-width:175px;overflow:hidden;color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 55%,var(--line));border-radius:3px 10px 10px 3px;background:linear-gradient(90deg,#0004 0 4%,transparent 5% 9%,#ffffff0a 10%,transparent 13%),linear-gradient(140deg,var(--panel),var(--field));box-shadow:3px 6px 0 -2px var(--line),6px 10px 18px #0003}
+#dialog.reader-hub .reader-book:hover .reader-book-cover{transform:translateY(-3px);box-shadow:3px 9px 0 -2px var(--line),6px 14px 22px #0004}
+.reader-book-cover svg{width:75%;height:75%;filter:drop-shadow(0 0 8px var(--glow))}
+.reader-cover-frame{position:absolute;inset:8% 9% 8% 14%;border:1px solid currentColor;opacity:.4;pointer-events:none}
+.reader-cover-corner{position:absolute;bottom:10%;right:15%;font-size:15px;opacity:.6}
+#dialog.reader-hub .reader-cover-stories{background:linear-gradient(90deg,#0004,transparent 14%),radial-gradient(ellipse at 70% 20%,color-mix(in srgb,var(--gold) 32%,transparent),transparent 70%),var(--panel)}
+#dialog.reader-hub .reader-cover-moon{background:linear-gradient(90deg,#0005,transparent 14%),repeating-linear-gradient(135deg,transparent 0 12px,#ffffff05 13px 14px),var(--field)}
+#dialog.reader-hub .reader-cover-tea{border-radius:3px 15px 15px 3px;background:linear-gradient(90deg,#0004,transparent 14%),radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--gold) 15%,var(--panel)),var(--field))}
+#dialog.reader-hub .reader-cover-tea .reader-cover-frame{border-radius:35% 35% 2px 2px}
+#dialog.reader-hub .reader-cover-other{background:linear-gradient(90deg,#0004,transparent 14%),linear-gradient(165deg,var(--control) 50%,var(--panel) 50%)}
+#dialog.reader-reading[open]{height:100dvh;max-height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+#dialog.reader-reading .story-header{flex:none;margin-bottom:8px}
+#dialog.reader-reading .story-heading{min-width:0}
+#dialog.reader-reading .story-heading h2{font-size:clamp(17px,4.4vw,25px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dialog.reader-reading .story-shell{flex:1;min-height:0;display:flex;flex-direction:column;max-width:840px;width:100%}
+.reader-page{flex:1;min-height:0;overflow:auto;padding:clamp(18px,5vw,48px);background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:14px;font-family:var(--ledger-font);font-size:var(--reader-font,18px);line-height:var(--reader-line,1.95);overscroll-behavior:contain;scrollbar-color:var(--gold) transparent}
+.reader-prose{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.reader-cue{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted);font-size:.86em;border-inline-start:2px solid var(--line);padding-inline-start:12px;margin:1.6em 0 .8em}
+.reader-end{padding:2em 0;text-align:center;color:var(--gold)}
+.reader-toolbar{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;padding:10px 4px max(10px,env(safe-area-inset-bottom));color:var(--muted);flex:none}
+#dialog .reader-toolbar button{padding:6px 8px;min-width:32px;border-color:transparent;background:transparent;color:var(--gold)}
+.reader-toolbar label{display:flex;align-items:center;gap:4px;font-size:12px;margin:0}.reader-toolbar select{width:auto;padding:3px;margin:0}.reader-toolbar output{font-size:12px}.reader-toolbar input[type=range]{flex-basis:100%;width:100%;height:16px;padding:0;margin:0;accent-color:var(--gold)}
+@media(max-width:400px){#dialog.reader-hub .reader-bookshelf{gap:24px 10px}.reader-toolbar{gap:2px}.reader-page{padding:17px}}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1700,6 +1729,65 @@ function groupMemory(c){
 function groupAvatar(g){
   return avatarMarkup({name:g?.name||'群',avatar:typeof g?.avatar==='string'?g.avatar:'',frame:{src:'',ring:false}},'group-avatar');
 }
+function readerEntries(kind){
+  if(kind==='stories'||kind==='moon')return state.stories.filter(x=>Boolean(x.htmlCard)===(kind==='moon')).map(x=>({id:x.id,title:x.title,category:storyCategoryKey(x.category),body:x.body,html:!!x.htmlCard}));
+  if(kind==='tea'||kind==='bonus')return collectedTeaCards().filter(({tea})=>Boolean(tea.bonus)===(kind==='bonus')).map(({tea,source})=>({id:tea.id,title:source+' · '+teaTitle(tea),category:teaLibraryFolder(tea),body:tea.turns.map(t=>t.input+'\n\n'+t.output).join('\n\n'),tea}));
+  return state.readerOther.map(x=>({...x,category:storyCategoryKey(x.category)}));
+}
+const readerKindNames={stories:'余晖藏书阁',moon:'月匣',tea:'茶叙',bonus:'番外茶叙',other:'其他'};
+function readerSheet(title,body,back){
+  teaLibraryDialog(title,body,back);
+  $('dialog').classList.add('reader-hub');
+}
+function readerHub(){
+  const covers=[['stories','余晖藏书阁','落日余光 · 番外故事','<circle cx="50" cy="53" r="17"/><path d="M17 58h66M24 68h52M34 78h32M50 23v8M23 33l6 6M77 33l-6 6"/>'],['moon','月匣','月下工坊 · HTML 藏品','<path d="M65 30A24 24 0 1 0 70 67A26 26 0 0 1 65 30Z"/><path d="m28 24 2 5 5 2-5 2-2 5-2-5-5-2 5-2ZM76 77v8m-4-4h8"/>'],['tea','茶叙','茶叙与番外茶叙 · 同席拾忆','<path d="M28 46h38v12a15 15 0 0 1-15 15h-8a15 15 0 0 1-15-15ZM66 49h5a8 8 0 0 1 0 16h-6M22 81h57M39 35c-9-9 9-10 0-19m16 19c-9-9 9-10 0-19"/>'],['other','其他','导入文字 · 自由收藏','<path d="M50 29v48M50 35c-12-8-23-8-31-6v42c13-3 23-1 31 6 8-7 18-9 31-6V29c-8-2-19-2-31 6ZM32 18h36"/>']];
+  readerSheet('星页书架','<p class="reader-intro">循着星光，翻开一页收藏。</p><div class="reader-bookshelf">'+covers.map(([kind,title,description,art])=>'<button type="button" class="reader-book" data-reader-kind="'+kind+'"><span class="reader-book-cover reader-cover-'+kind+'"><span class="reader-cover-frame"></span><svg viewBox="0 0 100 110" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+art+'</svg><span class="reader-cover-corner" aria-hidden="true">✧</span></span><strong>'+title+'</strong><small>'+description+'</small></button>').join('')+'</div>',null);
+  for(const b of $('dialog').querySelectorAll('[data-reader-kind]'))b.onclick=()=>b.dataset.readerKind==='tea'?readerTeaTypes():readerFolders(b.dataset.readerKind);
+}
+function readerTeaTypes(){
+  readerSheet('茶叙','<div class="story-books">'+['tea','bonus'].map(kind=>'<button type="button" class="story-folder-card" data-reader-tea="'+kind+'">'+teaEmblem()+'<strong>'+readerKindNames[kind]+'</strong><small>'+readerEntries(kind).length+' 张卡片</small></button>').join('')+'</div>',readerHub);
+  for(const b of $('dialog').querySelectorAll('[data-reader-tea]'))b.onclick=()=>readerFolders(b.dataset.readerTea);
+}
+function readerFolders(kind){
+  const entries=readerEntries(kind),known=kind==='stories'?storyCategories():kind==='moon'?moonCategories():kind==='tea'||kind==='bonus'?state.teaLibraryFolders[kind==='bonus'?'bonus':'regular']:state.readerOtherFolders;
+  const folders=[...new Set(['',...known,...entries.map(x=>x.category)])];
+  readerSheet(readerKindNames[kind],'<div class="story-shelf-summary"><span>'+entries.length+' 篇收藏</span><span>'+folders.length+' 个文件夹</span></div>'+
+    (kind==='other'?'<details class="story-panel"><summary>＋ 导入文字 / 新建文件夹</summary><form id="readerOtherImport" class="fields"><label>文件夹名称<input name="folder" maxlength="80" placeholder="留空为未分类"></label><label>文字文件（TXT，可多选）<input type="file" name="files" accept=".txt,text/plain" multiple></label><button class="primary">保存</button></form></details>':'')+
+    '<div class="story-books">'+folders.map(folder=>'<button type="button" class="story-folder-card" data-reader-folder="'+esc(folder)+'"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M3 7h7l2 2h9v11H3ZM3 7V4h7l2 3"/></svg><strong>'+esc(folder||'未分类')+'</strong><small>'+entries.filter(x=>x.category===folder).length+' 篇</small></button>').join('')+'</div>',kind==='tea'||kind==='bonus'?readerTeaTypes:readerHub);
+  for(const b of $('dialog').querySelectorAll('[data-reader-folder]'))b.onclick=()=>readerFolder(kind,b.dataset.readerFolder);
+  const form=$('readerOtherImport');if(form)form.onsubmit=async e=>{
+    e.preventDefault();const button=form.querySelector('button');button.disabled=true;
+    try{
+      const folder=storyCategoryKey(form.elements.folder.value),files=[...form.elements.files.files];
+      if(!folder&&!files.length){toast('请填写文件夹名称或选择 TXT 文件。');return;}
+      const added=[];for(const file of files){if(file.size>10*1024*1024)throw Error('单个文字文件请控制在 10 MB 以内。');added.push({id:crypto.randomUUID(),title:file.name.replace(/\.txt$/i,''),body:await file.text(),category:folder});}
+      if(commit({...state,readerOther:[...state.readerOther,...added],readerOtherFolders:[...new Set([...state.readerOtherFolders,...(folder?[folder]:[])])]}))readerFolders('other');
+    }catch(error){toast(error.message);}finally{if(button.isConnected)button.disabled=false;}
+  };
+}
+function readerFolder(kind,folder){
+  const entries=readerEntries(kind).filter(x=>x.category===folder);
+  readerSheet(readerKindNames[kind]+' · '+(folder||'未分类'),'<div class="story-shelf-summary"><span>'+entries.length+' 篇收藏</span></div><div class="story-books">'+(entries.map(x=>'<div class="story-entry"><button type="button" data-reader-entry="'+esc(x.id)+'"><strong>'+esc(x.title)+'</strong><span>'+esc(x.tea?x.tea.pov+' · '+x.tea.turns.length+' 段':x.html?'HTML 藏品':'文字收藏')+'</span><small>'+storyCount(x.body)+' 字 · 打开阅读</small></button></div>').join('')||'<p class="story-panel muted">这个文件夹还没有收藏。</p>')+'</div>',()=>readerFolders(kind));
+  for(const b of $('dialog').querySelectorAll('[data-reader-entry]'))b.onclick=()=>readerRead(kind,b.dataset.readerEntry,folder);
+}
+function readerRead(kind,id,folder){
+  const entry=readerEntries(kind).find(x=>x.id===id);if(!entry)return;
+  const settings=state.readerSettings;
+  const content=entry.html?storyHtmlPreview(entry.body,entry.title):entry.tea?entry.tea.turns.map(t=>'<p class="reader-cue">'+esc(t.input)+'</p>'+(t.htmlCard?storyHtmlPreview(t.output,entry.title):'<div class="reader-prose">'+esc(t.output)+'</div>')).join(''):'<div class="reader-prose">'+esc(entry.body)+'</div>';
+  readerSheet(entry.title,'<article id="readerPage" class="reader-page" tabindex="0" style="--reader-font:'+settings.font+'px;--reader-line:'+settings.line+'">'+content+'<div class="reader-end">✧</div></article><footer class="reader-toolbar" aria-label="阅读设置"><button type="button" id="readerContents" aria-label="返回目录">☷</button><button type="button" id="readerFontDown" aria-label="减小字号">A−</button><output id="readerFontValue">'+settings.font+'</output><button type="button" id="readerFontUp" aria-label="增大字号">A＋</button><label>行距<select id="readerLine" aria-label="阅读行距">'+[1.6,1.95,2.3].map(value=>'<option value="'+value+'" '+(settings.line===value?'selected':'')+'>'+value+'</option>').join('')+'</select></label><output id="readerProgress">0%</output><input id="readerSeek" type="range" min="0" max="100" value="0" aria-label="阅读进度"></footer>',()=>readerFolder(kind,folder));
+  $('dialog').classList.add('reader-reading');
+  const article=$('readerPage'),progress=$('readerProgress'),seek=$('readerSeek');
+  article.onscroll=()=>{const percent=Math.round(article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight)*100);progress.textContent=percent+'%';seek.value=percent;};
+  seek.oninput=()=>{article.scrollTop=(article.scrollHeight-article.clientHeight)*Number(seek.value)/100;};
+  const update=(font,line)=>{const next={font:Math.min(32,Math.max(14,font)),line};if(commit({...state,readerSettings:next})){article.style.setProperty('--reader-font',next.font+'px');article.style.setProperty('--reader-line',next.line);$('readerFontValue').textContent=next.font;}};
+  $('readerContents').onclick=()=>readerFolder(kind,folder);
+  $('readerFontDown').onclick=()=>update(state.readerSettings.font-1,state.readerSettings.line);
+  $('readerFontUp').onclick=()=>update(state.readerSettings.font+1,state.readerSettings.line);
+  $('readerLine').onchange=e=>update(state.readerSettings.font,Number(e.target.value));
+}
+function privateReaderHeading(){
+  return '<div class="tea-directory-title"><h3>私聊</h3><button type="button" class="story-sun" data-reader-hub aria-label="打开阅读书架" title="阅读书架"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 2Q13.4 10.6 22 12Q13.4 13.4 12 22Q10.6 13.4 2 12Q10.6 10.6 12 2Z"/></svg></button></div>';
+}
 function groupDirectory(){
   return '<div class="row between"><div class="tea-directory-title"><h3>群聊</h3><button type="button" class="story-sun" data-tea-library aria-label="茶叙收藏馆" title="茶叙收藏馆"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h13v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Zm13 1h2a2 2 0 0 1 0 4h-2M3 21h18M8 6c-2-2 2-3 0-5m5 5c-2-2 2-3 0-5"/></svg></button></div><button type="button" data-group-edit="">＋ 新建群聊</button></div>'+
     state.groups.map(g=>'<button class="directory-item" data-group-open="'+esc(g.id)+'">'+groupAvatar(g)+'<span><strong>'+esc(g.name)+'</strong><small>'+g.members.filter(id=>contact(id)).length+' 位角色 · '+(g.shared?'记忆互通':'独立记忆')+'</small></span><b>›</b></button>').join('');
@@ -1961,8 +2049,8 @@ function chat(){
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
       '<section class="panel contact-list"><div class="row contact-list-top"><div class="row contact-list-user">'+avatarButton('user',user)+'<div class="contact-list-name"><strong title="'+esc(user.name)+'">'+esc(user.name)+'</strong><div class="muted">我的头像</div></div></div><div class="row contact-list-actions">'+storySun()+'<button class="primary" data-action="newContact">＋ 新建角色</button></div></div>'+
       (pendingShare?'<p class="notice">请选择接收账单的角色。<button data-action="cancelShare">取消分享</button></p>':'')+
-      (splitDirectory?'<div class="rose-directory"><section>'+groupDirectory()+(typeof ledgerOnline==='undefined'?'':ledgerOnline.directory())+'</section><section><h3>私聊</h3>'+ (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'</section></div>':
-        groupDirectory()+(typeof ledgerOnline==='undefined'?'':ledgerOnline.directory())+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>'))+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
+      (splitDirectory?'<div class="rose-directory"><section>'+groupDirectory()+(typeof ledgerOnline==='undefined'?'':ledgerOnline.directory())+'</section><section>'+privateReaderHeading()+ (list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>')+'</section></div>':
+        groupDirectory()+(typeof ledgerOnline==='undefined'?'':ledgerOnline.directory())+privateReaderHeading()+(list||'<div class="empty">通讯录还是空的。新建一个角色开始对话。</div>'))+'<p class="contact-signature">BELONG TO S.J.&amp;L.S.R.</p></section>';
   }
   const lock=teaLock([c.id]);
   const chatUser={...user,name:'你',nickname:''};
@@ -4995,7 +5083,7 @@ function skinAvailable(id,archive){
   return Object.hasOwn(skins,id)&&(!Object.hasOwn(skinUnlockIds,id)||archive.mysteryActive.includes(skinUnlockIds[id]));
 }
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({mysteryActive:[],kindroid:{unlocked:false,key:'',aiId:''},kindroidTranslation:{preset:'',language:'简体中文'},teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],readerOther:[],readerOtherFolders:[],readerSettings:{font:18,line:1.95},kindroid:{unlocked:false,key:'',aiId:''},kindroidTranslation:{preset:'',language:'简体中文'},teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
 const chatDraftKey=key+'-chat-drafts';
 const pendingChatDrafts=new Map();
 let state = initial(), storageError = '';
@@ -5025,6 +5113,10 @@ function validate(data){
     result[k]=data[k];
   }
   if(!Array.isArray(result.billPresets)||!result.billPresets.every(p=>p&&string(p.id)&&p.id&&string(p.title)&&p.title.trim()&&string(p.category)&&p.category.trim()&&['income','expense'].includes(p.type)&&Number.isSafeInteger(p.cents)&&p.cents>0)||!unique(result.billPresets))throw Error('记账预设存档无效。');
+  result.readerOther=Array.isArray(result.readerOther)?result.readerOther.filter(x=>x&&['id','title','body','category'].every(k=>typeof x[k]==='string')):[];
+  result.readerOtherFolders=Array.isArray(result.readerOtherFolders)?[...new Set(result.readerOtherFolders.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))]:[];
+  if(!result.readerSettings||typeof result.readerSettings!=='object')result.readerSettings={font:18,line:1.95};
+  result.readerSettings={font:Math.min(32,Math.max(14,Number(result.readerSettings.font)||18)),line:Math.min(2.5,Math.max(1.4,Number(result.readerSettings.line)||1.95))};
   if(!result.kindroidTranslation||typeof result.kindroidTranslation.preset!=='string'||typeof result.kindroidTranslation.language!=='string')result.kindroidTranslation={preset:'',language:'简体中文'};
   if(!result.kindroid||typeof result.kindroid!=='object'||typeof result.kindroid.key!=='string'||typeof result.kindroid.aiId!=='string'||typeof result.kindroid.unlocked!=='boolean')throw Error('Kindroid 接入存档无效。');
   if(!Array.isArray(result.mysteryActive)||!result.mysteryActive.every(id=>typeof id==='string'&&/^[a-z0-9-]+$/.test(id)))throw Error('神秘小入口存档无效。');
@@ -5505,7 +5597,7 @@ function dialog(html,full=false){
   panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
-  panel.classList.remove('story-studio');
+  panel.classList.remove('story-studio','reader-hub','reader-reading');
   delete panel.dataset.storyOrbPage;
   panel.innerHTML=html;
   releaseUnusedAvatarUrls();
@@ -5712,6 +5804,8 @@ document.addEventListener('click',e=>{
   }
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
+  if(b.hasAttribute('data-reader-hub')){readerHub();return;}
+
   if(d.kinTranslate!==undefined){void toggleKindroidTranslation(d.kinContact,Number(d.kinTranslate));return;}
 
 
@@ -6308,6 +6402,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
