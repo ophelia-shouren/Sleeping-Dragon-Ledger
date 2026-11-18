@@ -726,6 +726,13 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #readerExcerptForm{padding:8px;border-top:1px solid var(--line);margin-top:3px}#readerExcerptForm[hidden]{display:none}#readerExcerptForm label{font-size:12px}#readerExcerptForm select{font-size:12px;padding:6px;margin:5px 0 8px}#readerExcerptForm button{font-size:12px;padding:6px 12px;border-radius:999px}
 .reader-underline{background:transparent;color:inherit;text-decoration-line:underline;text-decoration-color:var(--gold);text-decoration-thickness:1px;text-underline-offset:.22em}
 @media(prefers-reduced-motion:reduce){.reader-flow{will-change:auto!important}}
+
+@media(pointer:coarse){#dialog.reader-immersive-ready .reader-page,#dialog.reader-immersive-ready .reader-page *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important}}
+#dialog.reader-immersive-ready .reader-page.reader-custom-select,#dialog.reader-immersive-ready .reader-page.reader-custom-select *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important}
+.reader-selection-layer{position:absolute;inset:0;pointer-events:none;z-index:33;overflow:hidden}
+.reader-selected-fragment{position:absolute;background:color-mix(in srgb,var(--gold) 30%,transparent);pointer-events:none;border-radius:2px}
+#dialog .reader-selection-layer .reader-selection-handle{position:absolute;pointer-events:auto;touch-action:none;width:28px!important;height:28px!important;min-width:28px!important;min-height:28px!important;padding:0!important;border:0!important;border-radius:50%!important;transform:translate(-50%,-3px);background:transparent!important;box-shadow:none!important}
+.reader-selection-handle:after{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--gold);box-shadow:0 1px 4px #0004}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1846,9 +1853,11 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   dialog.classList.add('reader-immersive','reader-immersive-ready');
   dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享给<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><button class="primary">发送摘录</button></form></div>');
   const tools=$('readerSelectionTools'),form=$('readerExcerptForm');
-  let selectionData=null,timer;
+  let selectionData=null,timer,customActive=false,longPress=null,pressOrigin=null,suppressUntil=0;
+  dialog.append(tools);
+  const selectionLayer=document.createElement('div');selectionLayer.className='reader-selection-layer';dialog.append(selectionLayer);
   const clock=()=>{const node=$('readerClock');if(node)node.textContent=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});};clock();const clockTimer=setInterval(clock,30000);
-  const close=()=>{tools.hidden=true;form.hidden=true;};
+  const close=()=>{tools.hidden=true;form.hidden=true;customActive=false;selectionData=null;selectionLayer.replaceChildren();};
   const drawMarks=()=>{
     const text=flow.textContent,marks=state.readerMarks.filter(m=>m.key===key&&text.slice(m.start,m.end)===m.quote);
     for(const mark of [...flow.querySelectorAll('mark.reader-underline')])mark.replaceWith(document.createTextNode(mark.textContent));flow.normalize();
@@ -1862,7 +1871,57 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
       node.replaceWith(fragment);
     }
   };drawMarks();
+  const rangeFor=(start,end)=>{
+    const walker=document.createTreeWalker(flow,NodeFilter.SHOW_TEXT),range=document.createRange();let node,offset=0,started=false;
+    while(node=walker.nextNode()){
+      if(!started&&start<=offset+node.length){range.setStart(node,Math.max(0,start-offset));started=true;}
+      if(started&&end<=offset+node.length){range.setEnd(node,Math.max(0,end-offset));return range;}
+      offset+=node.length;
+    }
+    return null;
+  };
+  const offsetAt=(x,y)=>{
+    let range=document.caretRangeFromPoint?.(x,y);
+    if(!range&&document.caretPositionFromPoint){const point=document.caretPositionFromPoint(x,y);if(point){range=document.createRange();range.setStart(point.offsetNode,point.offset);range.collapse(true);}}
+    if(!range||!flow.contains(range.startContainer))return null;
+    const prefix=range.cloneRange();prefix.selectNodeContents(flow);prefix.setEnd(range.startContainer,range.startOffset);return prefix.toString().length;
+  };
+  const drawCustom=()=>{
+    if(!selectionData)return;
+    const range=rangeFor(selectionData.start,selectionData.end);if(!range)return;
+    const bounds=dialog.getBoundingClientRect(),viewport=article.getBoundingClientRect();
+    const rects=[...range.getClientRects()].filter(r=>r.width>0&&r.height>0&&r.left<viewport.right&&r.right>viewport.left&&r.top<viewport.bottom&&r.bottom>viewport.top);
+    selectionLayer.replaceChildren();if(!rects.length){tools.hidden=true;return;}
+    for(const rect of rects){const mark=document.createElement('span');mark.className='reader-selected-fragment';mark.style.cssText='left:'+(Math.max(rect.left,viewport.left)-bounds.left)+'px;top:'+(Math.max(rect.top,viewport.top)-bounds.top)+'px;width:'+(Math.min(rect.right,viewport.right)-Math.max(rect.left,viewport.left))+'px;height:'+(Math.min(rect.bottom,viewport.bottom)-Math.max(rect.top,viewport.top))+'px';selectionLayer.append(mark);}
+    const handle=(edge,rect,x)=>{
+      const node=document.createElement('button');node.type='button';node.className='reader-selection-handle';node.setAttribute('aria-label',edge==='start'?'调整选区起点':'调整选区终点');node.style.left=(x-bounds.left)+'px';node.style.top=(Math.min(rect.bottom,viewport.bottom)-bounds.top)+'px';
+      node.onpointerdown=e=>{e.preventDefault();e.stopPropagation();node.setPointerCapture(e.pointerId);};
+      node.onpointermove=e=>{if(!node.hasPointerCapture(e.pointerId))return;e.preventDefault();const offset=offsetAt(e.clientX,e.clientY-12);if(offset===null)return;const length=flow.textContent.length;if(edge==='start')selectionData.start=Math.max(0,Math.min(offset,selectionData.end-1));else selectionData.end=Math.min(length,Math.max(offset,selectionData.start+1));selectionData.quote=flow.textContent.slice(selectionData.start,selectionData.end);paintSelection(false);};
+      node.onpointerup=e=>{if(node.hasPointerCapture(e.pointerId))node.releasePointerCapture(e.pointerId);suppressUntil=Date.now()+400;drawCustom();};
+      selectionLayer.append(node);
+    };
+    handle('start',rects[0],rects[0].left);handle('end',rects.at(-1),rects.at(-1).right);
+    const rect=rects[0];tools.hidden=false;tools.style.left=Math.max(10,Math.min(bounds.width-tools.offsetWidth-10,rect.left-bounds.left))+'px';tools.style.top=Math.max(38,Math.min(bounds.height-tools.offsetHeight-110,rect.top-bounds.top-tools.offsetHeight-12))+'px';
+  };
+  // Keep captured handles in place during a drag; redraw once released.
+  const paintSelection=full=>{if(full!==false){drawCustom();return;}const range=rangeFor(selectionData.start,selectionData.end);if(!range)return;const bounds=dialog.getBoundingClientRect();for(const old of selectionLayer.querySelectorAll('.reader-selected-fragment'))old.remove();for(const rect of range.getClientRects()){if(rect.width<=0)continue;const mark=document.createElement('span');mark.className='reader-selected-fragment';mark.style.cssText='left:'+(rect.left-bounds.left)+'px;top:'+(rect.top-bounds.top)+'px;width:'+rect.width+'px;height:'+rect.height+'px';selectionLayer.prepend(mark);}};
+  const cancelLong=()=>{clearTimeout(longPress);longPress=null;};
+  const touchDown=e=>{
+    if(e.pointerType==='mouse'||e.target.closest('button,a,input,select,iframe'))return;
+    article.classList.add('reader-custom-select');cancelLong();pressOrigin={x:e.clientX,y:e.clientY};
+    longPress=setTimeout(()=>{
+      const offset=offsetAt(e.clientX,e.clientY);if(offset===null)return;const text=flow.textContent;let start=Math.min(offset,Math.max(0,text.length-1)),end=start+1;
+      if(typeof Intl.Segmenter==='function'){for(const part of new Intl.Segmenter(undefined,{granularity:'word'}).segment(text)){if(part.index<=start&&part.index+part.segment.length>start){start=part.index;end=start+part.segment.length;break;}}}
+      if(!text.slice(start,end).trim())return;
+      window.getSelection()?.removeAllRanges();customActive=true;selectionData={start,end,quote:text.slice(start,end)};suppressUntil=Date.now()+1000;drawCustom();
+    },450);
+  };
+  const touchMove=e=>{if(pressOrigin&&Math.hypot(e.clientX-pressOrigin.x,e.clientY-pressOrigin.y)>10)cancelLong();};
+  const touchEnd=()=>{cancelLong();pressOrigin=null;if(customActive)suppressUntil=Date.now()+500;};
+  const contextMenu=e=>{e.preventDefault();};
+  article.addEventListener('pointerdown',touchDown);article.addEventListener('pointermove',touchMove);article.addEventListener('pointerup',touchEnd);article.addEventListener('pointercancel',touchEnd);article.addEventListener('contextmenu',contextMenu);
   const selectionChange=()=>{
+    if(customActive)return;
     clearTimeout(timer);timer=setTimeout(()=>{
       if(!article.isConnected)return;
       const selected=window.getSelection();if(!selected?.rangeCount||selected.isCollapsed){if(form.hidden)close();return;}
@@ -1893,7 +1952,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     const excerpt='与你分享《'+(folder||'未分类')+'》中的摘录\n章节：'+entry.title+'\n\n'+selectionData.quote;
     window.getSelection()?.removeAllRanges();dialog.close();activeContact=c.id;go('chat');await send(false,null,{content:excerpt});
   };
-  return {toggle(){close();dialog.classList.toggle('reader-immersive');},progress(percent){$('readerMiniProgress').textContent=percent+'%';},cleanup(){clearInterval(clockTimer);clearTimeout(timer);document.removeEventListener('selectionchange',selectionChange);}};
+  return {hasSelection(){return customActive||Date.now()<suppressUntil;},consumeTap(){if(Date.now()<suppressUntil)return true;if(customActive){close();return true;}return false;},toggle(){close();dialog.classList.toggle('reader-immersive');},progress(percent){$('readerMiniProgress').textContent=percent+'%';},cleanup(){cancelLong();article.removeEventListener('pointerdown',touchDown);article.removeEventListener('pointermove',touchMove);article.removeEventListener('pointerup',touchEnd);article.removeEventListener('pointercancel',touchEnd);article.removeEventListener('contextmenu',contextMenu);selectionLayer.remove();clearInterval(clockTimer);clearTimeout(timer);document.removeEventListener('selectionchange',selectionChange);}};
 }
 function readerRead(kind,id,folder){
   const chapters=readerEntries(kind).filter(x=>x.category===folder),index=chapters.findIndex(x=>x.id===id),entry=chapters[index];if(!entry)return;
@@ -1962,8 +2021,8 @@ function readerRead(kind,id,folder){
     if(direction<0&&pageIndex<=0){if(index>0)readerRead(kind,chapters[index-1].id,folder);return;}
     showPage(pageIndex+direction,true);
   };
-  article.onclick=e=>{if(e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio>=.32&&ratio<=.68){immersive.toggle();return;}if(state.readerSettings.mode==='tap'){if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);}};
-  let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(!window.getSelection()?.toString()&&Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
+  article.onclick=e=>{if(immersive.consumeTap())return;if(e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio>=.32&&ratio<=.68){immersive.toggle();return;}if(state.readerSettings.mode==='tap'){if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);}};
+  let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(!immersive.hasSelection()&&!window.getSelection()?.toString()&&Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
   article.onkeydown=e=>{if(state.readerSettings.mode==='scroll')return;if(['ArrowRight','PageDown','ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();turn(['ArrowRight','PageDown'].includes(e.key)?1:-1);}};
   apply();
   const relayout=()=>layout(readingRatio());
@@ -6592,6 +6651,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
