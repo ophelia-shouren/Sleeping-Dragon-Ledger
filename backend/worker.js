@@ -387,6 +387,14 @@ function characterPacketResponse(raw,mode,requester,charName){
   return {reply,decision,action:decision===true&&reply?{mode,amount:{main:validAmount?main:'1'},count:1,target:mode==='exclusive'?'user:'+requester:undefined}:null};
 }
 
+function resolveMention(body,characters){
+  const names=[...characters].sort((a,b)=>b.name.length-a.name.length);
+  for(const mention of body.matchAll(/[@＠]([^\s@＠]+)/gu)){
+    const token=mention[1];const match=names.find(c=>token===c.name||token.replace(/[，。！？、；：,.!?;:]+$/u,'')===c.name);
+    if(match)return match;
+  }
+  return null;
+}
 async function generateReply(env,room,char,summarize,ledger,messageId=null,automatic=null,ctx=null){
   const stmt=(sql,...args)=>env.DB.prepare(sql).bind(...args);
   const run=(sql,...args)=>stmt(sql,...args).run();
@@ -1058,7 +1066,9 @@ async function api(req, env, url, ledger, ctx) {
     if(!['story','moon'].includes(data.type))throw fail('不支持的分享卡片。');
     const attachment=JSON.stringify({title,body,type:data.type});
     if(new TextEncoder().encode(attachment).length>500000)throw fail('卡片太大，无法分享到群聊。',413);
-    const sent=await run("INSERT INTO messages (room,sender,body,kind,attachment) SELECT ?,?,?,'archive-card',? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?) AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)",room.id,uid,title,attachment,room.id,uid,room.id);
+    const cardInsert=stmt("INSERT INTO messages (room,sender,body,kind,attachment) SELECT ?,?,?,'archive-card',? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?) AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)",room.id,uid,title,attachment,room.id,uid,room.id);
+    const note=typeof data.note==='string'?data.note.trim().slice(0,2000):'';
+    const [sent]=await db.batch([cardInsert,...(note?[stmt("INSERT INTO messages (room,sender,body) SELECT ?,?,? WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?) AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)",room.id,uid,note,room.id,uid,room.id)]:[])]);
     if(!sent.meta.changes)throw fail('你已离开此会话。',404);
     return json({ok:true,message:sent.meta.last_row_id});
   }
@@ -1133,16 +1143,16 @@ async function api(req, env, url, ledger, ctx) {
       const match = body.match(/^[@＠]([^\s@＠]+)(?:\s|$)/u);
       if (match) char = await one('SELECT * FROM chars WHERE room=? AND name=? AND active=1',room.id,match[1]);
     }
-    const insert=stmt('INSERT INTO messages (room,sender,body,attachment) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))',room.id,uid,body,await quoteAttachment(),room.id,uid);
-    const deferred=ledger&&char&&data.deferReply===true;
-    const [sent]=deferred?await db.batch([
-      insert,stmt('INSERT INTO ledger_reply_jobs (message,char_id) SELECT last_insert_rowid(),? WHERE changes()=1',char.id)
-    ]):[await insert.run()];
-    if (!sent.meta.changes) throw fail('你已离开此会话。',404);
-    if (!char || deferred) {
-      summarize();
-      return json({ok:true,message:sent.meta.last_row_id,...(deferred?{reply:sent.meta.last_row_id}:{})});
+    // Resolve mentions from stored characters even when a client's member cache is stale.
+    if(!char){
+      const candidates=await all('SELECT * FROM chars WHERE room=? AND active=1',room.id);
+      char=resolveMention(body,candidates);
     }
+    const insert=stmt('INSERT INTO messages (room,sender,body,attachment) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))',room.id,uid,body,await quoteAttachment(),room.id,uid);
+    const sent=await insert.run();
+    if (!sent.meta.changes) throw fail('你已离开此会话。',404);
+    if (!char) {summarize();return json({ok:true,message:sent.meta.last_row_id});}
+    // The server starts the reply in this same request, regardless of the inviter's online status.
     return generateReply(env,room,char,summarize,ledger,sent.meta.last_row_id,null,ctx);
   }
   if (ledger && req.method==='POST' && path==='reply') {
@@ -1172,7 +1182,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'kindroid-private-bridge-31'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'reader-sharing-offline-reply-32'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
@@ -1193,6 +1203,7 @@ export default {
     return response;
   }
 };
+
 
 
 
