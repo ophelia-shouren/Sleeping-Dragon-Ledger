@@ -1855,7 +1855,7 @@ function readerFolder(kind,folder){
 function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   const key=kind+':'+entry.id;
   dialog.classList.add('reader-immersive','reader-immersive-ready');
-  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerCopyExcerpt">'+icon('<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>')+'复制</button><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享给<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><button class="primary">发送摘录</button></form></div>');
+  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerCopyExcerpt">'+icon('<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>')+'复制</button><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享至<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">角色 · '+esc(displayName(c))+'</option>').join('')+state.groups.map(g=>'<option value="group:'+esc(g.id)+'">群聊 · '+esc(g.name)+'</option>').join('')+(typeof ledgerOnline!=='undefined'?'<option value="online">在线群聊…</option>':'')+'</select></label><button class="primary">发送摘录</button></form></div>');
   const tools=$('readerSelectionTools'),form=$('readerExcerptForm');
   let selectionData=null,timer,customActive=false,longPress=null,pressOrigin=null,suppressUntil=0;
   dialog.append(tools);
@@ -1871,7 +1871,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     for(const {node,start,end} of nodes){
       const cuts=marks.filter(m=>m.start<end&&m.end>start);if(!cuts.length)continue;
       const points=[...new Set([0,node.length,...cuts.flatMap(m=>[Math.max(0,m.start-start),Math.min(node.length,m.end-start)])])].sort((a,b)=>a-b),fragment=document.createDocumentFragment();
-      for(let i=0;i<points.length-1;i++){const a=points[i],b=points[i+1],part=node.data.slice(a,b);if(cuts.some(m=>m.start<=start+a&&m.end>=start+b)){const mark=document.createElement('mark');mark.className='reader-underline';mark.textContent=part;fragment.append(mark);}else fragment.append(document.createTextNode(part));}
+      for(let i=0;i<points.length-1;i++){const a=points[i],b=points[i+1],part=node.data.slice(a,b);if(cuts.some(m=>m.start<=start+a&&m.end>=start+b)){const mark=document.createElement('mark');mark.className='reader-underline';const saved=cuts.find(m=>m.start<=start+a&&m.end>=start+b);mark.dataset.markStart=saved.start;mark.dataset.markEnd=saved.end;mark.textContent=part;fragment.append(mark);}else fragment.append(document.createTextNode(part));}
       node.replaceWith(fragment);
     }
   };drawMarks();
@@ -1890,7 +1890,8 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     if(!range||!flow.contains(range.startContainer))return null;
     const prefix=range.cloneRange();prefix.selectNodeContents(flow);prefix.setEnd(range.startContainer,range.startOffset);return prefix.toString().length;
   };
-  const drawCustom=()=>{
+  const updateUnderlineAction=()=>{const active=selectionData&&state.readerMarks.some(m=>m.key===key&&m.start===selectionData.start&&m.end===selectionData.end);$('readerUnderline').innerHTML=icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+(active?'取消划线':'划线');};
+  const drawCustom=()=>{updateUnderlineAction();
     if(!selectionData)return;
     const range=rangeFor(selectionData.start,selectionData.end);if(!range)return;
     const bounds=dialog.getBoundingClientRect(),viewport=article.getBoundingClientRect();
@@ -1932,7 +1933,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
       const range=selected.getRangeAt(0);if(!flow.contains(range.startContainer)||!flow.contains(range.endContainer))return;
       const before=range.cloneRange();before.selectNodeContents(flow);before.setEnd(range.startContainer,range.startOffset);
       const start=before.toString().length,quote=range.toString();if(!quote.trim())return;
-      selectionData={start,end:start+quote.length,quote};
+      selectionData={start,end:start+quote.length,quote};updateUnderlineAction();
       const rect=range.getBoundingClientRect(),bounds=dialog.getBoundingClientRect();tools.hidden=false;
       tools.style.left=Math.max(10,Math.min(bounds.width-tools.offsetWidth-10,rect.left-bounds.left+rect.width/2-tools.offsetWidth/2))+'px';
       const y=rect.top-bounds.top-tools.offsetHeight-12;
@@ -1941,6 +1942,8 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   };
   document.addEventListener('selectionchange',selectionChange);
   const dismissSelection=event=>{
+    const marked=event.target.closest('mark.reader-underline');
+    if(marked&&flow.contains(marked)){const start=Number(marked.dataset.markStart),end=Number(marked.dataset.markEnd);const saved=state.readerMarks.find(m=>m.key===key&&m.start===start&&m.end===end&&flow.textContent.slice(start,end)===m.quote);if(saved){cancelLong();window.getSelection()?.removeAllRanges();customActive=true;selectionData={start,end,quote:saved.quote};form.hidden=true;suppressUntil=Date.now()+350;drawCustom();event.preventDefault();event.stopImmediatePropagation();return;}}
     if(!selectionData||tools.contains(event.target)||event.target.closest('.reader-selection-handle'))return;
     const range=rangeFor(selectionData.start,selectionData.end);
     if(range&&[...range.getClientRects()].some(rect=>event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom))return;
@@ -1964,7 +1967,22 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   $('readerShareExcerpt').onclick=()=>{if(!selectionData)return;form.hidden=!form.hidden;tools.style.top=Math.max(38,Math.min(parseFloat(tools.style.top)||38,dialog.clientHeight-tools.offsetHeight-110))+'px';};
   form.onsubmit=async event=>{
     event.preventDefault();if(!selectionData)return;
-    const c=contact(form.elements.recipient.value);if(!c||localConfig(c).mode!=='ai'){toast('请选择角色。');return;}
+    const recipient=form.elements.recipient.value;
+    const articleText='【阅读分享】这是用户从书中读到并分享的文章节选，不是正在发生的事件，也不是共同经历。\n书名：《'+(folder||'未分类')+'》\n章节：'+entry.title+'\n\n'+selectionData.quote;
+    const excerptCard={book:folder||'未分类',chapter:entry.title,text:selectionData.quote,sourceType:kind,recall:false};
+    if(recipient==='online'){
+      const card={title:'《'+excerptCard.book+'》 · '+entry.title+' · 节选',body:articleText};
+      await ledgerOnline.shareArchive(card,()=>readerRead(kind,entry.id,folder));return;
+    }
+    if(recipient.startsWith('group:')){
+      const g=groupById(recipient.slice(6));if(!g){toast('群聊不存在。');return;}
+      if(groupJobs.has(g.id)||g.pending.length){toast('群聊正在回复，请稍后分享。');return;}
+      if(teaSendBlocked(g.members))return;
+      const lived=kind==='tea'?entry.tea?.cast.map(contact).filter(Boolean).map(displayName):[];
+      const content=lived?.length?'【普通茶叙记录分享】原参与者：'+lived.join('、')+'。仅原参与角色可作为共同回忆，未参与角色只当作阅读分享。\n'+articleText.replace('【阅读分享】这是用户从书中读到并分享的文章节选，不是正在发生的事件，也不是共同经历。','【节选来源】以下来自已结束的普通茶叙，请按上述参与者范围区分共同回忆与阅读分享。'):articleText;
+      dialog.close();openGroup(g.id);await sendGroup(g.id,content,null,null,false,false,excerptCard);return;
+    }
+    const c=contact(recipient);if(!c||localConfig(c).mode!=='ai'){toast('请选择角色或群聊。');return;}
     if(teaSendBlocked([c.id])||threads.has(c.id))return;
     if(c.provider==='kindroid'?!state.kindroid.key:!profileFor(c)){toast('请先配置该角色的 API。');return;}
     const recall=kind==='tea'&&entry.tea?.cast.includes(c.id);
@@ -2131,13 +2149,13 @@ function groupBubble(m,g,index,selected){
   const person=appearance(m.roleId||'user')||{name:m.speaker,avatar:'',frame:{src:'',ring:false}};
   const avatar='<span class="avatar-button">'+avatarMarkup(person)+'</span>';
   const name=mine||g.showName===false?'':'<small>'+esc(m.speaker)+'</small>';
-  return chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true}).map((part,i,parts)=>{
+  return (m.readerExcerpt?[m.content]:chatBubbleParts({...m,role},{...chatDisplay(person),split:g.split===true})).map((part,i,parts)=>{
     const last=i===parts.length-1;
     const layout=chatMessageLayout(avatar,name,bubbleTimestamp(m,g.showTime!==false,g.split===true,last));
     return '<div class="message-row '+role+'">'+layout.before+'<article class="bubble '+role+
       (selected?.indices.has(index)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
       (selected?'aria-checked="'+selected.indices.has(index)+'" ':'')+'data-message-index="'+index+'">'+
-      layout.name+(i===0?quoteMarkup(m.quote):'')+(m.storyForward?forwardedStoryCard(m):'<p>'+esc(part)+'</p>')+
+      layout.name+(i===0?quoteMarkup(m.quote):'')+(m.readerExcerpt?readerExcerptCard(m.readerExcerpt):m.storyForward?forwardedStoryCard(m):'<p>'+esc(part)+'</p>')+
       (last?imageInMessage(m):'')+layout.time+'</article></div>';
   }).join('');
 }
@@ -2259,7 +2277,7 @@ async function rerollGroup(id,index,guide){
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);groupRerolls.delete(id);refreshGroup(id);}
 }
-async function sendGroup(id,message='',file=null,game=null,storyForward=false,continueContext=false){
+async function sendGroup(id,message='',file=null,game=null,storyForward=false,continueContext=false,readerExcerpt=null){
   if(groupJobs.has(id))return;
   let g=groupById(id);if(!g||teaSendBlocked(g.members))return;
   groupJobs.add(id);
@@ -2274,7 +2292,7 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false,co
       const quote=!game&&!storyForward&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
-      patchGroup(g,{continueContext:false,pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{})}]});
+      patchGroup(g,{continueContext:false,pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{}),...(readerExcerpt?{readerExcerpt}:{})}]});
     }else if(continueContext&&!g.pending.length){
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
