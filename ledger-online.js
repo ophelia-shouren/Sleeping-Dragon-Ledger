@@ -416,7 +416,16 @@ const ledgerOnline = (() => {
   }
   function rooms(){
     room=null;
-    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button><button type="button" id="onlineUserProfile">在线 User 人设</button><button type="button" id="onlineAccountLogout">退出账号</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
+    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button><button type="button" id="onlineUserProfile">在线 User 人设</button><button type="button" id="onlineAccountLogout">退出账号</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature" tabindex="0" role="button" aria-label="查看个人用户码">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
+    const signature=el('onlineSignature');let revealingCode=false;
+    const revealCode=async()=>{
+      if(revealingCode)return;revealingCode=true;
+      try{const identityAtStart=me?.id;const result=await request('user-code');if(!active(serial)||me?.id!==identityAtStart)return;
+        screen('个人用户码','<section class="group-settings-card group-settings-block"><p class="muted">当前在线账号绑定的个人用户码</p><p style="text-align:center;overflow-wrap:anywhere"><strong>'+esc(result.code)+'</strong></p><button type="button" id="onlineCodeBack">返回</button></section>'+end,rooms);
+        el('onlineCodeBack').onclick=rooms;
+      }catch(error){if(active(serial))status(error.message);}finally{revealingCode=false;}
+    };
+    signature.onclick=revealCode;signature.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();void revealCode();}};
     el('onlineUserProfile').onclick=()=>void editOnlineUser();
     el('onlineAccountLogout').onclick=()=>void logoutOnline();
     el('onlineNew').onclick=create;
@@ -723,6 +732,9 @@ const ledgerOnline = (() => {
     '[data-skin="baker-street"] #ledgerOnline .bubble.online-human-only:after{content:"";position:absolute;right:8px;top:8px;width:7px;height:7px;border-top:1px solid color-mix(in srgb,var(--gold) 65%,transparent);border-right:1px solid color-mix(in srgb,var(--gold) 65%,transparent);pointer-events:none}'+
     '#ledgerOnline .bubble.online-message-picked{outline:4px solid var(--gold)!important;outline-offset:2px!important}'+
     '</style>';
+  function hasPendingReceipt(pending,rows){
+    return !!pending&&rows.some(message=>pending.saved?message.id===pending.saved:message.id>pending.after&&message.sender===pending.sender&&!message.char_id&&message.body===pending.body&&['text','human-only','mention-all'].includes(message.kind||'text'));
+  }
   function drawMessages(mode,added=null){
     const box=el('onlineMessages'), oldHeight=box.scrollHeight, oldTop=box.scrollTop;
     const people=new Map((detail?.members||[]).map(x=>[x.id,x]));
@@ -770,7 +782,6 @@ const ledgerOnline = (() => {
     }else{
       box.innerHTML=(older?'<div class="chat-history-page"><button type="button" id="onlineOlder">查看更早的消息</button></div>':'')+
       (markup||(!(pendingMessage?.room===room.id)?'<div class="empty">还没有消息，打声招呼吧。</div>':'')) +
-      (pendingMessage?.room===room.id?'<div class="message-row user"><span class="avatar-button">'+personAvatar(me.name,people.get(me.id)?.avatar,people.get(me.id)?.frame)+'</span><article class="bubble user'+(pendingMessage.humanOnly?' online-human-only':'')+'"><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(pendingMessage.body)+'</p><small class="muted">'+(pendingMessage.saved?'已发送':'发送中…')+'</small></article></div>':'')+
       '<div id="onlineTyping"></div>';
     }
     drawTyping();
@@ -1160,7 +1171,7 @@ const ledgerOnline = (() => {
         view.messages=messages;view.older=older;view.loaded=true;view.updated=Date.now();
         if(cursor||messages.length)void markRead(current,messages.at(-1)?.id||0);
         const hadPending=pendingMessage?.room===current.id;
-        if(hadPending&&messages.some(x=>x.id===pendingMessage.saved))pendingMessage=null;
+        if(hadPending&&hasPendingReceipt(pendingMessage,messages))pendingMessage=null;
         if(added.length||nextTyping.length)lastActivity=Date.now();
         if(added.length||firstLoad){
           const append=cursor&&!firstLoad&&!hadPending&&el('onlineTyping')&&!added.some(row=>['rps-result','message-deleted'].includes(row.kind));
@@ -1288,7 +1299,7 @@ const ledgerOnline = (() => {
       const charId=humanOnly||mentionAll?null:mentions.target(body);
       const path=mentionAll?'send-mention-all':humanOnly?'send-human-only':'send';
       input.value='';
-      const pending={room:current.id,body,humanOnly:humanOnly||mentionAll};
+      const pending={room:current.id,body,humanOnly:humanOnly||mentionAll,sender:me.id,after:messages.at(-1)?.id||0};
       pendingMessage=pending;
       drawMessages('bottom');
       let result;
@@ -1771,6 +1782,7 @@ const ledgerOnline = (() => {
   }
   return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal,kindroid:data=>request('kindroid-send',data)};
 })();
+
 
 
 
