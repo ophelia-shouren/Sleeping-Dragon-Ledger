@@ -153,13 +153,19 @@ const ledgerOnline = (() => {
     }
     return value;
   }
+  let retryRead=null;
+  function requestFailure(path,data,signal){
+    const route=path.split('?')[0];
+    const operation=({'rooms':'加载会话列表','messages':'加载聊天记录','detail':'加载群聊信息','online-profile':'同步在线 User 人设','online-profile-presets':'加载人设预设','vision-api':'同步识图模型设置','notifications':'加载消息通知','user-code':'加载个人用户码'})[route]||'在线聊天请求';
+    return Error(signal?.aborted?operation+'超时，请重试。':'在线聊天服务连接失败，请稍后再试。');
+  }
   async function request(path,data,signal){
     const headers={Authorization:'Bearer '+accessToken()};
     if(data)headers['Content-Type']='application/json';
     let response;
     try{response=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined,signal});}
-    catch{throw Error(signal?.aborted?'同步 User 人设超时，请重试。':'在线聊天服务连接失败，请稍后再试。');}
-    const result=await response.json().catch(()=>null);
+    catch{throw requestFailure(path,data,signal);}
+    let result;try{result=await response.json();}catch{if(signal?.aborted)throw requestFailure(path,data,signal);result=null;}
     if(response.status===401&&!path.startsWith('auth/')&&path!=='kindroid-send'&&localStorage.getItem(sessionKey)){
       localStorage.removeItem(sessionKey);const visible=scope();resetAccountView();if(visible)showLogin('登录状态已失效，请重新登录。');
     }
@@ -171,7 +177,8 @@ const ledgerOnline = (() => {
     if(!scope()||!node)return;
     delete node.dataset.connectionError;
     node.textContent=message;
-    if(message==='在线聊天服务连接失败，请稍后再试。'&&el('onlineMessages')&&resumeChat){
+    const retryAction=retryRead||((el('onlineMessages')&&resumeChat)?resumeChat:null);
+    if(retryAction&&(message==='在线聊天服务连接失败，请稍后再试。'||/^(加载会话列表|加载聊天记录|加载群聊信息)超时/.test(message))){
       node.dataset.connectionError='1';
       const retry=document.createElement('button');
       retry.type='button';
@@ -183,10 +190,15 @@ const ledgerOnline = (() => {
       label.textContent=message;
       row.append(label,retry);
       node.replaceChildren(row);
+      const viewSerial=generation;
       retry.onclick=async()=>{
+        if(!active(viewSerial))return;
         retry.disabled=true;
         retry.textContent='重试中…';
-        try{await resumeChat();}finally{retry.disabled=false;retry.textContent='重试';}
+        const serial=generation;
+        try{await retryAction();if(active(serial))status('');}
+        catch(error){if(active(serial))status(error.message);}
+        finally{retry.disabled=false;retry.textContent='重试';}
       };
       return;
     }
@@ -205,6 +217,7 @@ const ledgerOnline = (() => {
     close.onclick=()=>{node.replaceChildren();};
   }
   function screen(title,body,back,headerAction='',headerAvatar=''){
+    retryRead=null;
     clearTimeout(pollTimer);
     resumeChat=null;
     imageObserver?.disconnect();
@@ -473,8 +486,10 @@ const ledgerOnline = (() => {
       const list=await readRooms(refreshRoomsFirst);refreshRoomsFirst=false;
       if(!active(serial))return;
       paint(list);
+      if(el('onlineStatus')?.dataset.connectionError)status('');
       if(firstLoad&&list[0])prefetchRoom(list[0].id);
     }
+    retryRead=()=>active(serial)?refresh():Promise.resolve();
     refresh().catch(e=>{if(active(serial))status(e.message);});
     later(serial,refresh,12000);
   }
@@ -1377,6 +1392,7 @@ const ledgerOnline = (() => {
       if(result.notice)status(result.notice);
       refresh().catch(error=>{if(active(requestSerial))status(error.message);});
     });
+    retryRead=()=>active(serial)?refresh():Promise.resolve();
     resumeChat=()=>{
       if(!active(serial))return;
       lastActivity=Date.now();
