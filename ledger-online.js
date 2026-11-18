@@ -154,7 +154,7 @@ const ledgerOnline = (() => {
     return value;
   }
   async function request(path,data,signal){
-    const headers={Authorization:'Bearer '+identity()};
+    const headers={Authorization:'Bearer '+accessToken()};
     if(data)headers['Content-Type']='application/json';
     let response;
     try{response=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined,signal});}
@@ -252,8 +252,8 @@ const ledgerOnline = (() => {
   function userPersona(){
     return [['性别',state.userGender],['性格',state.userPersonality],['人设',state.user]].filter(x=>x[1]).map(([k,v])=>k+'：'+v).join('\n');
   }
-  async function avatarThumbnail(){
-    const source=safePicture(appearance('user').avatar||'');
+  async function avatarThumbnail(sourceOverride){
+    const source=safePicture(sourceOverride??appearance('user').avatar??'');
     if(!source)return '';
     if(/^data:image\/(jpeg|png|webp);base64,/.test(source)&&source.length<=24000)return source;
     return new Promise(resolve=>{
@@ -293,69 +293,118 @@ const ledgerOnline = (() => {
   }
   let visionSync=Promise.resolve(), syncedVision;
   function syncVision(){
-    if(localStorage.getItem(profileReadyKey)!=='1')return Promise.resolve();
-    const token=identity(), {url,model,key:apiKey}=state.imageApi;
+    if(!localStorage.getItem(sessionKey)||localStorage.getItem(profileReadyKey)!=='1')return Promise.resolve();
+    const token=accessToken(), {url,model,key:apiKey}=state.imageApi;
     const config=url&&model&&apiKey?{endpoint:url,model,key:apiKey}:{enabled:false};
     const signature=JSON.stringify([token,config]);
     const work=visionSync.catch(()=>{}).then(async()=>{
-      if(localStorage.getItem(key)!==token||syncedVision===signature)return;
+      if(accessToken()!==token||syncedVision===signature)return;
       await request('vision-api',config,AbortSignal.timeout(10000));
       syncedVision=signature;
     });
     visionSync=work;
     return work;
   }
-  async function activate(){
-    const token=identity();
-    const look=appearance('user');
-    const snapshot={name:fitText(look.name,30)||'你',persona:fitText(userPersona(),18000),avatar:look.avatar,frame:look.frame};
-    if(onlineIdentity!==token){
-      clearTimeout(noticeTimer);noticeSession=null;queuedNotice=null;el('onlineNotice')?.remove();
-      roomsRequest=null;roomsAt=0;onlineIdentity=token;me=null;syncedProfile=null;knownRooms=null;views.clear();pictures.clear();
-    }
-    const invite=inviteFromUrl();
-    if(me && !invite)rooms();
-    const serial=me&&!invite?generation:screen('在线聊天','<p class="muted">正在连接…</p>'+end);
-    try{
-      if(!me||JSON.stringify(snapshot)!==syncedProfile){
-        const [avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(snapshot.frame)]);
-        if(onlineIdentity!==token)return;
-        const controller=new AbortController();
-        const timeout=setTimeout(()=>controller.abort(),15000);
-        let user;
-        try{user=await request('profile',{...snapshot,avatar,frame},controller.signal);}
-        finally{clearTimeout(timeout);}
-        if(!user?.id)throw Error('服务器没有确认在线身份，请重试。');
-        if(onlineIdentity!==token)return;
-        me=user;syncedProfile=JSON.stringify(snapshot);
-        localStorage.setItem(profileReadyKey,'1');
-      }
+  const sessionKey='sleeping-dragon-online-session-v1',accountVisitedKey='sleeping-dragon-online-account-visited',accountNameKey='sleeping-dragon-online-account-name';
+  let onlineUserProfile=null,pendingOnlineAction=null;
+  const accessToken=()=>localStorage.getItem(sessionKey)||identity();
+  function resetAccountView(){
+    clearTimeout(noticeTimer);clearTimeout(pollTimer);noticeSession=null;queuedNotice=null;resumeChat=null;
+    el('onlineNotice')?.remove();roomsRequest=null;roomsAt=0;onlineIdentity=null;me=null;onlineUserProfile=null;syncedProfile=null;knownRooms=null;
+    views.clear();pictures.clear();detailsInFlight.clear();feedsInFlight.clear();localTyping.clear();
+  }
+  async function initialOnlineProfile(){
+    const look=appearance('user'),[avatar,frame]=await Promise.all([avatarThumbnail(),compactFrame(look.frame)]);
+    return {name:fitText(look.name,30)||'你',gender:fitText(state.userGender,120),personality:fitText(state.userPersonality,4000),description:fitText(state.user,12000),avatar,frame};
+  }
+  function accountShell(title,body){
+    return screen(title,'<section class="group-settings-card group-settings-block online-account-card"><span class="online-account-emblem" aria-hidden="true">✧</span>'+body+'</section>'+end);
+  }
+  function showLogin(message='',username=localStorage.getItem(accountNameKey)||''){
+    localStorage.setItem(accountVisitedKey,'1');
+    accountShell('在线聊天 · 登录','<h3>重返你的会话</h3><p class="muted">登录后可在不同浏览器继续原有群聊与聊天记录。</p>'+(message?'<p role="status">'+esc(message)+'</p>':'')+
+      '<form id="onlineAccountLogin"><label>账号名<input name="username" value="'+esc(username)+'" pattern="[A-Za-z0-9]{1,32}" maxlength="32" autocomplete="username" required placeholder="英文字母或数字"></label><label>密码<input name="password" type="password" minlength="8" maxlength="128" autocomplete="current-password" required></label><button type="submit" class="primary">登录并记住此浏览器</button></form><button type="button" id="onlineToRegister" class="online-account-link">注册账号</button>');
+    el('onlineToRegister').onclick=()=>showRegister(false);
+    form('onlineAccountLogin',async(data,serial)=>{
+      const result=await request('auth/login',{username:data.username,password:data.password});
       if(!active(serial))return;
-      startNotices();
-      void syncVision().catch(()=>{if(active(serial))status('在线识图配置同步失败，请检查图片 API 设置。');});
-      if(invite)join(invite);else if(!el('onlineList'))rooms();
+      localStorage.setItem(sessionKey,result.token);localStorage.setItem(accountNameKey,result.username);localStorage.setItem(profileReadyKey,'1');
+      resetAccountView();await activate();
+    });
+  }
+  function showRegister(migration=false){
+    localStorage.setItem(accountVisitedKey,'1');
+    accountShell('在线聊天 · 注册','<h3>'+(migration?'为原有在线身份绑定账号':'创建在线聊天账号')+'</h3><p class="muted">'+(migration?'注册后会保留原有群聊、聊天记录和角色归属。':'注册后自动建立专属在线身份，可跨浏览器登录。')+'账号名与聊天昵称可以不同。</p>'+
+      '<form id="onlineAccountRegister"><label>账号名<input name="username" pattern="[A-Za-z0-9]{1,32}" maxlength="32" autocomplete="username" required placeholder="仅英文字母、数字，不可重复"></label><label>密码<input name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required placeholder="8–128 位字符"></label><label>再次输入密码<input name="confirmPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label><p class="muted">注册时复制一份当前 User 人设、头像与头像框，之后可在在线聊天内独立修改。</p><button type="submit" class="primary">注册并绑定</button></form><button type="button" id="onlineToLogin" class="online-account-link">已有账号，去登录</button>');
+    el('onlineToLogin').onclick=()=>showLogin();
+    form('onlineAccountRegister',async(data,serial)=>{
+      if(data.password!==data.confirmPassword)throw Error('两次输入的密码不一致。');
+      const profile=await initialOnlineProfile();if(!active(serial))return;
+      const result=await request('auth/register',{...data,profile});
+      if(active(serial)){localStorage.setItem(accountNameKey,result.username);showLogin('注册成功，请使用刚才的账号和密码登录。',result.username);}
+    });
+  }
+  async function activate(){
+    const token=accessToken();if(!localStorage.getItem(sessionKey))return open();
+    if(onlineIdentity!==token){resetAccountView();onlineIdentity=token;}
+    const serial=screen('在线聊天','<p class="muted">正在载入账号与会话…</p>'+end);
+    try{
+      const [identityResult,profileResult]=await Promise.all([request('me'),request('online-profile')]);
+      if(!active(serial)||accessToken()!==token)return;
+      if(!identityResult.me?.id)throw Error('服务器没有确认登录身份，请重新登录。');
+      me=identityResult.me;onlineUserProfile=profileResult.profile;
+      localStorage.setItem(profileReadyKey,'1');startNotices();
+      void syncVision().catch(()=>{});
+      const next=pendingOnlineAction;pendingOnlineAction=null;if(next){await next();return;}const invite=inviteFromUrl();if(invite)join(invite);else rooms();
     }catch(error){
       if(!active(serial))return;
-      if(el('onlineList')){status('在线资料同步失败。'+error.message);return;}
-      showProfileGate('在线 User 人设同步未完成。'+error.message);
+      if(error.status===401){localStorage.removeItem(sessionKey);resetAccountView();showLogin('登录状态已失效，请重新登录。');}
+      else{status(error.message);const retry=document.createElement('button');retry.type='button';retry.textContent='重新连接';retry.onclick=activate;el('onlineStatus').append(retry);}
     }
   }
-  function showProfileGate(message=''){
-    const look=appearance('user');
-    const name=fitText(look.name,30)||'你';
-    screen('在线聊天',
-      '<section class="group-settings-card group-settings-block"><h3>在线 User 人设</h3><p class="muted">当前昵称：'+esc(name)+'</p>'+
-      '<p>使用本机的 User 人设卡进入在线聊天。昵称和头像会显示给会话成员。</p>'+
-      (message?'<p role="alert">'+esc(message)+'</p>':'')+
-      '<div class="row"><button type="button" class="primary" id="onlineStart">'+(message?'重新同步并进入':'使用当前 User 人设进入')+'</button>'+
-      '<button type="button" id="onlineEditUser">编辑 User 人设卡</button></div></section>'+end);
-    el('onlineStart').onclick=activate;
-    el('onlineEditUser').onclick=()=>openCard('user');
+  async function open(){
+    const serial=screen('在线聊天','<p class="muted">正在检查登录状态…</p>'+end);
+    try{
+      const account=await request('auth/status');if(!active(serial))return;
+      if(account.authenticated){localStorage.setItem(accountNameKey,account.username||'');return activate();}
+      localStorage.removeItem(sessionKey);resetAccountView();
+      if(account.migration)return showRegister(true);
+      if(!account.registered&&!localStorage.getItem(accountVisitedKey))return showRegister(false);
+      showLogin();
+    }catch(error){if(active(serial)){status(error.message);const retry=document.createElement('button');retry.type='button';retry.textContent='重试';retry.onclick=open;el('onlineStatus').append(retry);}}
   }
-  function open(){
-    if(localStorage.getItem(key)&&localStorage.getItem(profileReadyKey)==='1')return activate();
-    showProfileGate();
+  async function editOnlineUser(){
+    const serial=screen('在线 User 人设','<p class="muted">正在读取独立人设…</p>'+end,rooms);
+    try{
+      const {profile}=await request('online-profile');if(!active(serial))return;
+      const draft={...profile,frame:storedFrame(profile.frame)};
+      screen('在线 User 人设','<section class="group-settings-card group-settings-block"><div id="onlineUserLookPreview" style="display:flex;justify-content:center;padding:12px">'+personAvatar(draft.name,draft.avatar,draft.frame)+'</div><p class="muted">这份人设独立于外部 User 卡，并随账号保存在在线聊天中。</p><form id="onlineUserProfileForm"><label>姓名 / 聊天昵称<input name="name" required maxlength="30" value="'+esc(draft.name)+'"></label><label>性别<input name="gender" maxlength="120" value="'+esc(draft.gender)+'"></label><label>性格<textarea name="personality" maxlength="4000">'+esc(draft.personality)+'</textarea></label><label>人设<textarea name="description" maxlength="12000">'+esc(draft.description)+'</textarea></label><details class="group-settings-card"><summary>头像与头像框</summary><label>上传头像<input id="onlineUserAvatarFile" type="file" accept="image/*"></label><label>头像网址<input name="avatarUrl" type="url" placeholder="https://…"></label><button id="onlineUserAvatarClear" type="button">移除头像</button><label>上传头像框<input id="onlineUserFrameFile" type="file" accept="image/*"></label><label>头像框网址<input name="frameUrl" type="url" value="'+esc(draft.frame.src?.startsWith('https:')?draft.frame.src:'')+'" placeholder="https://…"></label><button id="onlineUserFrameClear" type="button">移除头像框</button><label>头像框缩放<input name="frameScale" type="range" min="0.5" max="3" step="0.05" value="'+draft.frame.scale+'"></label><label>水平位置<input name="frameX" type="range" min="-100" max="100" value="'+draft.frame.x+'"></label><label>垂直位置<input name="frameY" type="range" min="-100" max="100" value="'+draft.frame.y+'"></label><label><input name="frameRing" type="checkbox" '+(draft.frame.ring?'checked':'')+'> 显示装饰边框</label></details><button type="submit" class="primary">保存在线人设</button></form></section>'+end,rooms);
+      const node=el('onlineUserProfileForm'),preview=()=>{draft.frame={...draft.frame,scale:Number(node.elements.frameScale.value),x:Number(node.elements.frameX.value),y:Number(node.elements.frameY.value),ring:node.elements.frameRing.checked};el('onlineUserLookPreview').innerHTML=personAvatar(node.elements.name.value||draft.name,draft.avatar,draft.frame);};
+      let pictureJob=Promise.resolve(),pictureBusy=0;
+      const picture=(id,kind)=>el(id).onchange=event=>{
+        const file=event.target.files[0];if(!file)return;pictureBusy++;
+        pictureJob=pictureJob.catch(()=>{}).then(async()=>{const src=await readLookFile(file);if(kind==='avatar')draft.avatar=await avatarThumbnail(src);else draft.frame.src=src;if(node.isConnected)preview();}).catch(error=>toast(error.message)).finally(()=>{pictureBusy--;});
+      };
+      picture('onlineUserAvatarFile','avatar');picture('onlineUserFrameFile','frame');
+      el('onlineUserAvatarClear').onclick=()=>{draft.avatar='';node.elements.avatarUrl.value='';preview();};
+      el('onlineUserFrameClear').onclick=()=>{draft.frame.src='';node.elements.frameUrl.value='';preview();};
+      for(const name of ['frameScale','frameX','frameY','frameRing','name'])node.elements[name].oninput=preview;
+      form('onlineUserProfileForm',async(data,requestSerial)=>{
+        if(pictureBusy)await pictureJob;if(!active(requestSerial))return;
+        preview();if(data.avatarUrl){draft.avatar=await avatarThumbnail(data.avatarUrl);if(!draft.avatar)throw Error('头像网址读取失败，请尝试上传图片。');}
+        if(data.frameUrl)draft.frame.src=data.frameUrl;
+        const saved={name:data.name,gender:data.gender,personality:data.personality,description:data.description,avatar:draft.avatar,frame:await compactFrame(draft.frame)};
+        const result=await request('online-profile',saved);
+        if(active(requestSerial)){onlineUserProfile=result.profile;me.name=result.profile.name;for(const view of views.values())view.detail=null;toast('在线人设已保存');rooms();}
+      });
+    }catch(error){if(active(serial))status(error.message);}
   }
+  async function logoutOnline(){
+    if(!confirm('退出当前在线账号？本机的外部存档不受影响。'))return;
+    try{await request('auth/logout',{});}catch(error){toast(error.message);return;}
+    localStorage.removeItem(sessionKey);localStorage.removeItem(profileReadyKey);resetAccountView();showLogin('已退出，可登录其他账号。');
+  }
+
   function later(serial, refresh, delay){
     if(!active(serial))return;
     pollTimer=setTimeout(async()=>{
@@ -367,24 +416,9 @@ const ledgerOnline = (() => {
   }
   function rooms(){
     room=null;
-    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature" tabindex="0" role="button">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
-    const signature=el('onlineSignature');
-    let revealing=false;
-    async function revealCode(){
-      if(revealing)return;
-      revealing=true;
-      try{
-        const identityAtStart=me?.id;
-        const code=me?.userCode||(await request('user-code')).code;
-        if(!active(serial)||me?.id!==identityAtStart)return;
-        me.userCode=code;
-        screen('个人用户码','<section class="group-settings-card group-settings-block"><p style="text-align:center;overflow-wrap:anywhere"><strong>'+esc(code)+'</strong></p><button type="button" id="onlineCodeBack">返回</button></section>'+end,rooms);
-        el('onlineCodeBack').onclick=rooms;
-      }catch(error){if(active(serial))status(error.message);}
-      finally{revealing=false;}
-    }
-    signature.onclick=revealCode;
-    signature.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();void revealCode();}};
+    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button><button type="button" id="onlineUserProfile">在线 User 人设</button><button type="button" id="onlineAccountLogout">退出账号</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
+    el('onlineUserProfile').onclick=()=>void editOnlineUser();
+    el('onlineAccountLogout').onclick=()=>void logoutOnline();
     el('onlineNew').onclick=create;
     el('onlineJoin').onclick=()=>join();
     let previous;
@@ -602,6 +636,7 @@ const ledgerOnline = (() => {
     later(serial,refresh,2500);
   }
   async function shareArchive(card,back){
+    if(!localStorage.getItem(sessionKey)||!me){pendingOnlineAction=()=>shareArchive(card,back);return open();}
     const type=card.htmlCard?'moon':'story';
     const serial=screen('分享到在线群聊','<p class="muted">正在读取在线群聊…</p>'+end,back);
     try{
@@ -1013,6 +1048,7 @@ const ledgerOnline = (() => {
     };
   }
   async function forwardExternal(scope,message){
+    if(!localStorage.getItem(sessionKey)||!me){pendingOnlineAction=()=>forwardExternal(scope,message);return open();}
     const back=()=>{if(scope.group)openGroup(scope.group.id);else{el('dialog').close();render();}};
     try{
       if(!me)throw Error('请先进入在线聊天完成身份同步。');
@@ -1031,7 +1067,7 @@ const ledgerOnline = (() => {
         remote.push(enabled.id);
       }
       screen('转发到在线群聊','<form id="onlineExternalForward"><label>接收群聊<select name="target" required><option value="">请选择</option>'+groups.filter(x=>x.kind==='group').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
-      form('onlineExternalForward',async(data,serial)=>{await request('external-forward',{room:data.target,charIds:remote,speaker:message.speaker||(message.role==='user'?state.userName:displayName(scope.c)),body:[quoteText(message.quote),message.content].filter(Boolean).join('\n'),created:message.sentAt?new Date(message.sentAt).toISOString():'',image:message.image||''});if(active(serial)){back();toast('已转发');}});
+      form('onlineExternalForward',async(data,serial)=>{await request('external-forward',{room:data.target,charIds:remote,speaker:message.speaker||(message.role==='user'?me?.name:displayName(scope.c)),body:[quoteText(message.quote),message.content].filter(Boolean).join('\n'),created:message.sentAt?new Date(message.sentAt).toISOString():'',image:message.image||''});if(active(serial)){back();toast('已转发');}});
     }catch(error){toast(error.message);}
   }
   function chatRoom(current){
@@ -1735,6 +1771,7 @@ const ledgerOnline = (() => {
   }
   return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal,kindroid:data=>request('kindroid-send',data)};
 })();
+
 
 
 
