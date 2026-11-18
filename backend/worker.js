@@ -580,12 +580,109 @@ function onlineTimeContext(history,now=Date.now()){
   const time=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',dateStyle:'full',timeStyle:'short'}).format(now);
   return '时间感知规则：以服务器提供的时间为准。当前北京时间为'+time+'。'+(Number.isFinite(elapsed)?'距最近一条可读消息约'+elapsed+'分钟。':'')+'结合每条消息的发送时间判断先后与间隔，自然回应隔夜、久别、作息和日期变化。群友可能处于不同时区，应尊重其说明。不要把现实经过的时间当作已发生的剧情，不编造离线经历，不每次报时。';
 }
+let accountSchemaReady;
+async function ensureAccountSchema(db){
+  if(accountSchemaReady)return accountSchemaReady;
+  accountSchemaReady=(async()=>{
+    await db.batch([
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_accounts (username TEXT PRIMARY KEY COLLATE NOCASE, uid TEXT NOT NULL UNIQUE REFERENCES profiles(id), salt TEXT NOT NULL, password_hash TEXT NOT NULL, iterations INTEGER NOT NULL, created INTEGER NOT NULL)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_sessions (token_hash TEXT PRIMARY KEY, uid TEXT NOT NULL REFERENCES profiles(id), created INTEGER NOT NULL)'),
+      db.prepare('CREATE INDEX IF NOT EXISTS ledger_sessions_uid ON ledger_sessions(uid)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_online_profiles (uid TEXT PRIMARY KEY REFERENCES profiles(id), snapshot TEXT NOT NULL)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_auth_limits (id TEXT PRIMARY KEY, attempts INTEGER NOT NULL, until_at INTEGER NOT NULL)'),
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_user_codes (uid TEXT PRIMARY KEY REFERENCES profiles(id),code TEXT NOT NULL UNIQUE)')
+    ]);
+  })().catch(error=>{accountSchemaReady=null;throw error;});
+  return accountSchemaReady;
+}
+const authHex=bytes=>Array.from(new Uint8Array(bytes),n=>n.toString(16).padStart(2,'0')).join('');
+async function authDigest(text){return authHex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)));}
+async function accountPassword(password,salt,iterations,env){
+  if(!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||''))throw fail('账号服务暂时不可用。',503);
+  const pepper=await crypto.subtle.importKey('raw',new TextEncoder().encode(env.CHAT_KEY_ENCRYPTION),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const material=await crypto.subtle.sign('HMAC',pepper,new TextEncoder().encode('ledger-account-password-v1\0'+password));
+  const key=await crypto.subtle.importKey('raw',material,'PBKDF2',false,['deriveBits']);
+  return authHex(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:from64(salt),iterations},key,256));
+}
+function samePasswordHash(a,b){let difference=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)difference|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return difference===0;}
+function accountName(value){const name=typeof value==='string'?value.trim():'';if(!/^[A-Za-z0-9]{1,32}$/.test(name))throw fail('账号名只能包含英文字母和数字，长度为 1–32 位。');return name;}
+function onlineProfileData(data){
+  const name=field(data,'name',30),gender=field(data,'gender',120,false),personality=field(data,'personality',4000,false),description=field(data,'description',12000,false);
+  const avatar=publicAvatar(field(data,'avatar',24000,false)),frame=JSON.parse(frameValue(data)||'{}');
+  return {name,gender,personality,description,avatar,frame};
+}
+function onlineProfileStatements(db,uid,snapshot){
+  const persona=[['性别',snapshot.gender],['性格',snapshot.personality],['人设',snapshot.description]].filter(x=>x[1]).map(([k,v])=>k+'：'+v).join('\n');
+  return [
+    db.prepare('INSERT INTO profiles (id,name) VALUES (?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').bind(uid,snapshot.name),
+    db.prepare('INSERT INTO ledger_online_profiles (uid,snapshot) VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET snapshot=excluded.snapshot').bind(uid,JSON.stringify(snapshot)),
+    db.prepare('INSERT INTO ledger_people (uid,persona,avatar) VALUES (?,?,?) ON CONFLICT(uid) DO UPDATE SET persona=excluded.persona,avatar=excluded.avatar').bind(uid,persona,snapshot.avatar),
+    db.prepare('INSERT INTO ledger_person_look (uid,frame) VALUES (?,?) ON CONFLICT(uid) DO UPDATE SET frame=excluded.frame').bind(uid,JSON.stringify(snapshot.frame))
+  ];
+}
+async function accountRateLimit(db,req,username){
+  const now=Date.now(),ip=req.headers.get('CF-Connecting-IP')||'unknown';
+  const keys=[['ip:'+await authDigest(ip),40],['name:'+await authDigest(username.toLowerCase()),12]];
+  for(const [key,max] of keys){
+    await db.prepare('INSERT INTO ledger_auth_limits (id,attempts,until_at) VALUES (?,1,?) ON CONFLICT(id) DO UPDATE SET attempts=CASE WHEN until_at<? THEN 1 ELSE attempts+1 END,until_at=CASE WHEN until_at<? THEN excluded.until_at ELSE until_at END').bind(key,now+900000,now,now).run();
+    const row=await db.prepare('SELECT attempts FROM ledger_auth_limits WHERE id=?').bind(key).first();
+    if(row.attempts>max)throw fail('尝试次数较多，请 15 分钟后重试。',429);
+  }
+}
+async function accountRoutes(req,env,path,data,uid,session,tokenHash){
+  const db=env.DB,one=(sql,...args)=>db.prepare(sql).bind(...args).first();
+  const account=await one('SELECT username FROM ledger_accounts WHERE uid=?',uid);
+  if(req.method==='GET'&&path==='auth/status'){
+    const existing=await one('SELECT id FROM profiles WHERE id=?',uid);
+    return json({authenticated:!!session,registered:!!account,migration:!!existing&&!account,...(session?{username:account?.username}:{})});
+  }
+  if(req.method==='POST'&&path==='auth/register'){
+    const username=accountName(data.username),password=data.password;
+    if(typeof password!=='string'||password.length<8||password.length>128)throw fail('密码请使用 8–128 位字符。');
+    if(password!==data.confirmPassword)throw fail('两次输入的密码不一致。');
+    if(account||session)throw fail('此在线身份已绑定账号，请直接登录。',409);
+    await accountRateLimit(db,req,username);
+    if(await one('SELECT username FROM ledger_accounts WHERE username=?',username))throw fail('此账号名已被使用，请换一个。',409);
+    const snapshot=onlineProfileData(data.profile||{}),salt=to64(crypto.getRandomValues(new Uint8Array(24))),iterations=100000;
+    const hash=await accountPassword(password,salt,iterations,env);
+    try{
+      await db.batch([...onlineProfileStatements(db,uid,snapshot),
+        db.prepare('INSERT INTO ledger_accounts (username,uid,salt,password_hash,iterations,created) VALUES (?,?,?,?,?,?)').bind(username,uid,salt,hash,iterations,Date.now()),
+        db.prepare('INSERT OR IGNORE INTO ledger_user_codes (uid,code) VALUES (?,?)').bind(uid,'ML-'+crypto.randomUUID().replaceAll('-','').slice(0,12).toUpperCase().match(/.{4}/g).join('-'))]);
+    }catch(error){
+      if(await one('SELECT username FROM ledger_accounts WHERE username=? OR uid=?',username,uid))throw fail('账号名或当前在线身份已完成注册，请登录或换一个账号名。',409);
+      throw error;
+    }
+    await personalUserCode(db,uid);
+    return json({ok:true,username});
+  }
+  if(req.method==='POST'&&path==='auth/login'){
+    const username=accountName(data.username),password=data.password;
+    if(typeof password!=='string'||password.length<8||password.length>128)throw fail('账号或密码不正确。',401);
+    await accountRateLimit(db,req,username);
+    const row=await one('SELECT * FROM ledger_accounts WHERE username=?',username);
+    const salt=row?.salt||to64(new Uint8Array(24)),hash=await accountPassword(password,salt,row?.iterations||100000,env);
+    if(!row||!samePasswordHash(row.password_hash,hash))throw fail('账号或密码不正确。',401);
+    const token=authHex(crypto.getRandomValues(new Uint8Array(32)));
+    await db.prepare('INSERT INTO ledger_sessions (token_hash,uid,created) VALUES (?,?,?)').bind(await authDigest(token),row.uid,Date.now()).run();
+    return json({ok:true,token,username:row.username});
+  }
+  if(req.method==='POST'&&path==='auth/logout'){
+    if(session)await db.prepare('DELETE FROM ledger_sessions WHERE token_hash=?').bind(tokenHash).run();
+    return json({ok:true});
+  }
+  return null;
+}
+
 async function api(req, env, url, ledger, ctx) {
-  const uid = ledger ? await ledgerIdentity(req) : req.headers.get('oai-authenticated-user-id');
+  let uid = ledger ? await ledgerIdentity(req) : req.headers.get('oai-authenticated-user-id');
   if (!uid) throw fail('请先登录。',401);
   if (!env.DB) throw fail('聊天数据库尚未就绪。',503);
   const db = env.DB;
   await ensureOnlineFeatures(db);
+  await ensureAccountSchema(db);
+  const tokenHash=ledger?uid.slice(7):'',session=ledger?await db.prepare('SELECT uid FROM ledger_sessions WHERE token_hash=?').bind(tokenHash).first():null;
+  if(session)uid=session.uid;
   const stmt = (sql,...args) => db.prepare(sql).bind(...args);
   const all = async (sql,...args) => (await stmt(sql,...args).all()).results;
   const one = (sql,...args) => stmt(sql,...args).first();
@@ -598,6 +695,8 @@ async function api(req, env, url, ledger, ctx) {
   const path = url.pathname.slice(ledger ? 12 : 5);
   if (req.method === 'POST' && ((!ledger && req.headers.get('origin') !== url.origin) || !req.headers.get('content-type')?.startsWith('application/json'))) throw fail('请求来源无效。',403);
   const data = req.method === 'POST' ? await req.json().catch(() => {throw fail('请求数据无效。');}) : {};
+  if(ledger&&path.startsWith('auth/')){const result=await accountRoutes(req,env,path,data,uid,session,tokenHash);if(result)return result;}
+  if(ledger&&!session&&path!=='kindroid-send')throw fail('请先登录在线聊天账号。',401);
   if(ledger&&req.method==='POST'&&path==='kindroid-send'){
     const key=field(data,'key',512),ai_id=field(data,'ai_id',160),message=field(data,'message',16000);
     if(!/^kn_[A-Za-z0-9_-]+$/.test(key))throw fail('Kindroid API Key 格式无效。');
@@ -614,6 +713,18 @@ async function api(req, env, url, ledger, ctx) {
     return json({reply});
   }
   let me = await one('SELECT id,name FROM profiles WHERE id=?',uid);
+  if(ledger&&path==='online-profile'){
+    if(req.method==='POST'){
+      const snapshot=onlineProfileData(data);await db.batch(onlineProfileStatements(db,uid,snapshot));return json({ok:true,profile:snapshot});
+    }
+    if(req.method==='GET'){
+      const saved=await one('SELECT snapshot FROM ledger_online_profiles WHERE uid=?',uid);
+      if(!saved)throw fail('在线人设尚未初始化，请联系管理员。',409);
+      return json({profile:JSON.parse(saved.snapshot)});
+    }
+  }
+
+  if(ledger&&req.method==='POST'&&path==='profile'){return json({id:uid,name:me?.name});}
   if (req.method === 'POST' && path === 'profile') {
     const name = field(data,'name',30);
     const profile = stmt('INSERT INTO profiles VALUES (?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name',uid,name);
@@ -1182,7 +1293,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'reader-sharing-offline-reply-32'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-accounts-profile-33'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
@@ -1203,6 +1314,7 @@ export default {
     return response;
   }
 };
+
 
 
 
