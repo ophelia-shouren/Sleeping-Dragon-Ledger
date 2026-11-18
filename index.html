@@ -698,6 +698,14 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #dialog.reader-night{--bg:#17191e;--panel:#20232a;--field:#191c22;--ink:#d8d5cb;--muted:#a6a397;--gold:#b5a384;--line:#393b42;--control:#282b33;--selected:#38372f;--selected-ink:#e4d7bf;background:#17191e!important;color:#d8d5cb!important}
 #dialog.reader-night .story-header{background:#20232a!important;color:#d8d5cb!important}
 @media(prefers-reduced-motion:reduce){#dialog aside.reader-drawer{transition:none}}
+
+#dialog.reader-polished .story-header-actions #readerContents.reader-html-contents{display:inline-flex!important;align-items:center;justify-content:center;flex:none;width:30px!important;height:30px!important;min-width:30px!important;min-height:30px!important;margin:0 7px 0 0!important;padding:6px!important;border:1px solid color-mix(in srgb,var(--gold) 30%,transparent)!important;border-radius:50%!important;background:transparent!important;color:var(--gold);box-shadow:none!important}
+#dialog.reader-polished #readerContents.reader-html-contents svg{display:block;width:16px!important;height:16px!important}
+#dialog.reader-polished .reader-page.reader-paged{overflow:hidden!important;scroll-behavior:auto!important;overflow-anchor:none}
+.reader-flow{min-width:0}
+.reader-paged .reader-flow{position:relative;column-fill:auto;will-change:transform}
+.reader-paged .reader-prose,.reader-paged .reader-cue{orphans:1;widows:1;break-inside:auto}
+.reader-paged .reader-end{break-inside:avoid}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1824,25 +1832,44 @@ function readerRead(kind,id,folder){
     '<section id="readerModePanel" class="reader-control-panel" hidden><div class="reader-control-heading"><strong>阅读方式</strong><button type="button" data-reader-panel-close aria-label="关闭阅读设置">×</button></div><label>翻页方式<select id="readerPageMode"><option value="scroll">连续滚动</option><option value="tap">点击左右区域翻页</option><option value="swipe">左右滑动翻页</option></select></label><label class="mode-toggle"><input type="checkbox" role="switch" id="readerNight"><span aria-hidden="true"></span>阅读器夜间模式</label></section>';
   const toolbar=html?'':'<footer class="reader-toolbar reader-orb-toolbar" aria-label="阅读工具"><button type="button" id="readerContents" aria-label="章节目录" title="章节目录">'+listIcon+'</button><button type="button" id="readerFontButton" aria-label="字体设置" title="字体设置" aria-expanded="false"><span class="reader-letter-a">A</span></button><button type="button" id="readerProgressButton" aria-label="阅读进度" title="阅读进度" aria-expanded="false">'+icon('<circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/>')+'</button><button type="button" id="readerModeButton" aria-label="翻页与夜间模式" title="翻页与夜间模式" aria-expanded="false">'+icon('<path d="M4 5h6l2 2 2-2h6v14h-6l-2 2-2-2H4ZM12 7v14"/><path d="M16 9h2m-2 4h2"/>')+'</button></footer>';
   const drawer='<div id="readerDrawerShade" class="reader-drawer-shade" hidden></div><aside id="readerDrawer" class="reader-drawer" aria-label="章节目录" aria-hidden="true" inert><div class="reader-drawer-heading"><strong>'+esc(folder||'未分类')+'</strong><button type="button" id="readerDrawerClose" aria-label="关闭目录">×</button></div><nav>'+chapters.map(x=>'<button type="button" data-reader-jump="'+esc(x.id)+'" '+(x.id===id?'aria-current="page"':'')+'>'+esc(x.title)+'</button>').join('')+'</nav></aside>';
-  readerSheet(entry.title,'<article id="readerPage" class="reader-page" tabindex="0">'+content+'<div class="reader-end">✧</div></article>'+panels+toolbar+drawer,()=>readerFolder(kind,folder));
+  readerSheet(entry.title,'<article id="readerPage" class="reader-page" tabindex="0"><div id="readerFlow" class="reader-flow">'+content+'<div class="reader-end">✧</div></div></article>'+panels+toolbar+drawer,()=>readerFolder(kind,folder));
   const dialog=$('dialog'),article=$('readerPage');dialog.classList.add('reader-reading','reader-polished');
   const setDrawer=open=>{const drawer=$('readerDrawer');drawer.classList.toggle('is-open',open);drawer.inert=!open;drawer.setAttribute('aria-hidden',String(!open));$('readerDrawerShade').hidden=!open;if(open)$('readerDrawerClose').focus();};
   for(const button of dialog.querySelectorAll('[data-reader-jump]'))button.onclick=()=>readerRead(kind,button.dataset.readerJump,folder);
   $('readerDrawerClose').onclick=()=>setDrawer(false);$('readerDrawerShade').onclick=()=>setDrawer(false);
   const originalBack=dialog.orbBack;dialog.orbBack=()=>{if($('readerDrawer')?.classList.contains('is-open'))setDrawer(false);else if(!html&&[...dialog.querySelectorAll('.reader-control-panel')].some(p=>!p.hidden))closePanels();else originalBack?.();};
-  if(html){const header=dialog.querySelector('.story-header-actions');header.insertAdjacentHTML('afterbegin','<button type="button" id="readerContents" class="story-header-icon" aria-label="章节目录">'+listIcon+'</button>');$('readerContents').onclick=()=>setDrawer(true);return;}
+  if(html){const header=dialog.querySelector('.story-header-actions');header.insertAdjacentHTML('afterbegin','<button type="button" id="readerContents" class="story-header-icon reader-html-contents" aria-label="章节目录">'+listIcon+'</button>');$('readerContents').onclick=()=>setDrawer(true);return;}
   const buttonPanels=[['readerFontButton','readerFontPanel'],['readerProgressButton','readerProgressPanel'],['readerModeButton','readerModePanel']];
   function closePanels(){for(const [button,panel] of buttonPanels){$(panel).hidden=true;$(button).setAttribute('aria-expanded','false');}}
   for(const [button,panel] of buttonPanels)$(button).onclick=()=>{const open=$(panel).hidden;closePanels();$(panel).hidden=!open;$(button).setAttribute('aria-expanded',String(open));};
   for(const button of dialog.querySelectorAll('[data-reader-panel-close]'))button.onclick=closePanels;
   $('readerContents').onclick=()=>{closePanels();setDrawer(true);};
+  const flow=$('readerFlow');
+  let pageIndex=0,pageCount=1,pageStride=0,layoutMode='scroll';
+  const readingRatio=()=>layoutMode==='scroll'?article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight):pageIndex/Math.max(1,pageCount-1);
+  const syncProgress=()=>{const percent=Math.round(readingRatio()*100);$('readerProgress').textContent=percent+'%';$('readerSeek').value=percent;};
+  const showPage=number=>{pageIndex=Math.max(0,Math.min(pageCount-1,Math.round(number)));flow.style.transform='translateX('+(-pageIndex*pageStride)+'px)';article.scrollLeft=0;article.scrollTop=0;syncProgress();};
+  const layout=ratio=>{
+    if(!article.isConnected)return;
+    const paged=state.readerSettings.mode!=='scroll',style=getComputedStyle(article);
+    const paddingX=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight),paddingY=parseFloat(style.paddingTop)+parseFloat(style.paddingBottom);
+    const width=Math.max(1,article.clientWidth-paddingX),line=parseFloat(style.lineHeight)||state.readerSettings.font*state.readerSettings.line;
+    flow.style.transform='';flow.style.columnWidth='';flow.style.columnGap='';flow.style.height='';flow.style.width='';flow.style.columnFill='';
+    article.classList.toggle('reader-paged',paged);article.scrollLeft=0;
+    if(paged){
+      const rows=Math.max(1,Math.floor((article.clientHeight-paddingY-2)/line));
+      flow.style.width=width+'px';flow.style.height=(rows*line)+'px';flow.style.columnWidth=width+'px';flow.style.columnGap=paddingX+'px';flow.style.columnFill='auto';
+      pageStride=width+paddingX;pageCount=Math.max(1,Math.ceil((flow.scrollWidth+paddingX-.5)/pageStride));layoutMode='paged';showPage(ratio*(pageCount-1));
+    }else{layoutMode='scroll';article.scrollTop=ratio*Math.max(0,article.scrollHeight-article.clientHeight);syncProgress();}
+  };
   const apply=()=>{
-    const p=state.readerSettings;
+    const ratio=readingRatio(),p=state.readerSettings;
     article.style.setProperty('--reader-font',p.font+'px');article.style.setProperty('--reader-line',p.line);article.style.letterSpacing=p.spacing+'px';
     article.style.fontFamily={serif:'"Source Han Serif SC","Noto Serif CJK SC",SimSun,serif',sans:'"Noto Sans CJK SC","Microsoft YaHei",sans-serif',system:'system-ui,sans-serif',mincho:'"Ledger Installed Mincho",var(--ledger-font)'}[p.typeface]||'var(--ledger-font)';
     article.style.overflowY=p.mode==='scroll'?'auto':'hidden';article.style.touchAction=p.mode==='scroll'?'pan-y':'none';
     dialog.classList.toggle('reader-night',p.night===true);
     $('readerTypeface').value=p.typeface||'serif';$('readerFontSize').value=p.font;$('readerFontSizeValue').textContent=p.font+' px';$('readerSpacing').value=p.spacing||0;$('readerSpacingValue').textContent=(p.spacing||0)+' px';$('readerLineSpacing').value=p.line;$('readerPageMode').value=p.mode||'scroll';$('readerNight').checked=!!p.night;
+    layout(ratio);
   };
   const update=patch=>{if(commit({...state,readerSettings:{...state.readerSettings,...patch}}))apply();};
   $('readerTypeface').onchange=async e=>{const value=e.target.value;if(value==='mincho'&&typeof installMincho==='function'&&!await installMincho()){apply();return;}update({typeface:value});};
@@ -1851,19 +1878,23 @@ function readerRead(kind,id,folder){
   $('readerLineSpacing').oninput=e=>update({line:Number(e.target.value)});
   $('readerPageMode').onchange=e=>update({mode:e.target.value});$('readerNight').onchange=e=>update({night:e.target.checked});
   const progress=$('readerProgress'),seek=$('readerSeek');
-  article.onscroll=()=>{const percent=Math.round(article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight)*100);progress.textContent=percent+'%';seek.value=percent;};
-  seek.oninput=()=>{article.scrollTop=(article.scrollHeight-article.clientHeight)*Number(seek.value)/100;};
+  article.onscroll=()=>{if(layoutMode==='scroll')syncProgress();};
+  seek.oninput=()=>{if(layoutMode==='paged')showPage(Number(seek.value)/100*(pageCount-1));else article.scrollTop=(article.scrollHeight-article.clientHeight)*Number(seek.value)/100;};
   $('readerPrevChapter').onclick=()=>{if(index>0)readerRead(kind,chapters[index-1].id,folder);};$('readerNextChapter').onclick=()=>{if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);};
   const turn=direction=>{
-    const max=article.scrollHeight-article.clientHeight,step=Math.max(1,article.clientHeight-32);
-    if(direction>0&&article.scrollTop>=max-2){if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);return;}
-    if(direction<0&&article.scrollTop<=1){if(index>0)readerRead(kind,chapters[index-1].id,folder);return;}
-    article.scrollTop=Math.max(0,Math.min(max,article.scrollTop+step*direction));
+    if(direction>0&&pageIndex>=pageCount-1){if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);return;}
+    if(direction<0&&pageIndex<=0){if(index>0)readerRead(kind,chapters[index-1].id,folder);return;}
+    showPage(pageIndex+direction);
   };
   article.onclick=e=>{if(state.readerSettings.mode!=='tap'||e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);};
   let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
   article.onkeydown=e=>{if(state.readerSettings.mode==='scroll')return;if(['ArrowRight','PageDown','ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();turn(['ArrowRight','PageDown'].includes(e.key)?1:-1);}};
   apply();
+  const relayout=()=>layout(readingRatio());
+  const observer=typeof ResizeObserver==='function'?new ResizeObserver(relayout):null;observer?.observe(article);
+  window.addEventListener('resize',relayout);
+  document.fonts?.ready.then(()=>{if(article.isConnected)relayout();});
+  dialog.readerCleanup=()=>{observer?.disconnect();window.removeEventListener('resize',relayout);};
 }
 function privateReaderHeading(){
   return '<div class="tea-directory-title"><h3>私聊</h3><button type="button" class="story-sun" data-reader-hub aria-label="打开阅读书架" title="阅读书架"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 2Q13.4 10.6 22 12Q13.4 13.4 12 22Q10.6 13.4 2 12Q10.6 10.6 12 2Z"/></svg></button></div>';
@@ -5674,6 +5705,7 @@ function render(){
 function dialog(html,full=false){
   const panel=$('dialog'),orb=$('homeOrb');
   panel.onscroll=null;
+  panel.readerCleanup?.();panel.readerCleanup=null;
   panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
@@ -6482,6 +6514,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
