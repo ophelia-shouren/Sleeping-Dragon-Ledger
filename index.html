@@ -1855,13 +1855,13 @@ function readerFolder(kind,folder){
 function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   const key=kind+':'+entry.id;
   dialog.classList.add('reader-immersive','reader-immersive-ready');
-  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享给<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><button class="primary">发送摘录</button></form></div>');
+  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerCopyExcerpt">'+icon('<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>')+'复制</button><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享给<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><button class="primary">发送摘录</button></form></div>');
   const tools=$('readerSelectionTools'),form=$('readerExcerptForm');
   let selectionData=null,timer,customActive=false,longPress=null,pressOrigin=null,suppressUntil=0;
   dialog.append(tools);
   const selectionLayer=document.createElement('div');selectionLayer.className='reader-selection-layer';dialog.append(selectionLayer);
   const clock=()=>{const node=$('readerClock');if(node)node.textContent=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});};clock();const clockTimer=setInterval(clock,30000);
-  const close=()=>{tools.hidden=true;form.hidden=true;customActive=false;selectionData=null;selectionLayer.replaceChildren();};
+  const close=()=>{window.getSelection()?.removeAllRanges();tools.hidden=true;form.hidden=true;customActive=false;selectionData=null;selectionLayer.replaceChildren();};
   const drawMarks=()=>{
     const text=flow.textContent,marks=state.readerMarks.filter(m=>m.key===key&&text.slice(m.start,m.end)===m.quote);
     for(const mark of [...flow.querySelectorAll('mark.reader-underline')])mark.replaceWith(document.createTextNode(mark.textContent));flow.normalize();
@@ -1940,6 +1940,20 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     },120);
   };
   document.addEventListener('selectionchange',selectionChange);
+  const dismissSelection=event=>{
+    if(!selectionData||tools.contains(event.target)||event.target.closest('.reader-selection-handle'))return;
+    const range=rangeFor(selectionData.start,selectionData.end);
+    if(range&&[...range.getClientRects()].some(rect=>event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom))return;
+    cancelLong();close();suppressUntil=Date.now()+350;
+    event.preventDefault();event.stopImmediatePropagation();
+  };
+  dialog.addEventListener('click',dismissSelection,true);
+  $('readerCopyExcerpt').onclick=async()=>{
+    if(!selectionData)return;const quote=selectionData.quote;
+    const copied=await copyText(quote);if(copied)close();
+    toast(copied?'已复制选中文字。':'复制失败，请重试。');
+  };
+
   $('readerSelectionClose').onclick=close;
   $('readerUnderline').onclick=()=>{
     if(!selectionData)return;const {start,end,quote}=selectionData;
@@ -1958,7 +1972,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     const readerExcerpt={book:folder||'未分类',chapter:entry.title,text:selectionData.quote,sourceType:kind,recall};
     window.getSelection()?.removeAllRanges();dialog.close();activeContact=c.id;go('chat');await send(false,null,{content:excerpt,readerExcerpt});
   };
-  return {hasSelection(){return customActive||Date.now()<suppressUntil;},consumeTap(){if(Date.now()<suppressUntil)return true;if(customActive){close();return true;}return false;},toggle(){close();dialog.classList.toggle('reader-immersive');},progress(percent){$('readerMiniProgress').textContent=percent+'%';},cleanup(){cancelLong();article.removeEventListener('pointerdown',touchDown);article.removeEventListener('pointermove',touchMove);article.removeEventListener('pointerup',touchEnd);article.removeEventListener('pointercancel',touchEnd);article.removeEventListener('contextmenu',contextMenu);selectionLayer.remove();clearInterval(clockTimer);clearTimeout(timer);document.removeEventListener('selectionchange',selectionChange);}};
+  return {hasSelection(){return customActive||Date.now()<suppressUntil;},consumeTap(){if(Date.now()<suppressUntil)return true;if(customActive){close();return true;}return false;},toggle(){close();dialog.classList.toggle('reader-immersive');},progress(percent){$('readerMiniProgress').textContent=percent+'%';},cleanup(){cancelLong();dialog.removeEventListener('click',dismissSelection,true);article.removeEventListener('pointerdown',touchDown);article.removeEventListener('pointermove',touchMove);article.removeEventListener('pointerup',touchEnd);article.removeEventListener('pointercancel',touchEnd);article.removeEventListener('contextmenu',contextMenu);selectionLayer.remove();clearInterval(clockTimer);clearTimeout(timer);document.removeEventListener('selectionchange',selectionChange);}};
 }
 function readerRead(kind,id,folder){
   const chapters=readerEntries(kind).filter(x=>x.category===folder),index=chapters.findIndex(x=>x.id===id),entry=chapters[index];if(!entry)return;
