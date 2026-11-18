@@ -3,6 +3,6 @@
   "short_name": "眠龙勿扰",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait"
 }
