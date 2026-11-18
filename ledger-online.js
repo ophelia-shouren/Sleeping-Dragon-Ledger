@@ -614,7 +614,7 @@ const ledgerOnline = (() => {
       screen('分享到在线群聊','<form id="onlineArchiveShare"><p>'+esc(card.title)+'</p><label>选择群聊<select name="target" required><option value="">请选择</option>'+
         groups.map(item=>'<option value="'+esc(item.id)+'">'+esc(item.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">发送卡片</button></form>'+end,back);
       form('onlineArchiveShare',async(data,requestSerial)=>{
-        await request('archive-card',{room:data.target,title:card.title,body:card.body,type});
+        await request('archive-card',{room:data.target,title:card.title,body:card.body,type,note:card.note||''});
         if(active(requestSerial)){back();toast('卡片已分享到在线群聊');}
       });
     }catch(error){
