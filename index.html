@@ -706,6 +706,26 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .reader-paged .reader-flow{position:relative;column-fill:auto;will-change:transform}
 .reader-paged .reader-prose,.reader-paged .reader-cue{orphans:1;widows:1;break-inside:auto}
 .reader-paged .reader-end{break-inside:avoid}
+#dialog.reader-immersive-ready{padding:0!important;width:100vw!important;max-width:100vw!important;border-radius:0!important;border:0!important}
+#dialog.reader-immersive-ready .story-shell{height:100%;width:100%;max-width:960px;padding:30px 0 28px;box-sizing:border-box}
+#dialog.reader-immersive-ready .story-header{position:absolute!important;top:0;left:0;right:0;z-index:18;margin:0!important;width:100%;border-radius:0 0 18px 18px;padding:12px 18px;box-shadow:0 6px 24px #0002;max-height:100px}
+#dialog.reader-immersive-ready .reader-orb-toolbar{position:absolute!important;bottom:max(8px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:18;margin:0!important;width:min(88%,440px)}
+#dialog.reader-immersive-ready .reader-control-panel{position:absolute;bottom:calc(100px + env(safe-area-inset-bottom));max-height:min(55dvh,430px);z-index:20}
+#dialog.reader-immersive .story-header,#dialog.reader-immersive .reader-orb-toolbar{visibility:hidden;opacity:0;pointer-events:none}
+.reader-hud-title{position:absolute;left:18px;top:max(5px,env(safe-area-inset-top));right:80px;font:11px/1.6 var(--ledger-font);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;z-index:3}
+.reader-hud-time,.reader-hud-percent{position:absolute;bottom:max(6px,env(safe-area-inset-bottom));font:11px/1.6 var(--ledger-font);color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;z-index:3}
+.reader-hud-time{left:18px}.reader-hud-percent{right:18px}
+#dialog.reader-immersive-ready:not(.reader-immersive) :is(.reader-hud-title,.reader-hud-time,.reader-hud-percent){visibility:hidden}
+#dialog.reader-immersive-ready .reader-page{background:var(--field);border-radius:0;user-select:text!important;-webkit-user-select:text!important;-webkit-touch-callout:default}
+#dialog .reader-selection-tools{position:absolute;z-index:35;max-width:min(86vw,310px);padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);box-shadow:0 8px 25px #0004}
+#dialog .reader-selection-tools[hidden]{display:none}
+.reader-selection-actions{display:flex;align-items:center;gap:2px}
+#dialog .reader-selection-actions button{display:flex;align-items:center;gap:5px;padding:7px 9px;margin:0;min-height:30px;border:0;border-radius:9px;background:transparent;font-size:12px;color:var(--gold);white-space:nowrap;box-shadow:none}
+#dialog .reader-selection-actions button:hover{background:var(--field)}
+.reader-selection-actions svg{width:14px;height:14px;display:block}
+#readerExcerptForm{padding:8px;border-top:1px solid var(--line);margin-top:3px}#readerExcerptForm[hidden]{display:none}#readerExcerptForm label{font-size:12px}#readerExcerptForm select{font-size:12px;padding:6px;margin:5px 0 8px}#readerExcerptForm button{font-size:12px;padding:6px 12px;border-radius:999px}
+.reader-underline{background:transparent;color:inherit;text-decoration-line:underline;text-decoration-color:var(--gold);text-decoration-thickness:1px;text-underline-offset:.22em}
+@media(prefers-reduced-motion:reduce){.reader-flow{will-change:auto!important}}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1821,6 +1841,60 @@ function readerFolder(kind,folder){
   readerSheet(folder||'未分类','<div class="story-shelf-summary"><span>章节目录</span><span>共 '+entries.length+' 章</span></div><div class="story-books">'+(entries.map((x,index)=>'<div class="story-entry"><button type="button" data-reader-entry="'+esc(x.id)+'"><strong>第 '+(index+1)+' 章 · '+esc(x.title)+'</strong><span>'+esc(x.tea?x.tea.pov+' · '+x.tea.turns.length+' 段':x.html?'HTML 藏品':'文字收藏')+'</span><small>'+storyCount(x.body)+' 字 · 打开阅读</small></button></div>').join('')||'<p class="story-panel muted">本书还没有章节。</p>')+'</div>',()=>readerFolders(kind));
   for(const b of $('dialog').querySelectorAll('[data-reader-entry]'))b.onclick=()=>readerRead(kind,b.dataset.readerEntry,folder);
 }
+function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
+  const key=kind+':'+entry.id;
+  dialog.classList.add('reader-immersive','reader-immersive-ready');
+  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享给<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">'+esc(displayName(c))+'</option>').join('')+'</select></label><button class="primary">发送摘录</button></form></div>');
+  const tools=$('readerSelectionTools'),form=$('readerExcerptForm');
+  let selectionData=null,timer;
+  const clock=()=>{const node=$('readerClock');if(node)node.textContent=new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});};clock();const clockTimer=setInterval(clock,30000);
+  const close=()=>{tools.hidden=true;form.hidden=true;};
+  const drawMarks=()=>{
+    const text=flow.textContent,marks=state.readerMarks.filter(m=>m.key===key&&text.slice(m.start,m.end)===m.quote);
+    for(const mark of [...flow.querySelectorAll('mark.reader-underline')])mark.replaceWith(document.createTextNode(mark.textContent));flow.normalize();
+    if(!marks.length)return;
+    const walker=document.createTreeWalker(flow,NodeFilter.SHOW_TEXT),nodes=[];let offset=0,node;
+    while(node=walker.nextNode()){nodes.push({node,start:offset,end:offset+node.length});offset+=node.length;}
+    for(const {node,start,end} of nodes){
+      const cuts=marks.filter(m=>m.start<end&&m.end>start);if(!cuts.length)continue;
+      const points=[...new Set([0,node.length,...cuts.flatMap(m=>[Math.max(0,m.start-start),Math.min(node.length,m.end-start)])])].sort((a,b)=>a-b),fragment=document.createDocumentFragment();
+      for(let i=0;i<points.length-1;i++){const a=points[i],b=points[i+1],part=node.data.slice(a,b);if(cuts.some(m=>m.start<=start+a&&m.end>=start+b)){const mark=document.createElement('mark');mark.className='reader-underline';mark.textContent=part;fragment.append(mark);}else fragment.append(document.createTextNode(part));}
+      node.replaceWith(fragment);
+    }
+  };drawMarks();
+  const selectionChange=()=>{
+    clearTimeout(timer);timer=setTimeout(()=>{
+      if(!article.isConnected)return;
+      const selected=window.getSelection();if(!selected?.rangeCount||selected.isCollapsed){if(form.hidden)close();return;}
+      const range=selected.getRangeAt(0);if(!flow.contains(range.startContainer)||!flow.contains(range.endContainer))return;
+      const before=range.cloneRange();before.selectNodeContents(flow);before.setEnd(range.startContainer,range.startOffset);
+      const start=before.toString().length,quote=range.toString();if(!quote.trim())return;
+      selectionData={start,end:start+quote.length,quote};
+      const rect=range.getBoundingClientRect(),bounds=dialog.getBoundingClientRect();tools.hidden=false;
+      tools.style.left=Math.max(10,Math.min(bounds.width-tools.offsetWidth-10,rect.left-bounds.left+rect.width/2-tools.offsetWidth/2))+'px';
+      const y=rect.top-bounds.top-tools.offsetHeight-12;
+      tools.style.top=Math.max(38,Math.min(bounds.height-tools.offsetHeight-100,y>38?y:rect.bottom-bounds.top+10))+'px';
+    },120);
+  };
+  document.addEventListener('selectionchange',selectionChange);
+  $('readerSelectionClose').onclick=close;
+  $('readerUnderline').onclick=()=>{
+    if(!selectionData)return;const {start,end,quote}=selectionData;
+    const exists=state.readerMarks.some(m=>m.key===key&&m.start===start&&m.end===end);
+    const marks=exists?state.readerMarks.filter(m=>!(m.key===key&&m.start===start&&m.end===end)):[...state.readerMarks,{key,start,end,quote}];
+    if(commit({...state,readerMarks:marks})){window.getSelection()?.removeAllRanges();drawMarks();close();}
+  };
+  $('readerShareExcerpt').onclick=()=>{if(!selectionData)return;form.hidden=!form.hidden;};
+  form.onsubmit=async event=>{
+    event.preventDefault();if(!selectionData)return;
+    const c=contact(form.elements.recipient.value);if(!c||localConfig(c).mode!=='ai'){toast('请选择角色。');return;}
+    if(teaSendBlocked([c.id])||threads.has(c.id))return;
+    if(c.provider==='kindroid'?!state.kindroid.key:!profileFor(c)){toast('请先配置该角色的 API。');return;}
+    const excerpt='与你分享《'+(folder||'未分类')+'》中的摘录\n章节：'+entry.title+'\n\n'+selectionData.quote;
+    window.getSelection()?.removeAllRanges();dialog.close();activeContact=c.id;go('chat');await send(false,null,{content:excerpt});
+  };
+  return {toggle(){close();dialog.classList.toggle('reader-immersive');},progress(percent){$('readerMiniProgress').textContent=percent+'%';},cleanup(){clearInterval(clockTimer);clearTimeout(timer);document.removeEventListener('selectionchange',selectionChange);}};
+}
 function readerRead(kind,id,folder){
   const chapters=readerEntries(kind).filter(x=>x.category===folder),index=chapters.findIndex(x=>x.id===id),entry=chapters[index];if(!entry)return;
   const html=entry.html||entry.tea?.turns.some(t=>t.htmlCard),settings=state.readerSettings;
@@ -1845,10 +1919,12 @@ function readerRead(kind,id,folder){
   for(const button of dialog.querySelectorAll('[data-reader-panel-close]'))button.onclick=closePanels;
   $('readerContents').onclick=()=>{closePanels();setDrawer(true);};
   const flow=$('readerFlow');
+  const immersive=setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon});
   let pageIndex=0,pageCount=1,pageStride=0,layoutMode='scroll';
   const readingRatio=()=>layoutMode==='scroll'?article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight):pageIndex/Math.max(1,pageCount-1);
-  const syncProgress=()=>{const percent=Math.round(readingRatio()*100);$('readerProgress').textContent=percent+'%';$('readerSeek').value=percent;};
-  const showPage=number=>{pageIndex=Math.max(0,Math.min(pageCount-1,Math.round(number)));flow.style.transform='translateX('+(-pageIndex*pageStride)+'px)';article.scrollLeft=0;article.scrollTop=0;syncProgress();};
+  const syncProgress=()=>{const percent=Math.round(readingRatio()*100);$('readerProgress').textContent=percent+'%';$('readerSeek').value=percent;immersive.progress(percent);};
+  let flipAnimation;
+  const showPage=(number,animate=false)=>{const previous=pageIndex;pageIndex=Math.max(0,Math.min(pageCount-1,Math.round(number)));flow.style.transform='translateX('+(-pageIndex*pageStride)+'px)';article.scrollLeft=0;article.scrollTop=0;syncProgress();if(animate&&previous!==pageIndex&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&flow.animate){flipAnimation?.cancel();const x=-pageIndex*pageStride,offset=pageIndex>previous?12:-12;flipAnimation=flow.animate([{transform:'translateX('+(x+offset)+'px)',opacity:.5},{transform:'translateX('+x+'px)',opacity:1}],{duration:150,easing:'ease-out'});}};
   const layout=ratio=>{
     if(!article.isConnected)return;
     const paged=state.readerSettings.mode!=='scroll',style=getComputedStyle(article);
@@ -1884,17 +1960,17 @@ function readerRead(kind,id,folder){
   const turn=direction=>{
     if(direction>0&&pageIndex>=pageCount-1){if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);return;}
     if(direction<0&&pageIndex<=0){if(index>0)readerRead(kind,chapters[index-1].id,folder);return;}
-    showPage(pageIndex+direction);
+    showPage(pageIndex+direction,true);
   };
-  article.onclick=e=>{if(state.readerSettings.mode!=='tap'||e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);};
-  let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
+  article.onclick=e=>{if(e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio>=.32&&ratio<=.68){immersive.toggle();return;}if(state.readerSettings.mode==='tap'){if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);}};
+  let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(!window.getSelection()?.toString()&&Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
   article.onkeydown=e=>{if(state.readerSettings.mode==='scroll')return;if(['ArrowRight','PageDown','ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();turn(['ArrowRight','PageDown'].includes(e.key)?1:-1);}};
   apply();
   const relayout=()=>layout(readingRatio());
   const observer=typeof ResizeObserver==='function'?new ResizeObserver(relayout):null;observer?.observe(article);
   window.addEventListener('resize',relayout);
   document.fonts?.ready.then(()=>{if(article.isConnected)relayout();});
-  dialog.readerCleanup=()=>{observer?.disconnect();window.removeEventListener('resize',relayout);};
+  dialog.readerCleanup=()=>{observer?.disconnect();window.removeEventListener('resize',relayout);flipAnimation?.cancel();immersive.cleanup();};
 }
 function privateReaderHeading(){
   return '<div class="tea-directory-title"><h3>私聊</h3><button type="button" class="story-sun" data-reader-hub aria-label="打开阅读书架" title="阅读书架"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 2Q13.4 10.6 22 12Q13.4 13.4 12 22Q10.6 13.4 2 12Q10.6 10.6 12 2Z"/></svg></button></div>';
@@ -5194,7 +5270,7 @@ function skinAvailable(id,archive){
   return Object.hasOwn(skins,id)&&(!Object.hasOwn(skinUnlockIds,id)||archive.mysteryActive.includes(skinUnlockIds[id]));
 }
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({mysteryActive:[],readerOther:[],readerOtherFolders:[],readerSettings:{font:18,line:1.95,spacing:0,typeface:'serif',mode:'scroll',night:false},kindroid:{unlocked:false,key:'',aiId:''},kindroidTranslation:{preset:'',language:'简体中文'},teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],readerMarks:[],readerOther:[],readerOtherFolders:[],readerSettings:{font:18,line:1.95,spacing:0,typeface:'serif',mode:'scroll',night:false},kindroid:{unlocked:false,key:'',aiId:''},kindroidTranslation:{preset:'',language:'简体中文'},teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
 const chatDraftKey=key+'-chat-drafts';
 const pendingChatDrafts=new Map();
 let state = initial(), storageError = '';
@@ -5224,6 +5300,7 @@ function validate(data){
     result[k]=data[k];
   }
   if(!Array.isArray(result.billPresets)||!result.billPresets.every(p=>p&&string(p.id)&&p.id&&string(p.title)&&p.title.trim()&&string(p.category)&&p.category.trim()&&['income','expense'].includes(p.type)&&Number.isSafeInteger(p.cents)&&p.cents>0)||!unique(result.billPresets))throw Error('记账预设存档无效。');
+  result.readerMarks=Array.isArray(result.readerMarks)?result.readerMarks.filter(x=>x&&typeof x.key==='string'&&typeof x.quote==='string'&&Number.isInteger(x.start)&&Number.isInteger(x.end)&&x.start>=0&&x.end>x.start):[];
   result.readerOther=Array.isArray(result.readerOther)?result.readerOther.filter(x=>x&&['id','title','body','category'].every(k=>typeof x[k]==='string')):[];
   result.readerOtherFolders=Array.isArray(result.readerOtherFolders)?[...new Set(result.readerOtherFolders.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))]:[];
   if(!result.readerSettings||typeof result.readerSettings!=='object')result.readerSettings={font:18,line:1.95};
@@ -5709,7 +5786,7 @@ function dialog(html,full=false){
   panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
-  panel.classList.remove('story-studio','reader-hub','reader-reading','reader-polished','reader-night');
+  panel.classList.remove('story-studio','reader-hub','reader-reading','reader-polished','reader-night','reader-immersive','reader-immersive-ready');
   delete panel.dataset.storyOrbPage;
   panel.innerHTML=html;
   releaseUnusedAvatarUrls();
@@ -6397,6 +6474,7 @@ initDeviceLock();
 resumeNativeStory().catch(error=>toast(error.message));
 document.addEventListener('visibilitychange',resetIdleTimer);
 $('dialog').addEventListener('close',()=>{
+  $('dialog').readerCleanup?.();$('dialog').readerCleanup=null;
   const panel=$('dialog'),orb=$('homeOrb');
   if(!panel.open&&panel.contains(orb))panel.before(orb);
   refreshStoryOrb();
@@ -6514,6 +6592,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
