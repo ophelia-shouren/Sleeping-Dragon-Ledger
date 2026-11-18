@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- GitHub Pages redeployment --><html lang="zh-CN"><head><meta charset="utf-8"><link rel="manifest" href="./manifest.webmanifest">
-<script src="./ledger-online.js?v=kindroid-20261118"></script>
+<script src="./ledger-online.js?v=reader-share-20261118"></script>
 <script>
 const ledgerAndroid = (() => {
   let port = null;
@@ -743,9 +743,13 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .ledger-home-clock-face{display:flex;align-items:center;gap:12px;min-width:0}.ledger-clock-ornament{font-size:20px;opacity:.75}.ledger-home-clock time{font:26px/1.15 var(--ledger-font);font-variant-numeric:tabular-nums;letter-spacing:2px}.ledger-home-clock small{display:block;color:var(--muted);font-size:10px;letter-spacing:1px;margin-top:3px}
 #view .ledger-fullscreen-button{display:grid;place-items:center;flex:none;width:34px;height:34px;min-height:0;padding:8px;border-radius:50%;color:var(--gold);border:1px solid var(--line);background:var(--control)}.ledger-fullscreen-button svg{width:16px;height:16px;display:block}
 @media(display-mode:fullscreen){body>aside{padding-top:max(14px,env(safe-area-inset-top))}}
+
+#ledgerPageTime{position:fixed;top:max(5px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));z-index:2000;font:10px/1.4 var(--ledger-font);font-variant-numeric:tabular-nums;letter-spacing:.6px;color:var(--muted);pointer-events:none}#ledgerPageTime[hidden]{display:none}
+html #dialog.reader-polished:not(.reader-immersive) .story-header{background:var(--bg,#26191b)!important;background-image:none!important;opacity:1!important;backdrop-filter:none!important;color:var(--ink)!important}
+.reader-bookmarks{padding:12px 0;border-top:1px solid var(--line)}.reader-bookmarks h3{font-size:13px;margin:0 12px 8px}.reader-bookmark-row{display:flex;align-items:center;gap:4px}.reader-bookmark-row button:first-child{flex:1;min-width:0}.reader-bookmark-row button:last-child{width:32px;flex:none;padding:4px}.reader-note{min-height:56px!important;font-size:12px!important}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
-<main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
+<time id="ledgerPageTime" hidden aria-label="当前时间"></time><main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
 'use strict';
 
@@ -1861,7 +1865,7 @@ function readerFolder(kind,folder){
 function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   const key=kind+':'+entry.id;
   dialog.classList.add('reader-immersive','reader-immersive-ready');
-  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerCopyExcerpt">'+icon('<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>')+'复制</button><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享至<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">角色 · '+esc(displayName(c))+'</option>').join('')+state.groups.map(g=>'<option value="group:'+esc(g.id)+'">群聊 · '+esc(g.name)+'</option>').join('')+(typeof ledgerOnline!=='undefined'?'<option value="online">在线群聊…</option>':'')+'</select></label><button class="primary">发送摘录</button></form></div>');
+  dialog.querySelector('.story-shell').insertAdjacentHTML('beforeend','<div class="reader-hud-title">'+esc((folder||'未分类')+' · '+entry.title)+'</div><div class="reader-hud-time" id="readerClock"></div><div class="reader-hud-percent" id="readerMiniProgress">0%</div><div id="readerSelectionTools" class="reader-selection-tools" hidden><div class="reader-selection-actions"><button type="button" id="readerCopyExcerpt">'+icon('<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M15 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>')+'复制</button><button type="button" id="readerUnderline">'+icon('<path d="M5 20h14M7 4v7a5 5 0 0 0 10 0V4"/>')+'划线</button><button type="button" id="readerShareExcerpt">'+icon('<path d="m4 11 16-7-6 16-3-7-7-2Zm7 2 9-9"/>')+'分享给角色</button><button type="button" id="readerSelectionClose" aria-label="关闭">×</button></div><form id="readerExcerptForm" hidden><label>分享至<select name="recipient" required><option value="">选择角色</option>'+state.contacts.filter(c=>localConfig(c).mode==='ai').map(c=>'<option value="'+esc(c.id)+'">角色 · '+esc(displayName(c))+'</option>').join('')+state.groups.map(g=>'<option value="group:'+esc(g.id)+'">群聊 · '+esc(g.name)+'</option>').join('')+(typeof ledgerOnline!=='undefined'?'<option value="online">在线群聊…</option>':'')+'</select></label><label>带话（可选）<textarea class="reader-note" name="note" maxlength="2000" placeholder="想对对方说些什么…"></textarea></label><button class="primary">发送摘录</button></form></div>');
   const tools=$('readerSelectionTools'),form=$('readerExcerptForm');
   let selectionData=null,timer,customActive=false,longPress=null,pressOrigin=null,suppressUntil=0;
   dialog.append(tools);
@@ -1973,11 +1977,11 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
   $('readerShareExcerpt').onclick=()=>{if(!selectionData)return;form.hidden=!form.hidden;tools.style.top=Math.max(38,Math.min(parseFloat(tools.style.top)||38,dialog.clientHeight-tools.offsetHeight-110))+'px';};
   form.onsubmit=async event=>{
     event.preventDefault();if(!selectionData)return;
-    const recipient=form.elements.recipient.value;
+    const recipient=form.elements.recipient.value,note=String(form.elements.note.value||'').trim();
     const articleText='【阅读分享】这是用户从书中读到并分享的文章节选，不是正在发生的事件，也不是共同经历。\n书名：《'+(folder||'未分类')+'》\n章节：'+entry.title+'\n\n'+selectionData.quote;
     const excerptCard={book:folder||'未分类',chapter:entry.title,text:selectionData.quote,sourceType:kind,recall:false};
     if(recipient==='online'){
-      const card={title:'《'+excerptCard.book+'》 · '+entry.title+' · 节选',body:articleText};
+      const card={title:'《'+excerptCard.book+'》 · '+entry.title+' · 节选',body:articleText,note};
       await ledgerOnline.shareArchive(card,()=>readerRead(kind,entry.id,folder));return;
     }
     if(recipient.startsWith('group:')){
@@ -1986,7 +1990,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
       if(teaSendBlocked(g.members))return;
       const lived=kind==='tea'?entry.tea?.cast.map(contact).filter(Boolean).map(displayName):[];
       const content=lived?.length?'【普通茶叙记录分享】原参与者：'+lived.join('、')+'。仅原参与角色可作为共同回忆，未参与角色只当作阅读分享。\n'+articleText.replace('【阅读分享】这是用户从书中读到并分享的文章节选，不是正在发生的事件，也不是共同经历。','【节选来源】以下来自已结束的普通茶叙，请按上述参与者范围区分共同回忆与阅读分享。'):articleText;
-      dialog.close();openGroup(g.id);await sendGroup(g.id,content,null,null,false,false,excerptCard);return;
+      dialog.close();openGroup(g.id);await sendGroup(g.id,content,null,null,false,false,excerptCard,note);return;
     }
     const c=contact(recipient);if(!c||localConfig(c).mode!=='ai'){toast('请选择角色或群聊。');return;}
     if(teaSendBlocked([c.id])||threads.has(c.id))return;
@@ -1994,7 +1998,7 @@ function setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon}){
     const recall=kind==='tea'&&entry.tea?.cast.includes(c.id);
     const excerpt=(recall?'【普通茶叙回忆】这是你与用户共同经历过的片段，请结合已有记忆自然回忆。':kind==='tea'?'【阅读分享】这是用户分享的茶叙记录；你未参与，不要认作自己的经历。':'【阅读分享】这是用户从书中读到并分享给你的文章节选，不是用户正在经历的事件，也不是你们共同的回忆。')+'\n书名：《'+(folder||'未分类')+'》\n章节：'+entry.title+'\n\n'+selectionData.quote;
     const readerExcerpt={book:folder||'未分类',chapter:entry.title,text:selectionData.quote,sourceType:kind,recall};
-    window.getSelection()?.removeAllRanges();dialog.close();activeContact=c.id;go('chat');await send(false,null,{content:excerpt,readerExcerpt});
+    window.getSelection()?.removeAllRanges();dialog.close();activeContact=c.id;go('chat');await send(false,null,{content:excerpt,readerExcerpt,note});
   };
   return {hasSelection(){return customActive||Date.now()<suppressUntil;},consumeTap(){if(Date.now()<suppressUntil)return true;if(customActive){close();return true;}return false;},toggle(){close();dialog.classList.toggle('reader-immersive');},progress(percent){$('readerMiniProgress').textContent=percent+'%';},cleanup(){cancelLong();dialog.removeEventListener('click',dismissSelection,true);article.removeEventListener('pointerdown',touchDown);article.removeEventListener('pointermove',touchMove);article.removeEventListener('pointerup',touchEnd);article.removeEventListener('pointercancel',touchEnd);article.removeEventListener('contextmenu',contextMenu);selectionLayer.remove();clearInterval(clockTimer);clearTimeout(timer);document.removeEventListener('selectionchange',selectionChange);}};
 }
@@ -2008,14 +2012,29 @@ function readerRead(kind,id,folder){
     '<section id="readerProgressPanel" class="reader-control-panel" hidden><div class="reader-control-heading"><strong>阅读进度</strong><button type="button" data-reader-panel-close aria-label="关闭进度设置">×</button></div><p class="reader-current-chapter">'+esc(entry.title)+'</p><div class="reader-control-range"><input id="readerSeek" type="range" min="0" max="100" value="0" aria-label="阅读进度"><output id="readerProgress">0%</output></div><div class="reader-chapter-actions"><button type="button" id="readerPrevChapter" '+(index===0?'disabled':'')+'>上一章</button><button type="button" id="readerNextChapter" '+(index===chapters.length-1?'disabled':'')+'>下一章</button></div></section>'+
     '<section id="readerModePanel" class="reader-control-panel" hidden><div class="reader-control-heading"><strong>阅读方式</strong><button type="button" data-reader-panel-close aria-label="关闭阅读设置">×</button></div><label>翻页方式<select id="readerPageMode"><option value="scroll">连续滚动</option><option value="tap">点击左右区域翻页</option><option value="swipe">左右滑动翻页</option></select></label><label class="mode-toggle"><input type="checkbox" role="switch" id="readerNight"><span aria-hidden="true"></span>阅读器夜间模式</label></section>';
   const toolbar=html?'':'<footer class="reader-toolbar reader-orb-toolbar" aria-label="阅读工具"><button type="button" id="readerContents" aria-label="章节目录" title="章节目录">'+listIcon+'</button><button type="button" id="readerFontButton" aria-label="字体设置" title="字体设置" aria-expanded="false"><span class="reader-letter-a">A</span></button><button type="button" id="readerProgressButton" aria-label="阅读进度" title="阅读进度" aria-expanded="false">'+icon('<circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/>')+'</button><button type="button" id="readerModeButton" aria-label="翻页与夜间模式" title="翻页与夜间模式" aria-expanded="false">'+icon('<path d="M4 5h6l2 2 2-2h6v14h-6l-2 2-2-2H4ZM12 7v14"/><path d="M16 9h2m-2 4h2"/>')+'</button></footer>';
-  const drawer='<div id="readerDrawerShade" class="reader-drawer-shade" hidden></div><aside id="readerDrawer" class="reader-drawer" aria-label="章节目录" aria-hidden="true" inert><div class="reader-drawer-heading"><strong>'+esc(folder||'未分类')+'</strong><button type="button" id="readerDrawerClose" aria-label="关闭目录">×</button></div><nav>'+chapters.map(x=>'<button type="button" data-reader-jump="'+esc(x.id)+'" '+(x.id===id?'aria-current="page"':'')+'>'+esc(x.title)+'</button>').join('')+'</nav></aside>';
+  const drawer='<div id="readerDrawerShade" class="reader-drawer-shade" hidden></div><aside id="readerDrawer" class="reader-drawer" aria-label="章节目录" aria-hidden="true" inert><div class="reader-drawer-heading"><strong>'+esc(folder||'未分类')+'</strong><button type="button" id="readerDrawerClose" aria-label="关闭目录">×</button></div><nav>'+chapters.map(x=>'<button type="button" data-reader-jump="'+esc(x.id)+'" '+(x.id===id?'aria-current="page"':'')+'>'+esc(x.title)+'</button>').join('')+'</nav><section class="reader-bookmarks"><h3>书签</h3><button type="button" id="readerAddBookmark">＋ 添加当前位置</button><div id="readerBookmarkList"></div></section></aside>';
   readerSheet(entry.title,'<article id="readerPage" class="reader-page" tabindex="0"><div id="readerFlow" class="reader-flow">'+content+'<div class="reader-end">✧</div></div></article>'+panels+toolbar+drawer,()=>readerFolder(kind,folder));
   const dialog=$('dialog'),article=$('readerPage');dialog.classList.add('reader-reading','reader-polished');
   const setDrawer=open=>{const drawer=$('readerDrawer');drawer.classList.toggle('is-open',open);drawer.inert=!open;drawer.setAttribute('aria-hidden',String(!open));$('readerDrawerShade').hidden=!open;if(open)$('readerDrawerClose').focus();};
   for(const button of dialog.querySelectorAll('[data-reader-jump]'))button.onclick=()=>readerRead(kind,button.dataset.readerJump,folder);
   $('readerDrawerClose').onclick=()=>setDrawer(false);$('readerDrawerShade').onclick=()=>setDrawer(false);
+  const savedKey=kind+':'+entry.id,saved=readerShelfData()[savedKey]||{};
+  let savedRatio=Math.max(0,Math.min(1,Number(saved.ratio)||0)),restoring=true,savePositionTimer;
+  let ratioNow=()=>article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight);
+  let jumpRatio=ratio=>{article.scrollTop=ratio*Math.max(0,article.scrollHeight-article.clientHeight);};
+  const savePosition=()=>{if(restoring)return;clearTimeout(savePositionTimer);readerShelfSave(savedKey,{ratio:ratioNow(),title:entry.title,updated:Date.now()});};
+  const queuePosition=()=>{if(!restoring){clearTimeout(savePositionTimer);savePositionTimer=setTimeout(savePosition,650);}};
+  const drawBookmarks=()=>{
+    const list=$('readerBookmarkList');if(!list)return;const marks=readerShelfData()[savedKey]?.bookmarks||[];
+    list.innerHTML=marks.map(m=>'<div class="reader-bookmark-row"><button type="button" data-bookmark-jump="'+esc(m.id)+'">'+esc(m.label)+' · '+Math.round(m.ratio*100)+'%</button><button type="button" data-bookmark-delete="'+esc(m.id)+'" aria-label="删除书签">×</button></div>').join('')||'<p class="muted" style="padding:8px 12px;font-size:12px">暂无书签</p>';
+    for(const b of list.querySelectorAll('[data-bookmark-jump]'))b.onclick=()=>{const mark=marks.find(m=>m.id===b.dataset.bookmarkJump);if(mark){jumpRatio(mark.ratio);setDrawer(false);savePosition();}};
+    for(const b of list.querySelectorAll('[data-bookmark-delete]'))b.onclick=()=>{readerShelfSave(savedKey,{bookmarks:marks.filter(m=>m.id!==b.dataset.bookmarkDelete)});drawBookmarks();};
+  };
+  $('readerAddBookmark').onclick=()=>{const ratio=ratioNow(),marks=readerShelfData()[savedKey]?.bookmarks||[];if(readerShelfSave(savedKey,{bookmarks:[...marks,{id:crypto.randomUUID(),ratio,label:entry.title,created:Date.now()}]})){drawBookmarks();toast('已添加书签');}};drawBookmarks();
+  const leaveSave=()=>savePosition();window.addEventListener('pagehide',leaveSave);const visibilitySave=()=>{if(document.hidden)savePosition();};document.addEventListener('visibilitychange',visibilitySave);
+  const cleanPosition=()=>{savePosition();clearTimeout(savePositionTimer);window.removeEventListener('pagehide',leaveSave);document.removeEventListener('visibilitychange',visibilitySave);};
   const originalBack=dialog.orbBack;dialog.orbBack=()=>{if($('readerDrawer')?.classList.contains('is-open'))setDrawer(false);else if(!html&&[...dialog.querySelectorAll('.reader-control-panel')].some(p=>!p.hidden))closePanels();else originalBack?.();};
-  if(html){const header=dialog.querySelector('.story-header-actions');header.insertAdjacentHTML('afterbegin','<button type="button" id="readerContents" class="story-header-icon reader-html-contents" aria-label="章节目录">'+listIcon+'</button>');$('readerContents').onclick=()=>setDrawer(true);return;}
+  if(html){const header=dialog.querySelector('.story-header-actions');header.insertAdjacentHTML('afterbegin','<button type="button" id="readerContents" class="story-header-icon reader-html-contents" aria-label="章节目录">'+listIcon+'</button>');$('readerContents').onclick=()=>setDrawer(true);article.onscroll=queuePosition;restoring=false;jumpRatio(savedRatio);dialog.readerCleanup=cleanPosition;return;}
   const buttonPanels=[['readerFontButton','readerFontPanel'],['readerProgressButton','readerProgressPanel'],['readerModeButton','readerModePanel']];
   function closePanels(){for(const [button,panel] of buttonPanels){$(panel).hidden=true;$(button).setAttribute('aria-expanded','false');}}
   for(const [button,panel] of buttonPanels)$(button).onclick=()=>{const open=$(panel).hidden;closePanels();$(panel).hidden=!open;$(button).setAttribute('aria-expanded',String(open));};
@@ -2025,7 +2044,9 @@ function readerRead(kind,id,folder){
   const immersive=setupReaderImmersive({dialog,article,flow,entry,kind,folder,icon});
   let pageIndex=0,pageCount=1,pageStride=0,layoutMode='scroll';
   const readingRatio=()=>layoutMode==='scroll'?article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight):pageIndex/Math.max(1,pageCount-1);
-  const syncProgress=()=>{const percent=Math.round(readingRatio()*100);$('readerProgress').textContent=percent+'%';$('readerSeek').value=percent;immersive.progress(percent);};
+  ratioNow=readingRatio;
+  jumpRatio=ratio=>{if(layoutMode==='paged')showPage(ratio*(pageCount-1));else{article.scrollTop=ratio*Math.max(0,article.scrollHeight-article.clientHeight);syncProgress();}};
+  const syncProgress=()=>{queuePosition();const percent=Math.round(readingRatio()*100);$('readerProgress').textContent=percent+'%';$('readerSeek').value=percent;immersive.progress(percent);};
   let flipAnimation;
   const showPage=(number,animate=false)=>{const previous=pageIndex;pageIndex=Math.max(0,Math.min(pageCount-1,Math.round(number)));flow.style.transform='translateX('+(-pageIndex*pageStride)+'px)';article.scrollLeft=0;article.scrollTop=0;syncProgress();if(animate&&previous!==pageIndex&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&flow.animate){flipAnimation?.cancel();const x=-pageIndex*pageStride,offset=pageIndex>previous?12:-12;flipAnimation=flow.animate([{transform:'translateX('+(x+offset)+'px)',opacity:.5},{transform:'translateX('+x+'px)',opacity:1}],{duration:150,easing:'ease-out'});}};
   const layout=ratio=>{
@@ -2068,12 +2089,12 @@ function readerRead(kind,id,folder){
   article.onclick=e=>{if(immersive.consumeTap())return;if(e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio>=.32&&ratio<=.68){immersive.toggle();return;}if(state.readerSettings.mode==='tap'){if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);}};
   let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(!immersive.hasSelection()&&!window.getSelection()?.toString()&&Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
   article.onkeydown=e=>{if(state.readerSettings.mode==='scroll')return;if(['ArrowRight','PageDown','ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();turn(['ArrowRight','PageDown'].includes(e.key)?1:-1);}};
-  apply();
+  apply();layout(savedRatio);restoring=false;
   const relayout=()=>layout(readingRatio());
   const observer=typeof ResizeObserver==='function'?new ResizeObserver(relayout):null;observer?.observe(article);
   window.addEventListener('resize',relayout);
   document.fonts?.ready.then(()=>{if(article.isConnected)relayout();});
-  dialog.readerCleanup=()=>{observer?.disconnect();window.removeEventListener('resize',relayout);flipAnimation?.cancel();immersive.cleanup();};
+  dialog.readerCleanup=()=>{cleanPosition();observer?.disconnect();window.removeEventListener('resize',relayout);flipAnimation?.cancel();immersive.cleanup();};
 }
 function privateReaderHeading(){
   return '<div class="tea-directory-title"><h3>私聊</h3><button type="button" class="story-sun" data-reader-hub aria-label="打开阅读书架" title="阅读书架"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 2Q13.4 10.6 22 12Q13.4 13.4 12 22Q10.6 13.4 2 12Q10.6 10.6 12 2Z"/></svg></button></div>';
@@ -2283,7 +2304,7 @@ async function rerollGroup(id,index,guide){
   }catch(error){toast(error.message);}
   finally{groupJobs.delete(id);groupRerolls.delete(id);refreshGroup(id);}
 }
-async function sendGroup(id,message='',file=null,game=null,storyForward=false,continueContext=false,readerExcerpt=null){
+async function sendGroup(id,message='',file=null,game=null,storyForward=false,continueContext=false,readerExcerpt=null,readerNote=''){
   if(groupJobs.has(id))return;
   let g=groupById(id);if(!g||teaSendBlocked(g.members))return;
   groupJobs.add(id);
@@ -2298,7 +2319,7 @@ async function sendGroup(id,message='',file=null,game=null,storyForward=false,co
       const quote=!game&&!storyForward&&chatQuotes.get(quoteKey(id,'group'));
       const image=game?'':file||'';
       if(groupById(id)!==g)throw Error('群聊已更新，请重新发送。');
-      patchGroup(g,{continueContext:false,pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{}),...(readerExcerpt?{readerExcerpt}:{})}]});
+      patchGroup(g,{continueContext:false,pending:game?[game.roleId]:members.map(c=>c.id),messages:[...g.messages,{speaker:state.userName||'你',roleId:'',content:message,sentAt:Date.now(),audience:members.map(c=>c.id),...(quote?{quote}:{}),...(image?{image}:{}),...(game?{gameResult:game.result}:{}),...(storyForward?{storyForward:true}:{}),...(readerExcerpt?{readerExcerpt}:{} )},...(readerNote?[{speaker:state.userName||'你',roleId:'',content:readerNote,sentAt:Date.now(),audience:members.map(c=>c.id)}]:[])]});
     }else if(continueContext&&!g.pending.length){
       const members=g.members.map(contact).filter(Boolean);
       if(members.length<2)throw Error('请先在群聊设置里邀请至少两位角色。');
@@ -2633,9 +2654,9 @@ async function sendKindroid(c,retry,reroll,gameTurn){
   const content=String(gameTurn?.content??c.draft).trim();if(!content)return;
   if(content.length>16000){toast('单条消息最多 16000 字。');return;}
   const qKey=quoteKey(c.id,'ai'),quote=!gameTurn&&chatQuotes.get(qKey);
-  const message=[characterLanguageRule(c),quoteText(quote)?'[引用] '+quoteText(quote):'',content].filter(Boolean).join('\n');
+  const message=[characterLanguageRule(c),quoteText(quote)?'[引用] '+quoteText(quote):'',content,gameTurn?.note?'用户带话：'+gameTurn.note:''].filter(Boolean).join('\n');
   if(message.length>16000){toast('消息与引用合计最多 16000 字。');return;}
-  const history=[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(gameTurn?.readerExcerpt?{readerExcerpt:gameTurn.readerExcerpt}:{})}];
+  const history=[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(gameTurn?.readerExcerpt?{readerExcerpt:gameTurn.readerExcerpt}:{})},...(gameTurn?.note?[{role:'user',content:gameTurn.note,sentAt:Date.now()}]:[])];
   if(!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
   chatQuotes.delete(qKey);threads.set(c.id,true);replyErrors.delete(c.id);render();
   try{
@@ -2666,7 +2687,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
   if(image&&(!state.imageApi.url||!state.imageApi.model)&&(!retry||!c.messages.at(-1)?.caption)){
     toast('请先配置图片专用 API 和视觉识别模型。');return;
   }
-  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(image?{image}:{}),...(gameTurn?.result?{gameResult:gameTurn.result}:{}),...(gameTurn?.storyForward?{storyForward:true}:{}),...(gameTurn?.readerExcerpt?{readerExcerpt:gameTurn.readerExcerpt}:{})}];
+  let history=reroll?c.messages.slice(0,reroll.index):retry?c.messages:[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(image?{image}:{}),...(gameTurn?.result?{gameResult:gameTurn.result}:{}),...(gameTurn?.storyForward?{storyForward:true}:{}),...(gameTurn?.readerExcerpt?{readerExcerpt:gameTurn.readerExcerpt}:{})},...(gameTurn?.note?[{role:'user',content:gameTurn.note,sentAt:Date.now()}]:[])];
   if(!retry&&!reroll&&!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
   if(!retry&&!reroll&&!gameTurn){chatImages.delete(key);chatQuotes.delete(qKey);}
   const name=c.name||displayName(c);
@@ -5755,6 +5776,18 @@ function heroCrest(skin){
   const animal=animals[skin]||animals.gryffindor;
   return `<svg class="crest" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 270" fill="none" stroke="currentColor"><circle cx="150" cy="131" r="107" opacity=".27"/><circle cx="150" cy="131" r="97" opacity=".25" stroke-dasharray="2 7"/><path d="M150 26l64 22v70c0 43-24 78-64 101-40-23-64-58-64-101V48z" fill="var(--hero-dark)" fill-opacity=".46" stroke-width="2"/><path d="M150 33l57 20v65c0 39-21 71-57 93-36-22-57-54-57-93V53z" opacity=".6"/>${animal}<g opacity=".7"><path d="M132 230C78 219 48 180 46 115m122 115c54-11 84-50 86-115"/><path d="M50 152q-20-5-20-23 16 6 20 23zm12 30q-21 0-26-18 18 1 26 18zm21 24q-22 6-32-9 18-4 32 9zm28 17q-20 10-34-2 18-8 34 2zm139-71q20-5 20-23-16 6-20 23zm-12 30q21 0 26-18-18 1-26 18zm-21 24q22 6 32-9-18-4-32 9zm-28 17q20 10 34-2-18-8-34 2z" fill="currentColor"/></g><path d="M92 236h116l-7 11 7 11H92l7-11z" fill="var(--hero-dark)"/><text x="150" y="251" font-family="Georgia" font-size="10" letter-spacing="2" text-anchor="middle" stroke="none" fill="currentColor">${skin.toUpperCase()}</text></svg>`;
 }
+function updatePageTime(){
+  const node=$('ledgerPageTime');if(!node)return;
+  const dialog=$('dialog'),reader=dialog?.open&&dialog.querySelector('#readerClock');
+  node.hidden=deviceLocked||!!reader||(page==='home'&&!dialog?.open);
+  if(!node.hidden){const now=new Date();const time=new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}).format(now);if(node.textContent!==time)node.textContent=time;node.dateTime=now.toISOString();}
+}
+setInterval(updatePageTime,15000);
+document.addEventListener('visibilitychange',updatePageTime);
+let pageTimeTimer;new MutationObserver(()=>{clearTimeout(pageTimeTimer);pageTimeTimer=setTimeout(updatePageTime,80);}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['open']});
+const readerShelfStorage='sleeping-dragon-reader-positions-v1';
+function readerShelfData(){try{const value=JSON.parse(localStorage.getItem(readerShelfStorage)||'{}');return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}catch{return {};}}
+function readerShelfSave(key,patch){try{const all=readerShelfData();all[key]={...all[key],...patch};localStorage.setItem(readerShelfStorage,JSON.stringify(all));return true;}catch{toast('阅读位置保存失败，请检查设备存储空间。');return false;}}
 function homeClockMarkup(){
   return '<section class="ledger-home-clock" aria-label="此刻"><div class="ledger-home-clock-face"><span class="ledger-clock-ornament" aria-hidden="true">✧</span><div><time id="ledgerHomeTime"></time><small id="ledgerHomeDay"></small></div></div><button type="button" class="ledger-fullscreen-button" data-action="ledgerFullscreen" aria-label="切换全屏" title="切换全屏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button></section>';
 }
@@ -5986,7 +6019,7 @@ function render(){
   $('view').dataset.page=page;
   releaseUnusedAvatarUrls();
   $('view').innerHTML=(storageError?'<div class="notice">'+esc(storageError)+'</div>':'')+(page==='home'?homeClockMarkup():'')+screens[page]();
-  updateHomeClock();
+  updateHomeClock();updatePageTime();
   if(page==='backup'&&typeof updateArchiveVersion==='function')updateArchiveVersion();
   if($('messages')) $('messages').scrollTop=$('messages').scrollHeight;
   scheduleTypingReveal();
