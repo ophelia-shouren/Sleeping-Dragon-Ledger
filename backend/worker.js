@@ -92,12 +92,14 @@ function upstreamError(status) {
   return fail('API 返回 HTTP '+status+'。'+(hints[status] || '请在服务商后台查看请求详情。'),502);
 }
 
-async function requestModel(env, char, messages, maxTokens = 800, timeout = 55000, stream = true) {
+async function requestModel(env, char, messages, maxTokens = 800, timeout = 55000, stream = true, externalSignal = null) {
   let key;
   try {key = await decrypt(env,char.secret,char.id);}
   catch {throw fail('站点无法解密此角色的 API Key，请重新保存该角色的 API 配置。',503);}
   const url = new URL(char.endpoint);
-  const signal = AbortSignal.timeout(timeout);
+  const timed=timeout==null?null:AbortSignal.timeout(timeout);
+  const signal=externalSignal&&timed?AbortSignal.any([externalSignal,timed]):externalSignal||timed||undefined;
+  if(signal?.aborted)throw fail('本次回复已中断。',409);
   const options = {
     method:'POST',redirect:'manual',signal,
     headers:{'Content-Type':'application/json',Accept:'text/event-stream, application/json',Authorization:'Bearer '+key},
@@ -123,7 +125,8 @@ async function requestModel(env, char, messages, maxTokens = 800, timeout = 5500
     return reply;
   } catch (error) {
     if (error.status) throw error;
-    if (signal.aborted || error.name === 'TimeoutError' || error.name === 'AbortError') {
+    if(externalSignal?.aborted)throw fail('本次回复已中断。',409);
+    if (signal?.aborted || error.name === 'TimeoutError' || error.name === 'AbortError') {
       throw fail('站点等待 API 回复超过 '+Math.round(timeout/1000)+' 秒。请检查服务商响应速度，或改用响应更快的模型。',504);
     }
     throw fail('站点服务器未能连通 API。若手机上测试正常，请检查服务商是否限制服务器 IP、地区或 HTTPS 连接。',502);
@@ -250,7 +253,7 @@ function stripCharacterPrefix(body,name){
 async function ensureVisionTable(db){
   await db.prepare('CREATE TABLE IF NOT EXISTS ledger_vision_api (uid TEXT PRIMARY KEY, endpoint TEXT NOT NULL, model TEXT NOT NULL, secret TEXT NOT NULL)').run();
 }
-async function describeGroupImages(env,char,history){
+async function describeGroupImages(env,char,history,signal=null){
   const images=history.filter(message=>message.kind==='image'&&message.attachment);
   if(!images.length)return {};
   try{
@@ -261,7 +264,7 @@ async function describeGroupImages(env,char,history){
     for(const [index,message] of images.entries()){
       content.push({type:'text',text:'图片 '+(index+1)+'，发送者：'+message.name},{type:'image_url',image_url:{url:message.attachment}});
     }
-    const descriptions=await requestModel(env,{...vision,id:'vision:'+char.owner},[{role:'user',content}],1000,14000,false);
+    const descriptions=await requestModel(env,{...vision,id:'vision:'+char.owner},[{role:'user',content}],1000,14000,false,signal);
     return {descriptions};
   }catch{
     return {notice:'邀请者的识图模型暂时无法读取图片，本次仅根据文字回复。'};
@@ -334,7 +337,7 @@ async function claimPacket(db,room,id,person,decline=false){
   }
   throw fail('红包正在更新，请重试。',409);
 }
-async function sendPacket(env,ctx,room,uid,char,data,reply=null){
+async function sendPacket(env,ctx,room,uid,char,data,reply=null,generationId=null){
   const db=env.DB, currency=await currencyFor(db,room);
   if(!['normal','lucky','exclusive'].includes(data.mode))throw fail('请选择红包类型。');
   const people=await packetPeople(db,room);
@@ -352,11 +355,12 @@ async function sendPacket(env,ctx,room,uid,char,data,reply=null){
     WHERE EXISTS (SELECT 1 FROM members WHERE room=? AND uid=?)
     AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups WHERE room=?)
     AND (? IS NULL OR EXISTS(SELECT 1 FROM chars WHERE room=? AND id=? AND active=1))
-    AND ?<=(SELECT COUNT(*) FROM members WHERE room=?)+(SELECT COUNT(*) FROM chars WHERE room=? AND active=1)`).bind(room,uid,char?.id||null,label+' · '+formatPacket(total,packet.unit),JSON.stringify(packet),room,uid,room,char?.id||null,room,char?.id||null,count,room,room);
-  const [sent]=reply?await db.batch([
-    insert,
-    db.prepare("INSERT INTO messages (room,sender,char_id,body) SELECT ?,?,?,? WHERE changes()=1").bind(room,uid,char.id,reply)
-  ]):[await insert.run()];
+    AND ?<=(SELECT COUNT(*) FROM members WHERE room=?)+(SELECT COUNT(*) FROM chars WHERE room=? AND active=1)
+    AND (? IS NULL OR EXISTS (SELECT 1 FROM ledger_generation_jobs WHERE id=? AND status='running'))`).bind(room,uid,char?.id||null,label+' · '+formatPacket(total,packet.unit),JSON.stringify(packet),room,uid,room,char?.id||null,room,char?.id||null,count,room,room,generationId,generationId);
+  const statements=[insert];
+  if(reply)statements.push(db.prepare("INSERT INTO messages (room,sender,char_id,body) SELECT ?,?,?,? WHERE changes()=1").bind(room,uid,char.id,reply));
+  if(generationId)statements.push(db.prepare("UPDATE ledger_generation_jobs SET status='completed',updated=? WHERE id=? AND status='running'").bind(Date.now(),generationId));
+  const [sent]=await db.batch(statements);
   if(!sent.meta.changes)throw fail('群成员已变化，请重新打开红包界面后发送。',409);
   const id=sent.meta.last_row_id;
   const bots=people.filter(p=>p.id.startsWith('char:')&&isPacketRecipient(packet,p.id));
@@ -395,16 +399,66 @@ function resolveMention(body,characters){
   }
   return null;
 }
+let generationSchemaReady;
+const generationControllers=new Map();
+async function ensureGenerationSchema(db){
+  if(!generationSchemaReady)generationSchemaReady=db.batch([
+    db.prepare("CREATE TABLE IF NOT EXISTS ledger_generation_jobs (id TEXT PRIMARY KEY,room TEXT NOT NULL,char_id TEXT NOT NULL,message_id INTEGER,requester TEXT,status TEXT NOT NULL,started INTEGER NOT NULL,updated INTEGER NOT NULL)"),
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS ledger_generation_one_active ON ledger_generation_jobs(char_id) WHERE status='running'")
+  ]).catch(error=>{generationSchemaReady=null;throw error;});
+  await generationSchemaReady;
+}
+async function closeStaleGenerations(db,now){
+  await db.prepare("UPDATE ledger_generation_jobs SET status='failed',updated=? WHERE status='running' AND updated<?").bind(now,now-90000).run();
+}
+function streamingGeneration(work){
+  const encoder=new TextEncoder();let keepAlive,ended=false;
+  const body=new ReadableStream({
+    start(controller){
+      controller.enqueue(encoder.encode('\n'));
+      keepAlive=setInterval(()=>{if(!ended)try{controller.enqueue(encoder.encode('\n'));}catch{ended=true;clearInterval(keepAlive);}},10000);
+      Promise.resolve(work).then(async response=>{
+        const text=await response.text();if(!ended){controller.enqueue(encoder.encode(text));controller.close();}
+      }).catch(()=>{if(!ended){controller.enqueue(encoder.encode(JSON.stringify({ok:true,notice:'本次回复未能完成，请核对聊天记录后重试。'})));controller.close();}}).finally(()=>{ended=true;clearInterval(keepAlive);});
+    },
+    cancel(){ended=true;clearInterval(keepAlive);}
+  });
+  return new Response(body,{headers:{'Content-Type':'application/json;charset=UTF-8','Cache-Control':'no-store, no-transform','X-Content-Type-Options':'nosniff'}});
+}
+
 async function generateReply(env,room,char,summarize,ledger,messageId=null,automatic=null,ctx=null){
   const stmt=(sql,...args)=>env.DB.prepare(sql).bind(...args);
   const run=(sql,...args)=>stmt(sql,...args).run();
   const one=(sql,...args)=>stmt(sql,...args).first();
   const all=async(sql,...args)=>(await stmt(sql,...args).all()).results;
   const now = Date.now();
-  if(automatic&&!(await one('SELECT char_id FROM ledger_char_autopost WHERE char_id=? AND next_at=?',char.id,automatic.next_at)))return;
-  const claim = await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until<? AND active=1', now+90000,char.id,now);
+  await ensureGenerationSchema(env.DB);await closeStaleGenerations(env.DB,now);
+  if(automatic&&!(await one('SELECT char_id FROM ledger_char_autopost WHERE char_id=? AND next_at=?',char.id,automatic.next_at)))return json({ok:true});
+  let lease=now+90000;
+  const claim = await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until<? AND active=1',lease,char.id,now);
   if (!claim.meta.changes) {summarize();return json({ok:true,notice:'角色正在回复，请稍后再 @。'});}
+  const jobId=uuid(),controller=new AbortController();let watcher,watching=false,finished=false,lastHeartbeat=now;
   try {
+    const jobTrigger=messageId?await one('SELECT sender FROM messages WHERE room=? AND id=?',room.id,messageId):null;
+    await run("INSERT INTO ledger_generation_jobs (id,room,char_id,message_id,requester,status,started,updated) VALUES (?,?,?,?,?,'running',?,?)",jobId,room.id,char.id,messageId,jobTrigger?.sender||null,now,now);
+    generationControllers.set(jobId,controller);
+    const watch=async()=>{
+      if(watching||finished)return;watching=true;
+      try{
+        const job=await one("SELECT j.status,c.active FROM ledger_generation_jobs j JOIN chars c ON c.id=j.char_id WHERE j.id=?",jobId);
+        if(finished)return;
+        if(!job||job.status!=='running'||!job.active){controller.abort();return;}
+        if(Date.now()-lastHeartbeat>=15000){
+          const next=Date.now()+90000;
+          const [renewed]=await env.DB.batch([
+            stmt("UPDATE chars SET busy_until=? WHERE id=? AND busy_until=? AND EXISTS (SELECT 1 FROM ledger_generation_jobs WHERE id=? AND status='running')",next,char.id,lease,jobId),
+            stmt("UPDATE ledger_generation_jobs SET updated=? WHERE id=? AND status='running'",Date.now(),jobId)
+          ]);
+          if(renewed.meta.changes){lease=next;lastHeartbeat=Date.now();}else controller.abort();
+        }
+      }catch(error){console.error('Generation heartbeat could not run',error.name);}finally{watching=false;}
+    };
+    watcher=setInterval(()=>{void watch();},2500);
     const history = await all('SELECT m.body,m.kind,m.attachment,m.created,m.char_id,m.sender,COALESCE(c.name,p.name) name,l.persona FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id LEFT JOIN ledger_people l ON l.uid=p.id WHERE m.room=? AND m.kind IN (\'text\',?,?) AND (? IS NULL OR m.id<=?) ORDER BY m.id DESC LIMIT ?',room.id,ledger?'image':'text',ledger?'forwarded-chat':'text',messageId,messageId,ledger?10:15);
     history.reverse();
     for(const message of history){
@@ -419,7 +473,7 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
       const quote=messageMeta(message).quote;
       message.body=(message.created?'[发送时间 UTC '+message.created+'] ':'')+(quote&&!quote.humanOnly?'[引用 '+quote.speaker+'：'+quote.content+']\n':'')+message.body;
     }
-    const imageContext=ledger?await describeGroupImages(env,char,history):{};
+    const imageContext=ledger?await describeGroupImages(env,char,history,controller.signal):{};
     const context = ledger ? await one('SELECT world_front,world_end FROM ledger_cast WHERE char_id=?',char.id) : null;
     const memory = ledger ? await one('SELECT summary,updated FROM ledger_room_memory WHERE room=?',room.id) : null;
     const groupMemory=roomMemoryCards(memory?.summary,memory?.updated).map(card=>card.body).join('\n\n').slice(-12000);
@@ -436,20 +490,21 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
       ...history.map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.char_id===char.id?stripCharacterPrefix(m.body,m.name).slice(0,1600):m.name+'：'+(m.char_id?stripCharacterPrefix(m.body,m.name):m.body).slice(0,1600)}))
     ];
     if(automatic)messages.push({role:'user',content:'请以角色身份主动在群聊发一条消息。'});
-    const raw=await requestModel(env,char,messages);
+    const raw=await requestModel(env,char,messages,800,null,true,controller.signal);
     let packetResponse=packetMode?characterPacketResponse(raw,packetMode,trigger.sender,char.name):null;
     if(packetResponse?.decision===null){
       const retry=[...messages,{role:'assistant',content:raw.slice(0,3000)},
         {role:'user',content:'上一条回答尚未执行任何发送操作。请按原本的角色意图重新输出规定的 JSON，明确填写 sendRedPacket 为 true 或 false，并给出角色台词。可以拒绝。'}];
       try{
-        const corrected=await requestModel(env,char,retry,800,12000);
+        const corrected=await requestModel(env,char,retry,800,null,true,controller.signal);
         packetResponse=characterPacketResponse(corrected,packetMode,trigger.sender,char.name);
       }catch(error){
         console.error('Could not confirm character red packet decision',error.name);
       }
     }
+    if(controller.signal.aborted||(await one('SELECT status FROM ledger_generation_jobs WHERE id=?',jobId))?.status!=='running')return json({ok:true,cancelled:true,notice:'本次回复已中断。'});
     if(packetResponse?.action){
-      await sendPacket(env,ctx,room.id,char.owner,char,packetResponse.action,packetResponse.reply);
+      await sendPacket(env,ctx,room.id,char.owner,char,packetResponse.action,packetResponse.reply,jobId);
       return json({ok:true,...(imageContext.notice?{notice:imageContext.notice}:{})});
     }
     if(packetResponse?.decision===null||packetResponse?.decision===true){
@@ -457,19 +512,27 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
     }
     const reply=packetResponse?packetResponse.reply:stripCharacterPrefix(raw,char.name);
     if(!reply)throw fail('模型没有返回发言正文。',502);
+    let insert;
     if(automatic){
       await ensureOnlineFeatures(env.DB);
       const quiet=await one('SELECT start,end,offset FROM ledger_quiet_hours WHERE char_id=?',char.id);
       if(inQuietHours(quiet))return json({ok:true});
-      await run('INSERT INTO messages (room,sender,char_id,body) SELECT c.room,c.owner,c.id,? FROM chars c JOIN ledger_char_autopost a ON a.char_id=c.id WHERE c.id=? AND c.active=1 AND a.next_at=?',reply,char.id,automatic.next_at);
-    }else await run('INSERT INTO messages (room,sender,char_id,body) SELECT room,owner,id,? FROM chars WHERE id=? AND active=1',reply, char.id);
+      insert=stmt("INSERT INTO messages (room,sender,char_id,body) SELECT c.room,c.owner,c.id,? FROM chars c JOIN ledger_char_autopost a ON a.char_id=c.id WHERE c.id=? AND c.active=1 AND a.next_at=? AND EXISTS (SELECT 1 FROM ledger_generation_jobs WHERE id=? AND status='running')",reply,char.id,automatic.next_at,jobId);
+    }else insert=stmt("INSERT INTO messages (room,sender,char_id,body) SELECT room,owner,id,? FROM chars WHERE id=? AND active=1 AND EXISTS (SELECT 1 FROM ledger_generation_jobs WHERE id=? AND status='running')",reply,char.id,jobId);
+    const [saved]=await env.DB.batch([insert,stmt("UPDATE ledger_generation_jobs SET status='completed',updated=? WHERE id=? AND status='running'",Date.now(),jobId)]);
+    if(!saved.meta.changes)return json({ok:true,cancelled:true,notice:'本次回复已中断。'});
     return json({ok:true,...(imageContext.notice?{notice:imageContext.notice}:{})});
   } catch (error) {
+    const job=await one('SELECT status FROM ledger_generation_jobs WHERE id=?',jobId).catch(()=>null);
+    if(controller.signal.aborted||job?.status==='cancelled')return json({ok:true,cancelled:true,notice:'本次回复已中断。'});
+    await run("UPDATE ledger_generation_jobs SET status='failed',updated=? WHERE id=? AND status='running'",Date.now(),jobId).catch(()=>{});
     if (!error.status) console.error('Character reply could not be saved',error.name);
     return json({ok:true,notice:error.status ? error.message : '角色回复未能保存，请稍后重试。'});
   } finally {
+    finished=true;clearInterval(watcher);generationControllers.delete(jobId);
+    await run("UPDATE ledger_generation_jobs SET status='completed',updated=? WHERE id=? AND status='running'",Date.now(),jobId).catch(()=>{});
     summarize();
-    await run('UPDATE chars SET busy_until=? WHERE id=? AND busy_until=?',Date.now()+8000,char.id,now+90000);
+    await run("UPDATE chars SET busy_until=? WHERE id=? AND busy_until=? AND NOT EXISTS (SELECT 1 FROM ledger_generation_jobs WHERE char_id=? AND status='running')",Date.now()+8000,char.id,lease,char.id);
   }
 }
 
@@ -681,7 +744,7 @@ async function api(req, env, url, ledger, ctx) {
   if (!env.DB) throw fail('聊天数据库尚未就绪。',503);
   const db = env.DB;
   await ensureOnlineFeatures(db);
-  await ensureAccountSchema(db);
+  await ensureAccountSchema(db);await ensureGenerationSchema(db);
   const tokenHash=ledger?uid.slice(7):'',session=ledger?await db.prepare('SELECT uid FROM ledger_sessions WHERE token_hash=?').bind(tokenHash).first():null;
   if(session)uid=session.uid;
   const stmt = (sql,...args) => db.prepare(sql).bind(...args);
@@ -1024,6 +1087,18 @@ async function api(req, env, url, ledger, ctx) {
     for(const char of chars)char.can_configure_api=char.owner===uid;
     return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid&&(!ledger||room.kind==='dm') ? room.invite : null,inviteCode});
   }
+  if(ledger&&req.method==='POST'&&path==='cancel-reply'){
+    const id=field(data,'id',36),job=await one('SELECT j.*,c.owner inviter,r.owner host FROM ledger_generation_jobs j JOIN chars c ON c.id=j.char_id JOIN rooms r ON r.id=j.room WHERE j.id=? AND j.room=?',id,room.id);
+    if(!job)throw fail('这条回复任务已不存在。',404);
+    if(![job.requester,job.inviter,job.host].includes(uid))throw fail('只有本次 @ 的发起者、角色邀请者或群主可以中断。',403);
+    if(job.status!=='running')return json({ok:true,cancelled:false,notice:'这条回复已经结束。'});
+    const [cancelled]=await db.batch([
+      stmt("UPDATE ledger_generation_jobs SET status='cancelled',updated=? WHERE id=? AND status='running'",Date.now(),id),
+      stmt("UPDATE chars SET busy_until=0 WHERE changes()=1 AND id=? AND NOT EXISTS (SELECT 1 FROM ledger_generation_jobs WHERE char_id=? AND status='running')",job.char_id,job.char_id)
+    ]);
+    if(cancelled.meta.changes)generationControllers.get(id)?.abort();
+    return json({ok:true,cancelled:!!cancelled.meta.changes,...(!cancelled.meta.changes?{notice:'这条回复已经结束。'}:{})});
+  }
   if (req.method === 'GET' && path === 'messages') {
     const cursor = Number(url.searchParams.get('after') || url.searchParams.get('before')) || 0;
     const select = 'SELECT m.id,m.sender,m.char_id,m.body,m.created,m.kind,CASE WHEN m.kind IN (\'text\',\'human-only\',\'mention-all\',\'forwarded-chat\') THEN m.attachment ELSE NULL END meta,CASE WHEN m.kind=\'rps-result\' THEN m.attachment ELSE NULL END challenge,CASE WHEN m.kind=\'rps\' THEN EXISTS (SELECT 1 FROM ledger_rps WHERE message_id=m.id AND resolution IS NOT NULL) ELSE 0 END resolved,COALESCE(c.name,p.name) name,c.avatar FROM messages m JOIN profiles p ON p.id=m.sender LEFT JOIN chars c ON c.id=m.char_id WHERE m.room=? AND m.kind<>\'currency-config\'';
@@ -1032,7 +1107,7 @@ async function api(req, env, url, ledger, ctx) {
       : cursor ? await all(select+' AND m.id>? ORDER BY m.id LIMIT 60',room.id,cursor)
       : (await all(select+' ORDER BY m.id DESC LIMIT 60',room.id)).reverse();
     if(!ledger||url.searchParams.get('live')!=='1')return json(rows);
-    const typing=room.kind==='group'?await all('SELECT id,name FROM chars WHERE room=? AND active=1 AND busy_until>? ORDER BY id',room.id,Date.now()+8000):[];
+    const typing=room.kind==='group'?await all("SELECT c.id,c.name,j.id job_id,CASE WHEN j.id IS NOT NULL AND (j.requester=? OR c.owner=? OR ?=1) THEN 1 ELSE 0 END can_cancel FROM chars c LEFT JOIN ledger_generation_jobs j ON j.char_id=c.id AND j.status='running' WHERE c.room=? AND c.active=1 AND c.busy_until>? ORDER BY c.id",uid,uid,room.owner===uid?1:0,room.id,Date.now()+8000):[];
     return json({rows,typing});
   }
   if (req.method === 'POST' && path === 'chars') {
@@ -1281,7 +1356,7 @@ async function api(req, env, url, ledger, ctx) {
     if (!sent.meta.changes) throw fail('你已离开此会话。',404);
     if (!char) {summarize();return json({ok:true,message:sent.meta.last_row_id});}
     // The server starts the reply in this same request, regardless of the inviter's online status.
-    return generateReply(env,room,char,summarize,ledger,sent.meta.last_row_id,null,ctx);
+    return streamingGeneration(generateReply(env,room,char,summarize,ledger,sent.meta.last_row_id,null,ctx));
   }
   if (ledger && req.method==='POST' && path==='reply') {
     const id=data.message;
@@ -1292,7 +1367,7 @@ async function api(req, env, url, ledger, ctx) {
     if(!claimed.meta.changes)return json({ok:true});
     const char=await one('SELECT * FROM chars WHERE id=? AND room=? AND active=1',job.char_id,room.id);
     if(!char)return json({ok:true,notice:'这个角色已退出群聊。'});
-    return generateReply(env,room,char,summarize,ledger,id,null,ctx);
+    return streamingGeneration(generateReply(env,room,char,summarize,ledger,id,null,ctx));
   }
   throw fail('请求不存在。',404);
 }
@@ -1310,7 +1385,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-profile-presets-34'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-generation-cancel-35'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
@@ -1331,6 +1406,7 @@ export default {
     return response;
   }
 };
+
 
 
 
