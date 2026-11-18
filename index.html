@@ -671,6 +671,33 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 #dialog .reader-progress-row input[type=range]{display:block;flex:1;flex-basis:auto;min-width:0;width:auto;height:14px;margin:0;padding:0;border:0;background:transparent;accent-color:var(--gold)}
 .reader-progress-row output{min-width:31px;text-align:right;color:var(--muted);font-size:10px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
 @media(max-width:360px){#dialog .reader-toolbar-refined{padding-inline:9px}.reader-toolbar-top{gap:3px}.reader-font-tools{gap:1px}}
+#dialog.reader-polished{position:fixed;isolation:isolate;padding-bottom:0}
+#dialog.reader-polished .story-shell{position:relative;max-width:900px}
+#dialog.reader-polished .reader-page{border:0;border-radius:8px;padding-top:12px}
+#dialog.reader-polished .story-header{margin-bottom:2px}
+#dialog .reader-orb-toolbar{display:flex;flex-wrap:nowrap;justify-content:space-around;align-items:center;gap:12px;align-self:center;width:min(100%,440px);padding:9px 18px;margin:10px auto max(10px,env(safe-area-inset-bottom));border:1px solid color-mix(in srgb,var(--gold) 26%,var(--line));border-radius:999px;background:linear-gradient(145deg,var(--panel),var(--field));box-shadow:0 7px 24px #0002;flex:none}
+#dialog .reader-orb-toolbar>button{display:inline-flex!important;align-items:center;justify-content:center;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;flex:none;padding:10px!important;margin:0!important;border:1px solid color-mix(in srgb,var(--gold) 25%,var(--line))!important;border-radius:50%!important;background:var(--control)!important;color:var(--gold);box-shadow:inset 0 1px 0 #ffffff08}
+#dialog .reader-orb-toolbar>button[aria-expanded=true]{background:var(--selected)!important;border-color:var(--gold)!important;color:var(--selected-ink,var(--gold))}
+.reader-orb-toolbar svg{width:22px;height:22px;display:block}.reader-letter-a{font:24px/1 Georgia,serif}
+#dialog .reader-control-panel{position:absolute;z-index:15;bottom:84px;left:50%;transform:translateX(-50%);width:min(94%,440px);max-height:65dvh;overflow:auto;padding:18px;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:0 12px 50px #0005;color:var(--ink)}
+#dialog .reader-control-panel[hidden]{display:none}
+.reader-control-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;color:var(--gold)}
+#dialog .reader-control-heading button{width:30px;min-width:30px;height:30px;padding:0;border:0;border-radius:50%;background:var(--field);font-size:22px;line-height:1}
+.reader-control-panel label{margin:10px 0;font-size:13px}.reader-control-range{display:flex;align-items:center;gap:10px}.reader-control-range input{min-width:0;flex:1}.reader-control-range output{min-width:45px;color:var(--muted);font-size:12px}.reader-control-panel input[type=range]{height:24px;margin:6px 0;padding:0;accent-color:var(--gold)}
+.reader-current-chapter{font-size:13px;color:var(--muted);overflow-wrap:anywhere}.reader-chapter-actions{display:flex;justify-content:space-between;gap:12px;margin-top:12px}
+#dialog .reader-drawer-shade{position:absolute;inset:0;z-index:40;background:#0007;backdrop-filter:blur(2px)}
+#dialog .reader-drawer-shade[hidden]{display:none}
+#dialog aside.reader-drawer{position:absolute!important;inset:0 auto 0 0!important;z-index:41!important;width:min(84%,380px)!important;height:100%!important;max-height:100%!important;margin:0!important;padding:20px 14px max(20px,env(safe-area-inset-bottom))!important;display:flex!important;flex-direction:column!important;border:0!important;border-right:1px solid var(--line)!important;border-radius:0 18px 18px 0!important;background:var(--panel)!important;color:var(--ink)!important;transform:translateX(-105%);transition:transform .22s ease;overflow:hidden;visibility:hidden;box-shadow:12px 0 40px #0003}
+#dialog aside.reader-drawer.is-open{transform:translateX(0);visibility:visible}
+.reader-drawer-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 6px 18px;flex:none;color:var(--gold)}
+#dialog .reader-drawer-heading strong{font-size:16px;line-height:1.6;overflow-wrap:anywhere}
+#dialog .reader-drawer-heading button{width:32px;min-width:32px;height:32px;margin:0;padding:0;border-radius:50%;font-size:22px;flex:none}
+#dialog .reader-drawer nav{display:block!important;flex:1;overflow:auto;min-height:0;margin:0;padding:0;background:none}
+#dialog .reader-drawer nav button{display:block;width:100%;padding:15px 12px;margin:0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;color:var(--ink);font-size:14px;font-family:var(--ledger-font);font-weight:400;text-align:left;white-space:normal;line-height:1.7;overflow-wrap:anywhere}
+#dialog .reader-drawer nav button[aria-current=page]{color:var(--gold);background:var(--field);border-inline-start:2px solid var(--gold)}
+#dialog.reader-night{--bg:#17191e;--panel:#20232a;--field:#191c22;--ink:#d8d5cb;--muted:#a6a397;--gold:#b5a384;--line:#393b42;--control:#282b33;--selected:#38372f;--selected-ink:#e4d7bf;background:#17191e!important;color:#d8d5cb!important}
+#dialog.reader-night .story-header{background:#20232a!important;color:#d8d5cb!important}
+@media(prefers-reduced-motion:reduce){#dialog aside.reader-drawer{transition:none}}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1790,23 +1817,53 @@ function readerRead(kind,id,folder){
   const chapters=readerEntries(kind).filter(x=>x.category===folder),index=chapters.findIndex(x=>x.id===id),entry=chapters[index];if(!entry)return;
   const html=entry.html||entry.tea?.turns.some(t=>t.htmlCard),settings=state.readerSettings;
   const icon=paths=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths+'</svg>';
+  const listIcon=icon('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>');
   const content=entry.html?storyHtmlPreview(entry.body,entry.title):entry.tea?entry.tea.turns.map(t=>'<p class="reader-cue">'+esc(t.input)+'</p>'+(t.htmlCard?storyHtmlPreview(t.output,entry.title):'<div class="reader-prose">'+esc(t.output)+'</div>')).join(''):'<div class="reader-prose">'+esc(entry.body)+'</div>';
-  const navigation='<nav class="reader-chapter-nav" aria-label="章节导航"><button type="button" id="readerPrev" '+(index===0?'disabled':'')+' aria-label="上一章">‹</button><select id="readerChapterSelect" aria-label="选择章节">'+chapters.map((x,i)=>'<option value="'+esc(x.id)+'" '+(i===index?'selected':'')+'>第 '+(i+1)+' 章 · '+esc(x.title)+'</option>').join('')+'</select><button type="button" id="readerNext" '+(index===chapters.length-1?'disabled':'')+' aria-label="下一章">›</button></nav>';
-  const toolbar=html?'':'<footer class="reader-toolbar reader-toolbar-refined" aria-label="阅读设置"><div class="reader-toolbar-top"><button type="button" id="readerContents" aria-label="章节目录" title="章节目录">'+icon('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>')+'</button><span class="reader-tool-divider"></span><div class="reader-font-tools"><button type="button" id="readerFontDown" aria-label="减小字号">A<span>−</span></button><output id="readerFontValue">'+settings.font+'</output><button type="button" id="readerFontUp" aria-label="增大字号">A<span>＋</span></button></div><span class="reader-tool-divider"></span><label class="reader-line-control" title="行距">'+icon('<path d="M9 5h12M9 12h12M9 19h12M3 4v16m-2-2 2 2 2-2M1 6l2-2 2 2"/>')+'<select id="readerLine" aria-label="阅读行距">'+[1.6,1.95,2.3].map(value=>'<option value="'+value+'" '+(settings.line===value?'selected':'')+'>'+value+'</option>').join('')+'</select></label></div><div class="reader-progress-row"><input id="readerSeek" type="range" min="0" max="100" value="0" aria-label="阅读进度"><output id="readerProgress">0%</output></div></footer>';
-  readerSheet((folder||'未分类')+' · 第 '+(index+1)+' 章',navigation+'<article id="readerPage" class="reader-page" tabindex="0" style="--reader-font:'+settings.font+'px;--reader-line:'+settings.line+'">'+content+'<div class="reader-end">✧</div></article>'+toolbar,()=>readerFolder(kind,folder));
-  $('dialog').classList.add('reader-reading');
-  $('readerPrev').onclick=()=>{if(index>0)readerRead(kind,chapters[index-1].id,folder);};
-  $('readerNext').onclick=()=>{if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);};
-  $('readerChapterSelect').onchange=e=>readerRead(kind,e.target.value,folder);
-  if(html)return;
-  const article=$('readerPage'),progress=$('readerProgress'),seek=$('readerSeek');
+  const panels=html?'':'<section id="readerFontPanel" class="reader-control-panel" hidden><div class="reader-control-heading"><strong>字体排版</strong><button type="button" data-reader-panel-close aria-label="关闭字体设置">×</button></div><label>字体<select id="readerTypeface"><option value="serif">宋体</option><option value="sans">黑体</option><option value="system">系统字体</option><option value="mincho">明朝</option></select></label><label>字号<div class="reader-control-range"><input id="readerFontSize" type="range" min="14" max="32" step="1"><output id="readerFontSizeValue"></output></div></label><label>字间距<div class="reader-control-range"><input id="readerSpacing" type="range" min="0" max="4" step=".2"><output id="readerSpacingValue"></output></div></label><label>行距<input id="readerLineSpacing" type="range" min="1.4" max="2.5" step=".05"></label></section>'+
+    '<section id="readerProgressPanel" class="reader-control-panel" hidden><div class="reader-control-heading"><strong>阅读进度</strong><button type="button" data-reader-panel-close aria-label="关闭进度设置">×</button></div><p class="reader-current-chapter">'+esc(entry.title)+'</p><div class="reader-control-range"><input id="readerSeek" type="range" min="0" max="100" value="0" aria-label="阅读进度"><output id="readerProgress">0%</output></div><div class="reader-chapter-actions"><button type="button" id="readerPrevChapter" '+(index===0?'disabled':'')+'>上一章</button><button type="button" id="readerNextChapter" '+(index===chapters.length-1?'disabled':'')+'>下一章</button></div></section>'+
+    '<section id="readerModePanel" class="reader-control-panel" hidden><div class="reader-control-heading"><strong>阅读方式</strong><button type="button" data-reader-panel-close aria-label="关闭阅读设置">×</button></div><label>翻页方式<select id="readerPageMode"><option value="scroll">连续滚动</option><option value="tap">点击左右区域翻页</option><option value="swipe">左右滑动翻页</option></select></label><label class="mode-toggle"><input type="checkbox" role="switch" id="readerNight"><span aria-hidden="true"></span>阅读器夜间模式</label></section>';
+  const toolbar=html?'':'<footer class="reader-toolbar reader-orb-toolbar" aria-label="阅读工具"><button type="button" id="readerContents" aria-label="章节目录" title="章节目录">'+listIcon+'</button><button type="button" id="readerFontButton" aria-label="字体设置" title="字体设置" aria-expanded="false"><span class="reader-letter-a">A</span></button><button type="button" id="readerProgressButton" aria-label="阅读进度" title="阅读进度" aria-expanded="false">'+icon('<circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/>')+'</button><button type="button" id="readerModeButton" aria-label="翻页与夜间模式" title="翻页与夜间模式" aria-expanded="false">'+icon('<path d="M4 5h6l2 2 2-2h6v14h-6l-2 2-2-2H4ZM12 7v14"/><path d="M16 9h2m-2 4h2"/>')+'</button></footer>';
+  const drawer='<div id="readerDrawerShade" class="reader-drawer-shade" hidden></div><aside id="readerDrawer" class="reader-drawer" aria-label="章节目录" aria-hidden="true" inert><div class="reader-drawer-heading"><strong>'+esc(folder||'未分类')+'</strong><button type="button" id="readerDrawerClose" aria-label="关闭目录">×</button></div><nav>'+chapters.map(x=>'<button type="button" data-reader-jump="'+esc(x.id)+'" '+(x.id===id?'aria-current="page"':'')+'>'+esc(x.title)+'</button>').join('')+'</nav></aside>';
+  readerSheet(entry.title,'<article id="readerPage" class="reader-page" tabindex="0">'+content+'<div class="reader-end">✧</div></article>'+panels+toolbar+drawer,()=>readerFolder(kind,folder));
+  const dialog=$('dialog'),article=$('readerPage');dialog.classList.add('reader-reading','reader-polished');
+  const setDrawer=open=>{const drawer=$('readerDrawer');drawer.classList.toggle('is-open',open);drawer.inert=!open;drawer.setAttribute('aria-hidden',String(!open));$('readerDrawerShade').hidden=!open;if(open)$('readerDrawerClose').focus();};
+  for(const button of dialog.querySelectorAll('[data-reader-jump]'))button.onclick=()=>readerRead(kind,button.dataset.readerJump,folder);
+  $('readerDrawerClose').onclick=()=>setDrawer(false);$('readerDrawerShade').onclick=()=>setDrawer(false);
+  const originalBack=dialog.orbBack;dialog.orbBack=()=>{if($('readerDrawer')?.classList.contains('is-open'))setDrawer(false);else if(!html&&[...dialog.querySelectorAll('.reader-control-panel')].some(p=>!p.hidden))closePanels();else originalBack?.();};
+  if(html){const header=dialog.querySelector('.story-header-actions');header.insertAdjacentHTML('afterbegin','<button type="button" id="readerContents" class="story-header-icon" aria-label="章节目录">'+listIcon+'</button>');$('readerContents').onclick=()=>setDrawer(true);return;}
+  const buttonPanels=[['readerFontButton','readerFontPanel'],['readerProgressButton','readerProgressPanel'],['readerModeButton','readerModePanel']];
+  function closePanels(){for(const [button,panel] of buttonPanels){$(panel).hidden=true;$(button).setAttribute('aria-expanded','false');}}
+  for(const [button,panel] of buttonPanels)$(button).onclick=()=>{const open=$(panel).hidden;closePanels();$(panel).hidden=!open;$(button).setAttribute('aria-expanded',String(open));};
+  for(const button of dialog.querySelectorAll('[data-reader-panel-close]'))button.onclick=closePanels;
+  $('readerContents').onclick=()=>{closePanels();setDrawer(true);};
+  const apply=()=>{
+    const p=state.readerSettings;
+    article.style.setProperty('--reader-font',p.font+'px');article.style.setProperty('--reader-line',p.line);article.style.letterSpacing=p.spacing+'px';
+    article.style.fontFamily={serif:'"Source Han Serif SC","Noto Serif CJK SC",SimSun,serif',sans:'"Noto Sans CJK SC","Microsoft YaHei",sans-serif',system:'system-ui,sans-serif',mincho:'"Ledger Installed Mincho",var(--ledger-font)'}[p.typeface]||'var(--ledger-font)';
+    article.style.overflowY=p.mode==='scroll'?'auto':'hidden';article.style.touchAction=p.mode==='scroll'?'pan-y':'none';
+    dialog.classList.toggle('reader-night',p.night===true);
+    $('readerTypeface').value=p.typeface||'serif';$('readerFontSize').value=p.font;$('readerFontSizeValue').textContent=p.font+' px';$('readerSpacing').value=p.spacing||0;$('readerSpacingValue').textContent=(p.spacing||0)+' px';$('readerLineSpacing').value=p.line;$('readerPageMode').value=p.mode||'scroll';$('readerNight').checked=!!p.night;
+  };
+  const update=patch=>{if(commit({...state,readerSettings:{...state.readerSettings,...patch}}))apply();};
+  $('readerTypeface').onchange=async e=>{const value=e.target.value;if(value==='mincho'&&typeof installMincho==='function'&&!await installMincho()){apply();return;}update({typeface:value});};
+  $('readerFontSize').oninput=e=>update({font:Number(e.target.value)});
+  $('readerSpacing').oninput=e=>update({spacing:Number(e.target.value)});
+  $('readerLineSpacing').oninput=e=>update({line:Number(e.target.value)});
+  $('readerPageMode').onchange=e=>update({mode:e.target.value});$('readerNight').onchange=e=>update({night:e.target.checked});
+  const progress=$('readerProgress'),seek=$('readerSeek');
   article.onscroll=()=>{const percent=Math.round(article.scrollTop/Math.max(1,article.scrollHeight-article.clientHeight)*100);progress.textContent=percent+'%';seek.value=percent;};
   seek.oninput=()=>{article.scrollTop=(article.scrollHeight-article.clientHeight)*Number(seek.value)/100;};
-  const update=(font,line)=>{const next={font:Math.min(32,Math.max(14,font)),line};if(commit({...state,readerSettings:next})){article.style.setProperty('--reader-font',next.font+'px');article.style.setProperty('--reader-line',next.line);$('readerFontValue').textContent=next.font;}};
-  $('readerContents').onclick=()=>readerFolder(kind,folder);
-  $('readerFontDown').onclick=()=>update(state.readerSettings.font-1,state.readerSettings.line);
-  $('readerFontUp').onclick=()=>update(state.readerSettings.font+1,state.readerSettings.line);
-  $('readerLine').onchange=e=>update(state.readerSettings.font,Number(e.target.value));
+  $('readerPrevChapter').onclick=()=>{if(index>0)readerRead(kind,chapters[index-1].id,folder);};$('readerNextChapter').onclick=()=>{if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);};
+  const turn=direction=>{
+    const max=article.scrollHeight-article.clientHeight,step=Math.max(1,article.clientHeight-32);
+    if(direction>0&&article.scrollTop>=max-2){if(index<chapters.length-1)readerRead(kind,chapters[index+1].id,folder);return;}
+    if(direction<0&&article.scrollTop<=1){if(index>0)readerRead(kind,chapters[index-1].id,folder);return;}
+    article.scrollTop=Math.max(0,Math.min(max,article.scrollTop+step*direction));
+  };
+  article.onclick=e=>{if(state.readerSettings.mode!=='tap'||e.target.closest('button,a,input,iframe,select')||window.getSelection()?.toString())return;const rect=article.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;if(ratio<.32)turn(-1);else if(ratio>.68)turn(1);};
+  let start=null;article.onpointerdown=e=>{if(state.readerSettings.mode==='swipe')start={x:e.clientX,y:e.clientY};};article.onpointercancel=()=>{start=null;};article.onpointerup=e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turn(dx<0?1:-1);};
+  article.onkeydown=e=>{if(state.readerSettings.mode==='scroll')return;if(['ArrowRight','PageDown','ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();turn(['ArrowRight','PageDown'].includes(e.key)?1:-1);}};
+  apply();
 }
 function privateReaderHeading(){
   return '<div class="tea-directory-title"><h3>私聊</h3><button type="button" class="story-sun" data-reader-hub aria-label="打开阅读书架" title="阅读书架"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M12 2Q13.4 10.6 22 12Q13.4 13.4 12 22Q10.6 13.4 2 12Q10.6 10.6 12 2Z"/></svg></button></div>';
@@ -5106,7 +5163,7 @@ function skinAvailable(id,archive){
   return Object.hasOwn(skins,id)&&(!Object.hasOwn(skinUnlockIds,id)||archive.mysteryActive.includes(skinUnlockIds[id]));
 }
 const imageDefaults=()=>({url:'',key:'',model:'',generationModel:''});
-const initial = () => ({mysteryActive:[],readerOther:[],readerOtherFolders:[],readerSettings:{font:18,line:1.95},kindroid:{unlocked:false,key:'',aiId:''},kindroidTranslation:{preset:'',language:'简体中文'},teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
+const initial = () => ({mysteryActive:[],readerOther:[],readerOtherFolders:[],readerSettings:{font:18,line:1.95,spacing:0,typeface:'serif',mode:'scroll',night:false},kindroid:{unlocked:false,key:'',aiId:''},kindroidTranslation:{preset:'',language:'简体中文'},teaSessions:[],teaLibraryFolders:{regular:[],bonus:[]},teaLibraryPlaces:{},groups:[],scenePresets:[],stories:[],storyCategories:[],moonCategories:[],customStoryStyles:[],storyFont:18,teaFont:17,opening:0, bills:[], billPresets:[], messages:[], charName:'', character:'', user:'', lore:'', profiles:[], profile:'', draft:'',heroTitle:'格兰芬多账本',heroSubtitle:'壁炉旁留着一卷羊皮纸，等你记下今天的收支。',skin:'gryffindor',skinFonts:{},charGender:'',charPersonality:'',userName:'',userGender:'',userPersonality:'',imageApi:imageDefaults(),contacts:[],worlds:[],worldPlacement:{},worldScopes:{},worldGroupSnapshots:[],streamReplies:false,userLook:userDefaults()});
 const chatDraftKey=key+'-chat-drafts';
 const pendingChatDrafts=new Map();
 let state = initial(), storageError = '';
@@ -5139,7 +5196,7 @@ function validate(data){
   result.readerOther=Array.isArray(result.readerOther)?result.readerOther.filter(x=>x&&['id','title','body','category'].every(k=>typeof x[k]==='string')):[];
   result.readerOtherFolders=Array.isArray(result.readerOtherFolders)?[...new Set(result.readerOtherFolders.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()))]:[];
   if(!result.readerSettings||typeof result.readerSettings!=='object')result.readerSettings={font:18,line:1.95};
-  result.readerSettings={font:Math.min(32,Math.max(14,Number(result.readerSettings.font)||18)),line:Math.min(2.5,Math.max(1.4,Number(result.readerSettings.line)||1.95))};
+  result.readerSettings={font:Math.min(32,Math.max(14,Number(result.readerSettings.font)||18)),line:Math.min(2.5,Math.max(1.4,Number(result.readerSettings.line)||1.95)),spacing:Math.min(4,Math.max(0,Number(result.readerSettings.spacing)||0)),typeface:['serif','sans','system','mincho'].includes(result.readerSettings.typeface)?result.readerSettings.typeface:'serif',mode:['scroll','tap','swipe'].includes(result.readerSettings.mode)?result.readerSettings.mode:'scroll',night:result.readerSettings.night===true};
   if(!result.kindroidTranslation||typeof result.kindroidTranslation.preset!=='string'||typeof result.kindroidTranslation.language!=='string')result.kindroidTranslation={preset:'',language:'简体中文'};
   if(!result.kindroid||typeof result.kindroid!=='object'||typeof result.kindroid.key!=='string'||typeof result.kindroid.aiId!=='string'||typeof result.kindroid.unlocked!=='boolean')throw Error('Kindroid 接入存档无效。');
   if(!Array.isArray(result.mysteryActive)||!result.mysteryActive.every(id=>typeof id==='string'&&/^[a-z0-9-]+$/.test(id)))throw Error('神秘小入口存档无效。');
@@ -5620,7 +5677,7 @@ function dialog(html,full=false){
   panel.orbBack=null;
   if(panel.contains(orb))panel.before(orb);
   panel.classList.toggle('story-fullscreen',full);
-  panel.classList.remove('story-studio','reader-hub','reader-reading');
+  panel.classList.remove('story-studio','reader-hub','reader-reading','reader-polished','reader-night');
   delete panel.dataset.storyOrbPage;
   panel.innerHTML=html;
   releaseUnusedAvatarUrls();
@@ -6425,6 +6482,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
