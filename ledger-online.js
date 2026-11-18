@@ -1716,8 +1716,9 @@ const ledgerOnline = (() => {
       reset();
     }
     profile.onchange=applyPreset;
-    endpoint.oninput=key.oninput=reset;
-    choices.onchange=()=>{if(choices.value)model.value=choices.value;};
+    const manual=()=>{profile.value='';reset();};
+    endpoint.oninput=key.oninput=model.oninput=manual;
+    choices.onchange=()=>{if(choices.value){model.value=choices.value;profile.value='';}};
     load.onclick=async()=>{
       const url=endpoint.value.trim(), secret=key.value.trim();
       if(!url||!secret){status.textContent='请先选择预设，或填写 API 地址和 Key。';return;}
@@ -1771,9 +1772,16 @@ const ledgerOnline = (() => {
         '<label>模型名称<input name="model" required maxlength="120" value="'+esc(config.model)+'"></label>'+
         '<label>API Key<input name="key" type="password" autocomplete="off" maxlength="2000" placeholder="地址不变时，留空沿用当前 Key"></label>'+
         roleModelTools()+'<button type="submit" class="primary">保存角色 API</button></form></section>'+end,()=>members(current));
-      bindRoleModelTools(el('onlineCharApiForm'),profiles);
+      const node=el('onlineCharApiForm');
+      if(config.profile&&!profiles.some(p=>p.id===config.profile))node.elements.profile.add(new Option((config.profileName||'已保存预设')+'（本机未保存）',config.profile));
+      node.elements.profile.value=config.profile||'';
+      bindRoleModelTools(node,profiles);
       form('onlineCharApiForm',async data=>{
-        await request('update-char-api',{room:current.id,id:char.id,...data});
+        const preset=profiles.find(p=>p.id===data.profile);
+        const saved=await request('update-char-api',{room:current.id,id:char.id,...data,profileName:preset?.name||config.profileName||''});
+        if(!saved.ok)throw Error('角色 API 未保存成功，请重试。');
+        const verified=await request('char-api?room='+encodeURIComponent(current.id)+'&id='+encodeURIComponent(char.id));
+        if(verified.model!==data.model.trim()||verified.profile!==(data.profile||'')||!verified.hasKey)throw Error('角色 API 保存核验未通过，请重新打开设置检查。');
         viewFor(current.id).detail=null;
         if(active(formSerial)){await members(current);status('角色 API 已保存。');}
       });
@@ -1890,7 +1898,7 @@ const ledgerOnline = (() => {
       const card=contact(data.card);
       if(!card)throw Error('请选择已有角色。');
       const context=cardContext(card);
-      const {id}=await request('chars',{room:current.id,name:displayName(card).replace(/[\s@＠]+/gu,'').slice(0,24),avatar:'✦',...context,endpoint:data.endpoint,model:data.model,key:data.key});
+      const {id}=await request('chars',{room:current.id,name:displayName(card).replace(/[\s@＠]+/gu,'').slice(0,24),avatar:'✦',...context,endpoint:data.endpoint,model:data.model,key:data.key,profile:data.profile||'',profileName:profiles.find(p=>p.id===data.profile)?.name||''});
       const map=mapping();map[id]={card:card.id,signature:await contextSignature(context)};
       localStorage.setItem(mappingKey,JSON.stringify(map));
       viewFor(current.id).detail=null;
