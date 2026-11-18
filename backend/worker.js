@@ -648,6 +648,7 @@ async function ensureAccountSchema(db){
   if(accountSchemaReady)return accountSchemaReady;
   accountSchemaReady=(async()=>{
     await db.batch([
+      db.prepare('CREATE TABLE IF NOT EXISTS ledger_char_api_presets (char_id TEXT PRIMARY KEY REFERENCES chars(id), profile_id TEXT NOT NULL, profile_name TEXT NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_accounts (username TEXT PRIMARY KEY COLLATE NOCASE, uid TEXT NOT NULL UNIQUE REFERENCES profiles(id), salt TEXT NOT NULL, password_hash TEXT NOT NULL, iterations INTEGER NOT NULL, created INTEGER NOT NULL)'),
       db.prepare('CREATE TABLE IF NOT EXISTS ledger_sessions (token_hash TEXT PRIMARY KEY, uid TEXT NOT NULL REFERENCES profiles(id), created INTEGER NOT NULL)'),
       db.prepare('CREATE INDEX IF NOT EXISTS ledger_sessions_uid ON ledger_sessions(uid)'),
@@ -1135,7 +1136,10 @@ async function api(req, env, url, ledger, ctx) {
     const base = endpoint(field(data,'endpoint',400),url.origin);
     const secret = await encrypt(env,key,id);
     const insert = stmt('INSERT OR IGNORE INTO chars (id,room,owner,name,avatar,persona,endpoint,model,secret) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM members m WHERE m.room=? AND m.uid=? AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=m.room))',id,room.id,uid,name,avatar,persona,base,model,secret,room.id,uid);
-    const result = ledger ? (await db.batch([insert,stmt('INSERT INTO ledger_cast (char_id,world_front,world_end) SELECT id,?,? FROM chars WHERE id=?',...ledgerWorld(data),id)]))[0] : await insert.run();
+    const profile=field(data,'profile',120,false),profileName=field(data,'profileName',160,false);
+    const rows=[insert,stmt('INSERT INTO ledger_cast (char_id,world_front,world_end) SELECT id,?,? FROM chars WHERE id=?',...ledgerWorld(data),id)];
+    if(profile)rows.push(stmt('INSERT INTO ledger_char_api_presets (char_id,profile_id,profile_name) SELECT id,?,? FROM chars WHERE id=?',profile,profileName,id));
+    const result = ledger ? (await db.batch(rows))[0] : await insert.run();
     if (!result.meta.changes) throw fail('群内已有同名角色。',409);
     return json({id});
   }
@@ -1190,7 +1194,8 @@ async function api(req, env, url, ledger, ctx) {
   }
   if (req.method === 'GET' && path === 'char-api') {
     const config=await apiCharacter(url.searchParams.get('id'));
-    return json({endpoint:config.endpoint,model:config.model});
+    const preset=await one('SELECT profile_id,profile_name FROM ledger_char_api_presets WHERE char_id=?',config.id);
+    return json({endpoint:config.endpoint,model:config.model,profile:preset?.profile_id||'',profileName:preset?.profile_name||'',hasKey:!!config.secret});
   }
   if (req.method === 'POST' && ['test-char-api','update-char-api'].includes(path)) {
     const id = field(data,'id',36);
@@ -1204,7 +1209,11 @@ async function api(req, env, url, ledger, ctx) {
       const reply = await requestModel(env,{...char,endpoint:base,model,secret},[{role:'user',content:'请用一句简短的话回复：连接成功。'}],256);
       return json({reply});
     }
-    const result = await run('UPDATE chars SET endpoint=?,model=?,secret=? WHERE id=? AND room=? AND owner=? AND active=1',base,model,secret,id,room.id,char.owner);
+    const profile=field(data,'profile',120,false),profileName=field(data,'profileName',160,false);
+    const [result]=await db.batch([
+      stmt('UPDATE chars SET endpoint=?,model=?,secret=? WHERE id=? AND room=? AND owner=? AND active=1',base,model,secret,id,room.id,char.owner),
+      profile?stmt('INSERT INTO ledger_char_api_presets (char_id,profile_id,profile_name) VALUES (?,?,?) ON CONFLICT(char_id) DO UPDATE SET profile_id=excluded.profile_id,profile_name=excluded.profile_name',id,profile,profileName):stmt('DELETE FROM ledger_char_api_presets WHERE char_id=?',id)
+    ]);
     if (!result.meta.changes) throw fail('该角色已被移除。',409);
     return json({ok:true});
   }
@@ -1398,7 +1407,7 @@ export default {
         if (!/^[a-f0-9]{64}$/.test(env.CHAT_KEY_ENCRYPTION||'')) {
           return json({service:'sleeping-dragon-ledger',status:'missing_encryption_secret'},503);
         }
-        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-light-members-36'});
+        return json({service:'sleeping-dragon-ledger',status:'ready',revision:'online-preset-save-37'});
       } catch {
         return json({service:'sleeping-dragon-ledger',status:'database_schema_unavailable'},503);
       }
