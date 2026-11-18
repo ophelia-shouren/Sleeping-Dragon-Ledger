@@ -619,6 +619,13 @@ button.group-settings-person{padding:0;background:transparent;border:0}
 .api-key-control input{min-width:0;margin:0}
 .api-key-control button{min-width:44px;padding-inline:10px;white-space:nowrap}
 [data-skin] #view .tea-directory-title{display:inline-flex;align-items:center;flex-wrap:nowrap;gap:4px;justify-content:flex-start}[data-skin] #view .tea-directory-title h3{margin:0!important;line-height:1.3}[data-skin] #view .tea-directory-title [data-tea-library]{display:inline-grid;place-items:center;align-self:center;flex:none;margin:0!important;line-height:1;padding:4px;min-width:32px;min-height:32px}[data-skin] #view .tea-directory-title [data-tea-library] svg{display:block;vertical-align:middle}
+
+#view .bubble button.kin-translation-star{display:inline-flex!important;align-items:center;justify-content:center;vertical-align:-.16em;width:18px!important;height:18px!important;min-width:0!important;min-height:0!important;margin:0 0 0 4px!important;padding:1px!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:var(--gold);line-height:1;opacity:.7;cursor:pointer}
+#view .bubble button.kin-translation-star svg{display:block;width:13px;height:13px}
+#view .bubble button.kin-translation-star:hover,#view .bubble button.kin-translation-star[aria-expanded="true"]{opacity:1}
+#view .bubble button.kin-translation-star:focus-visible{outline:1px solid var(--gold);outline-offset:2px}
+#view .bubble .kin-translation-text{border-top:1px solid var(--line);margin-top:7px;padding-top:7px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+#view .bubble .kin-translation-text p{margin:0}
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
 <main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
@@ -1983,7 +1990,7 @@ function chat(){
         return '<div class="message-row '+x.role+'">'+layout.before+'<article class="bubble '+x.role+
           (selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
           (selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+
-          layout.name+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+'</p>')+
+          layout.name+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+(last&&c.provider==='kindroid'&&!selected?kindroidTranslationStar(c,x,i):'')+'</p>')+
           (last?image:'')+(last&&c.provider==='kindroid'&&!selected?kindroidTranslationMarkup(c,x,i):'')+layout.time+'</article></div>';
       }).join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(history.current?'<div class="chat-history-page"><button type="button" data-action="newerChatPage">查看较新的消息</button><button type="button" data-action="latestChatPage">回到最新</button></div>':typing?typingBubble(c):'')+'</div>'+
@@ -2168,10 +2175,26 @@ function renderChatCard(card){
     (card.rows.length?'<dl>'+card.rows.map(row=>'<div><dt>'+esc(row.label)+'</dt><dd>'+esc(row.value)+'</dd></div>').join('')+'</dl>':'')+'</div>';
 }
 const kindroidTranslationJobs=new Set();
+const kindroidTranslationOpen=new Set();
+const kindroidTranslationViewKey=(c,m,index)=>JSON.stringify([c.id,index,m.sentAt,m.content]);
+function kindroidTranslationStar(c,message,index){
+  const busy=kindroidTranslationJobs.has(c.id+':'+index),open=kindroidTranslationOpen.has(kindroidTranslationViewKey(c,message,index));
+  return '<button type="button" class="kin-translation-star" data-kin-translate="'+index+'" data-kin-contact="'+esc(c.id)+'" aria-label="'+(busy?'翻译中':open?'隐藏译文':'展开译文')+'" title="'+(busy?'翻译中':open?'隐藏译文':'展开译文')+'" aria-expanded="'+open+'" '+(busy?'disabled':'')+'><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C13.2 8.7 15.3 10.8 22 12C15.3 13.2 13.2 15.3 12 22C10.8 15.3 8.7 13.2 2 12C8.7 10.8 10.8 8.7 12 2Z"/></svg></button>';
+}
 function kindroidTranslationMarkup(c,message,index){
-  const busy=kindroidTranslationJobs.has(c.id+':'+index),saved=message.kindroidTranslation;
-  return '<div class="kin-translation" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><button type="button" data-kin-translate="'+index+'" data-kin-contact="'+esc(c.id)+'" '+(busy?'disabled':'')+'>'+(busy?'翻译中…':saved?'重新翻译':'翻译')+'</button>'+
-    (saved&&saved.source===message.content?'<button type="button" data-kin-translation-toggle>收起译文</button><div data-kin-translation-text style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:8px"><small>'+esc(saved.language)+' · 译文</small><p>'+esc(saved.text)+'</p></div>':'')+'</div>';
+  const saved=message.kindroidTranslation,open=kindroidTranslationOpen.has(kindroidTranslationViewKey(c,message,index));
+  return open&&saved&&saved.source===message.content?'<div class="kin-translation-text" lang="'+esc(saved.language)+'"><p>'+esc(saved.text)+'</p></div>':'';
+}
+async function toggleKindroidTranslation(id,index){
+  const c=contact(id),message=c?.messages[index];if(!message||c.provider!=='kindroid'||deviceLocked)return;
+  const key=kindroidTranslationViewKey(c,message,index);
+  if(kindroidTranslationOpen.has(key))kindroidTranslationOpen.delete(key);
+  else{
+    kindroidTranslationOpen.add(key);
+    const saved=message.kindroidTranslation;
+    if(!saved||saved.source!==message.content||saved.language!==(state.kindroidTranslation.language||'简体中文'))await translateKindroid(id,index);
+  }
+  if(page==='chat'&&activeContact===id)render();
 }
 async function translateKindroid(id,index){
   const c=contact(id),message=c?.messages[index],job=id+':'+index;
@@ -5670,8 +5693,8 @@ document.addEventListener('click',e=>{
   }
   const b=e.target.closest('button');if(!b)return;
   const d=b.dataset;
-  if(d.kinTranslate!==undefined){void translateKindroid(d.kinContact,Number(d.kinTranslate));return;}
-  if(d.kinTranslationToggle!==undefined){const box=b.parentElement.querySelector('[data-kin-translation-text]');if(box){box.hidden=!box.hidden;b.textContent=box.hidden?'展开译文':'收起译文';}return;}
+  if(d.kinTranslate!==undefined){void toggleKindroidTranslation(d.kinContact,Number(d.kinTranslate));return;}
+
 
   if(b.hasAttribute('data-tea-library')){teaLibrary();return;}
   if(d.clearKeep){
@@ -6265,6 +6288,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
