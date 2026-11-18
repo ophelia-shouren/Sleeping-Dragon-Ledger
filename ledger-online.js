@@ -85,7 +85,7 @@ const ledgerOnline = (() => {
     if(!force&&knownRooms&&Date.now()-roomsAt<12000)return Promise.resolve(knownRooms);
     if(roomsRequest)return roomsRequest;
     const token=onlineIdentity;
-    const work=request('rooms').then(list=>{
+    const work=request('rooms',undefined,AbortSignal.timeout(12000)).then(list=>{
       if(onlineIdentity===token){knownRooms=list;roomsAt=Date.now();}
       return list;
     }).finally(()=>{if(roomsRequest===work)roomsRequest=null;});
@@ -103,14 +103,14 @@ const ledgerOnline = (() => {
   function roomFeed(id,cursor=0){
     const key=id+':'+cursor;
     if(!feedsInFlight.has(key)){
-      const promise=request('messages?live=1&room='+id+(cursor?'&after='+cursor:'')).finally(()=>feedsInFlight.delete(key));
+      const promise=request('messages?live=1&room='+id+(cursor?'&after='+cursor:''),undefined,AbortSignal.timeout(12000)).finally(()=>feedsInFlight.delete(key));
       feedsInFlight.set(key,promise);
     }
     return feedsInFlight.get(key);
   }
   function roomDetail(id){
     if(!detailsInFlight.has(id)){
-      const promise=request('detail?room='+id).finally(()=>detailsInFlight.delete(id));
+      const promise=request('detail?room='+id,undefined,AbortSignal.timeout(12000)).finally(()=>detailsInFlight.delete(id));
       detailsInFlight.set(id,promise);
     }
     return detailsInFlight.get(id);
@@ -124,7 +124,7 @@ const ledgerOnline = (() => {
       view.typing=feed.typing||[];view.loaded=true;view.updated=Date.now();
     }).catch(()=>{});
     if(!view.detail)roomDetail(id).then(info=>{
-      if(views.get(id)===view)view.detail=info;
+      if(views.get(id)===view){view.detail=info;view.detailUpdated=Date.now();}
     }).catch(()=>{});
   }
   function rememberChat(id){
@@ -160,6 +160,9 @@ const ledgerOnline = (() => {
     try{response=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined,signal});}
     catch{throw Error(signal?.aborted?'同步 User 人设超时，请重试。':'在线聊天服务连接失败，请稍后再试。');}
     const result=await response.json().catch(()=>null);
+    if(response.status===401&&!path.startsWith('auth/')&&path!=='kindroid-send'&&localStorage.getItem(sessionKey)){
+      localStorage.removeItem(sessionKey);const visible=scope();resetAccountView();if(visible)showLogin('登录状态已失效，请重新登录。');
+    }
     if(!response.ok||!result)throw Object.assign(Error(result?.error||'在线聊天服务暂时不可用。'),{status:response.status});
     return result;
   }
@@ -363,6 +366,11 @@ const ledgerOnline = (() => {
     }
   }
   async function open(){
+    if(me&&localStorage.getItem(sessionKey)&&onlineIdentity===accessToken()){
+      startNotices();const next=pendingOnlineAction;pendingOnlineAction=null;if(next)return next();
+      const invite=inviteFromUrl();if(invite)return join(invite);rooms();return;
+    }
+
     const serial=screen('在线聊天','<p class="muted">正在检查登录状态…</p>'+end);
     try{
       const account=await request('auth/status');if(!active(serial))return;
@@ -373,12 +381,25 @@ const ledgerOnline = (() => {
       showLogin();
     }catch(error){if(active(serial)){status(error.message);const retry=document.createElement('button');retry.type='button';retry.textContent='重试';retry.onclick=open;el('onlineStatus').append(retry);}}
   }
-  async function editOnlineUser(){
+  async function editOnlineUser(cached=null){
     const serial=screen('在线 User 人设','<p class="muted">正在读取独立人设…</p>'+end,rooms);
     try{
-      const {profile}=await request('online-profile');if(!active(serial))return;
+      const [profileResult,presetResult]=await Promise.all([cached?Promise.resolve({profile:cached}):request('online-profile'),request('online-profile-presets')]);if(!active(serial))return;
+      const profile=profileResult.profile,presets=presetResult.presets;
       const draft={...profile,frame:storedFrame(profile.frame)};
-      screen('在线 User 人设','<section class="group-settings-card group-settings-block"><div id="onlineUserLookPreview" style="display:flex;justify-content:center;padding:12px">'+personAvatar(draft.name,draft.avatar,draft.frame)+'</div><p class="muted">这份人设独立于外部 User 卡，并随账号保存在在线聊天中。</p><form id="onlineUserProfileForm"><label>姓名 / 聊天昵称<input name="name" required maxlength="30" value="'+esc(draft.name)+'"></label><label>性别<input name="gender" maxlength="120" value="'+esc(draft.gender)+'"></label><label>性格<textarea name="personality" maxlength="4000">'+esc(draft.personality)+'</textarea></label><label>人设<textarea name="description" maxlength="12000">'+esc(draft.description)+'</textarea></label><details class="group-settings-card"><summary>头像与头像框</summary><label>上传头像<input id="onlineUserAvatarFile" type="file" accept="image/*"></label><label>头像网址<input name="avatarUrl" type="url" placeholder="https://…"></label><button id="onlineUserAvatarClear" type="button">移除头像</button><label>上传头像框<input id="onlineUserFrameFile" type="file" accept="image/*"></label><label>头像框网址<input name="frameUrl" type="url" value="'+esc(draft.frame.src?.startsWith('https:')?draft.frame.src:'')+'" placeholder="https://…"></label><button id="onlineUserFrameClear" type="button">移除头像框</button><label>头像框缩放<input name="frameScale" type="range" min="0.5" max="3" step="0.05" value="'+draft.frame.scale+'"></label><label>水平位置<input name="frameX" type="range" min="-100" max="100" value="'+draft.frame.x+'"></label><label>垂直位置<input name="frameY" type="range" min="-100" max="100" value="'+draft.frame.y+'"></label><label><input name="frameRing" type="checkbox" '+(draft.frame.ring?'checked':'')+'> 显示装饰边框</label></details><button type="submit" class="primary">保存在线人设</button></form></section>'+end,rooms);
+      screen('在线 User 人设','<section class="group-settings-card group-settings-block"><h3>User 人设预设</h3><p class="muted">预设包含完整人设、头像和头像框。点击名称即可替换当前在线人设。</p><div class="row">'+presets.map(p=>'<span class="row"><button type="button" data-online-user-preset="'+esc(p.id)+'">'+esc(p.name)+'</button><button type="button" data-delete-online-user-preset="'+esc(p.id)+'" aria-label="删除预设">×</button></span>').join('')+'</div><label>预设名称<input id="onlineUserPresetName" maxlength="60" placeholder="例如：校园 / 日常"></label><button type="button" id="onlineUserPresetSave">将当前填写内容存为预设</button></section><section class="group-settings-card group-settings-block"><div id="onlineUserLookPreview" style="display:flex;justify-content:center;padding:12px">'+personAvatar(draft.name,draft.avatar,draft.frame)+'</div><p class="muted">这份人设独立于外部 User 卡，并随账号保存在在线聊天中。</p><form id="onlineUserProfileForm"><label>姓名 / 聊天昵称<input name="name" required maxlength="30" value="'+esc(draft.name)+'"></label><label>性别<input name="gender" maxlength="120" value="'+esc(draft.gender)+'"></label><label>性格<textarea name="personality" maxlength="4000">'+esc(draft.personality)+'</textarea></label><label>人设<textarea name="description" maxlength="12000">'+esc(draft.description)+'</textarea></label><details class="group-settings-card"><summary>头像与头像框</summary><label>上传头像<input id="onlineUserAvatarFile" type="file" accept="image/*"></label><label>头像网址<input name="avatarUrl" type="url" placeholder="https://…"></label><button id="onlineUserAvatarClear" type="button">移除头像</button><label>上传头像框<input id="onlineUserFrameFile" type="file" accept="image/*"></label><label>头像框网址<input name="frameUrl" type="url" value="'+esc(draft.frame.src?.startsWith('https:')?draft.frame.src:'')+'" placeholder="https://…"></label><button id="onlineUserFrameClear" type="button">移除头像框</button><label>头像框缩放<input name="frameScale" type="range" min="0.5" max="3" step="0.05" value="'+draft.frame.scale+'"></label><label>水平位置<input name="frameX" type="range" min="-100" max="100" value="'+draft.frame.x+'"></label><label>垂直位置<input name="frameY" type="range" min="-100" max="100" value="'+draft.frame.y+'"></label><label><input name="frameRing" type="checkbox" '+(draft.frame.ring?'checked':'')+'> 显示装饰边框</label></details><button type="submit" class="primary">保存在线人设</button></form></section>'+end,rooms);
+      const editorSerial=generation;
+      const updatePresetProfile=profile=>{onlineUserProfile=profile;me.name=profile.name;for(const view of views.values())view.detail=null;};
+      for(const button of el('ledgerOnline').querySelectorAll('[data-online-user-preset]'))button.onclick=async()=>{
+        button.disabled=true;try{const result=await request('online-profile-presets',{action:'apply',id:button.dataset.onlineUserPreset});if(!active(editorSerial))return;updatePresetProfile(result.profile);await editOnlineUser(result.profile);toast('已切换在线 User 人设');}catch(error){status(error.message);}finally{button.disabled=false;}
+      };
+      for(const button of el('ledgerOnline').querySelectorAll('[data-delete-online-user-preset]'))button.onclick=async()=>{
+        if(!confirm('删除此预设？当前使用的人设保持不变。'))return;button.disabled=true;try{await request('online-profile-presets',{action:'delete',id:button.dataset.deleteOnlineUserPreset});if(!active(editorSerial))return;await editOnlineUser(profile);}catch(error){status(error.message);}finally{button.disabled=false;}
+      };
+      el('onlineUserPresetSave').onclick=async event=>{
+        const name=el('onlineUserPresetName').value.trim();if(!name){status('请填写预设名称。');return;}const button=event.currentTarget;button.disabled=true;
+        try{const existing=presets.find(p=>p.name===name),snapshot=await captureOnlineDraft(Object.fromEntries(new FormData(node)));if(!active(editorSerial))return;await request('online-profile-presets',{action:'save',name,profile:snapshot,...(existing?{id:existing.id}:{})});if(!active(editorSerial))return;await editOnlineUser(snapshot);toast('预设已保存');}catch(error){status(error.message);}finally{button.disabled=false;}
+      };
       const node=el('onlineUserProfileForm'),preview=()=>{draft.frame={...draft.frame,scale:Number(node.elements.frameScale.value),x:Number(node.elements.frameX.value),y:Number(node.elements.frameY.value),ring:node.elements.frameRing.checked};el('onlineUserLookPreview').innerHTML=personAvatar(node.elements.name.value||draft.name,draft.avatar,draft.frame);};
       let pictureJob=Promise.resolve(),pictureBusy=0;
       const picture=(id,kind)=>el(id).onchange=event=>{
@@ -389,11 +410,14 @@ const ledgerOnline = (() => {
       el('onlineUserAvatarClear').onclick=()=>{draft.avatar='';node.elements.avatarUrl.value='';preview();};
       el('onlineUserFrameClear').onclick=()=>{draft.frame.src='';node.elements.frameUrl.value='';preview();};
       for(const name of ['frameScale','frameX','frameY','frameRing','name'])node.elements[name].oninput=preview;
-      form('onlineUserProfileForm',async(data,requestSerial)=>{
-        if(pictureBusy)await pictureJob;if(!active(requestSerial))return;
+      const captureOnlineDraft=async data=>{
+        if(pictureBusy)await pictureJob;
         preview();if(data.avatarUrl){draft.avatar=await avatarThumbnail(data.avatarUrl);if(!draft.avatar)throw Error('头像网址读取失败，请尝试上传图片。');}
         if(data.frameUrl)draft.frame.src=data.frameUrl;
-        const saved={name:data.name,gender:data.gender,personality:data.personality,description:data.description,avatar:draft.avatar,frame:await compactFrame(draft.frame)};
+        return {name:data.name,gender:data.gender,personality:data.personality,description:data.description,avatar:draft.avatar,frame:await compactFrame(draft.frame)};
+      };
+      form('onlineUserProfileForm',async(data,requestSerial)=>{
+        const saved=await captureOnlineDraft(data);if(!active(requestSerial))return;
         const result=await request('online-profile',saved);
         if(active(requestSerial)){onlineUserProfile=result.profile;me.name=result.profile.name;for(const view of views.values())view.detail=null;toast('在线人设已保存');rooms();}
       });
@@ -430,7 +454,7 @@ const ledgerOnline = (() => {
     el('onlineAccountLogout').onclick=()=>void logoutOnline();
     el('onlineNew').onclick=create;
     el('onlineJoin').onclick=()=>join();
-    let previous;
+    let previous,refreshRoomsFirst=true;
     function paint(list){
       if(!active(serial))return;
       const signature=JSON.stringify(list);
@@ -446,7 +470,7 @@ const ledgerOnline = (() => {
     else el('onlineList').textContent='正在加载会话…';
     async function refresh(){
       const firstLoad=knownRooms===null;
-      const list=await readRooms();
+      const list=await readRooms(refreshRoomsFirst);refreshRoomsFirst=false;
       if(!active(serial))return;
       paint(list);
       if(firstLoad&&list[0])prefetchRoom(list[0].id);
@@ -1121,12 +1145,12 @@ const ledgerOnline = (() => {
       drawMessages(view.top===null?'bottom':'keep');
       if(view.top!==null)el('onlineMessages').scrollTop=view.top;
     }else el('onlineMessages').textContent='正在加载聊天记录…';
-    let refreshing=false, lastDetail=0, lastActivity=Date.now();
+    let refreshing=false, lastDetail=view.detailUpdated||0, lastActivity=Date.now(),initialRefresh=true;
     function refreshDetail(){
       roomDetail(current.id).then(info=>{
         if(!active(serial))return;
         const changed=detail!==info&&JSON.stringify(detail)!==JSON.stringify(info);
-        view.detail=info;detail=info;
+        view.detail=info;view.detailUpdated=Date.now();detail=info;
         if(group&&info.name){
           el('onlineTitle').textContent=info.name;
           if(current.name!==info.name||current.avatar!==info.avatar){
@@ -1153,7 +1177,8 @@ const ledgerOnline = (() => {
         refreshDetail();
       }
       try{
-        const cursor=messages.at(-1)?.id||0;
+        const replaceTail=initialRefresh&&view.loaded&&view.top===null&&Date.now()-(view.updated||0)>1200;
+        const cursor=replaceTail?0:messages.at(-1)?.id||0;
         const feed=await roomFeed(current.id,cursor);
         if(!active(serial))return;
         if(el('onlineStatus')?.dataset.connectionError)status('');
@@ -1164,20 +1189,21 @@ const ledgerOnline = (() => {
         const box=el('onlineMessages'),stick=box.scrollHeight-box.clientHeight-box.scrollTop<120;
         const firstLoad=!view.loaded;
         const added=cursor?rows.filter(message=>message.id>cursor):rows;
-        if(!cursor&&!messages.length){
+        if(replaceTail||!cursor&&!messages.length){
           older=rows.length>36;
           messages=rows.slice(-36);
         }else messages.push(...added);
-        view.messages=messages;view.older=older;view.loaded=true;view.updated=Date.now();
+        view.messages=messages;view.older=older;view.loaded=true;view.updated=Date.now();initialRefresh=false;
         if(cursor||messages.length)void markRead(current,messages.at(-1)?.id||0);
         const hadPending=pendingMessage?.room===current.id;
         if(hadPending&&hasPendingReceipt(pendingMessage,messages))pendingMessage=null;
         if(added.length||nextTyping.length)lastActivity=Date.now();
-        if(added.length||firstLoad){
+        if(added.length||firstLoad||replaceTail){
           const append=cursor&&!firstLoad&&!hadPending&&el('onlineTyping')&&!added.some(row=>['rps-result','message-deleted'].includes(row.kind));
           drawMessages(stick?'bottom':'keep',append?added:null);
         }
         else if(typingChanged)drawTyping();
+        if(cursor&&rows.length===60)setTimeout(()=>{if(active(serial))void refresh().catch(error=>status(error.message));},0);
       }catch(error){
         if(active(serial)&&error.status===404){views.delete(current.id);rooms();status(error.message);}
         else throw error;
@@ -1340,7 +1366,7 @@ const ledgerOnline = (() => {
       lastActivity=Date.now();
       return refresh().catch(error=>{if(active(serial))status(error.message);});
     };
-    if(!view.updated||Date.now()-view.updated>=1200)resumeChat();
+    resumeChat();
     later(serial,refresh,()=>Date.now()-lastActivity<45000?1200:2500);
   }
   async function members(current){
@@ -1782,6 +1808,7 @@ const ledgerOnline = (() => {
   }
   return {directory,open,inviteFromUrl,shareArchive,syncVision,forwardExternal,kindroid:data=>request('kindroid-send',data)};
 })();
+
 
 
 
