@@ -1818,7 +1818,7 @@ async function groupReply(g,c,guide=''){
   const action=g.actionWriting===true;
   const gameResult=groupMessagesFor(g,c.id).findLast(m=>!m.roleId)?.gameResult;
   const system=[
-    worldContext('front',c.id),chatTimeContext(),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
+    worldContext('front',c.id),chatTimeContext(),characterLanguageRule(c),'你正在群聊中扮演'+displayName(c)+'。只回复你负责的角色，不替用户或其他角色发言。',
     '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
     '人设：'+c.description,...(c.speechRules?['该角色必须遵守的发言规则：'+c.speechRules]:[]),'性格：'+c.personality,'与用户的关系：'+c.relationship,...charRelationContext(c),
     g.shared&&profileFor(c)?.id===p.id?[memoryContext(c),'近期私聊：'+JSON.stringify(recentDialogue(c.messages).slice(-8)).slice(-8000)].filter(Boolean).join('\n'):'',
@@ -1990,8 +1990,8 @@ function chat(){
         return '<div class="message-row '+x.role+'">'+layout.before+'<article class="bubble '+x.role+
           (selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
           (selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+
-          layout.name+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+(last&&c.provider==='kindroid'&&!selected?kindroidTranslationStar(c,x,i):'')+'</p>')+
-          (last?image:'')+(last&&c.provider==='kindroid'&&!selected?kindroidTranslationMarkup(c,x,i):'')+layout.time+'</article></div>';
+          layout.name+(j===0?quoteMarkup(x.quote):'')+(x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+(last&&x.role==='assistant'&&mode==='ai'&&translationAvailable(c)&&!selected?kindroidTranslationStar(c,x,i):'')+'</p>')+
+          (last?image:'')+(last&&x.role==='assistant'&&mode==='ai'&&translationAvailable(c)&&!selected?kindroidTranslationMarkup(c,x,i):'')+layout.time+'</article></div>';
       }).join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(history.current?'<div class="chat-history-page"><button type="button" data-action="newerChatPage">查看较新的消息</button><button type="button" data-action="latestChatPage">回到最新</button></div>':typing?typingBubble(c):'')+'</div>'+
     (ai&&c.provider!=='kindroid'&&!busy&&!lock&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
@@ -2027,13 +2027,14 @@ function openCard(id){
   const fields=[['姓名','name'],['性别','gender'],['性格','personality'],['人设','description']];
   if(!isUser){fields.splice(1,0,['昵称','nickname']);fields.push(['发言规则（选填）','speechRules'],['Char 与 User 的关系','relationship']);}
   const locked=isMysteryBound(id);
+  const languageFields=isUser?'':characterLanguageFields(c);
   const labels=fields.filter(([,key])=>!locked||['relationship','speechRules'].includes(key)).map(([label,k])=>'<label>'+label+(['description','personality','speechRules'].includes(k)?'<textarea name="'+k+'"'+(k==='speechRules'?' maxlength="2000" placeholder="填写此角色必须遵守的发言规则，例如只用简短口语、禁止代替 User 发言"':'')+'>'+esc(c[k])+'</textarea>':'<input name="'+k+'" maxlength="80" '+(k==='relationship'?'placeholder="如恋人、暧昧、亲人、朋友、密友" ':'')+'value="'+esc(c[k])+'">')+'</label>').join('');
   const options=state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===c.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('');
   if(locked){
-    dialog('<h2>人设卡</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label><div class="row"><button class="primary">保存</button><button type="button" data-look="'+esc(id)+'">头像与头像框</button><button type="button" data-action="close">关闭</button></div></form>');
+    dialog('<h2>人设卡</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+languageFields+'<label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label><div class="row"><button class="primary">保存</button><button type="button" data-look="'+esc(id)+'">头像与头像框</button><button type="button" data-action="close">关闭</button></div></form>');
     return;
   }
-  dialog('<h2>'+(isUser?'User 人设卡':id?'编辑角色':'新建角色')+'</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+
+  dialog('<h2>'+(isUser?'User 人设卡':id?'编辑角色':'新建角色')+'</h2><form id="contactForm" data-id="'+esc(id)+'"><div class="fields">'+labels+'</div>'+languageFields+''+
     (isUser?'':'<section class="panel"><h3>Char 与 Char 的关系</h3><p class="muted">选填。可添加多条，每条选择一位通讯录角色并填写关系。</p><div data-char-relations>'+charRelations(c).filter(r=>contact(r.roleId)&&r.roleId!==id).map(r=>charRelationRow(id,r)).join('')+'</div><button type="button" data-add-char-relation '+(state.contacts.some(other=>other.id!==id)?'':'disabled')+'>＋ 添加角色关系</button></section><label>专属对话模型预设<select name="preset"><option value="">跟随全局预设</option>'+options+'</select></label>')+
     '<label>导入 TXT、Word（.docx）或 JSON<input data-persona-file type="file" accept=".txt,.docx,.json"></label><p class="muted">导入后可核对内容，再点击保存。</p><div class="row actions"><button class="primary">保存人设卡</button><button type="button" data-action="close">取消</button>'+((isUser||id)?'<button type="button" data-look="'+esc(id)+'">头像与头像框</button>':'')+(!isUser&&id?'<button type="button" data-delete-contact="'+esc(id)+'">删除角色</button>':'')+'</div></form>');
 }
@@ -2071,10 +2072,11 @@ function saveCard(form){
   const name=v('name'),gender=v('gender'),personality=v('personality'),description=v('description');
   if(id==='user')return commit({...state,userName:name,userGender:gender,userPersonality:personality,user:description});
   const nickname=v('nickname'),preset=v('preset'),speechRules=v('speechRules');
+  const language=v('language').slice(0,40)||'中文',translationEnabled=data.has('translationEnabled');
   if(speechRules.length>2000)throw Error('发言规则最多 2000 字。');
   if(isMysteryBound(id)){
     if(!contact(id)||preset&&!state.profiles.some(p=>p.id===preset))throw Error('模型预设无效。');
-    return replaceContact(id,{relationship:v('relationship').slice(0,80),preset,speechRules});
+    return replaceContact(id,{relationship:v('relationship').slice(0,80),preset,speechRules,language,translationEnabled});
   }
   if(!name&&!nickname)throw Error('请填写姓名或昵称。');
   const descriptions=data.getAll('relationDescription');
@@ -2082,7 +2084,7 @@ function saveCard(form){
     const description=String(descriptions[index]||'').trim();
     return roleId!==id&&contact(roleId)&&description?[{roleId,description}]:[];
   });
-  const patch={name,gender,personality,description,nickname,preset,speechRules,relationship:v('relationship'),charRelations};
+  const patch={name,gender,personality,description,nickname,preset,speechRules,language,translationEnabled,relationship:v('relationship'),charRelations};
   if(id)return !!contact(id)&&replaceContact(id,patch);
   return commit({...state,contacts:[...state.contacts,{...contactDefaults(crypto.randomUUID()),...patch}]});
 }
@@ -2174,6 +2176,20 @@ function renderChatCard(card){
     (card.body?'<p>'+esc(card.body)+'</p>':'')+
     (card.rows.length?'<dl>'+card.rows.map(row=>'<div><dt>'+esc(row.label)+'</dt><dd>'+esc(row.value)+'</dd></div>').join('')+'</dl>':'')+'</div>';
 }
+function characterUsesChinese(c){return /^(?:中文|汉语|漢語|简体中文|繁体中文|普通话|國語|国语|Chinese|Mandarin|zh(?:[-_].*)?)$/i.test((c.language||'中文').trim());}
+function characterLanguageRule(c){return '角色的默认回复语言为'+(c.language||'中文')+'。请用该语言回复，保留必要专名；除非用户明确要求翻译或切换语言。';}
+function translationAvailable(c){return c?.translationEnabled===true&&!characterUsesChinese(c)&&state.profiles.some(p=>p.id===state.kindroidTranslation.preset);}
+function characterLanguageFields(c){
+  return '<section class="panel"><h3>语言与翻译</h3><label>角色输出语言<input name="language" maxlength="40" list="characterLanguageOptions" value="'+esc(c.language||'中文')+'" placeholder="例如：中文、英语、日语"></label><datalist id="characterLanguageOptions"><option>中文</option><option>英语</option><option>日语</option><option>韩语</option><option>法语</option></datalist><label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="translationEnabled" '+(c.translationEnabled?'checked':'')+'><span aria-hidden="true"></span>开启翻译卡片</label><p class="muted">非中文角色开启后，使用 API 设置中的翻译模型；点击消息末尾四角星展开或隐藏译文。</p></section>';
+}
+function translationModelCard(){
+  return '<section class="panel"><h2>翻译模型</h2><form id="translationModelForm"><label>使用主 API 已保存的预设<select name="preset"><option value="">不启用</option>'+state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===state.kindroidTranslation.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('')+'</select></label><label>译文语言<input name="language" maxlength="40" value="'+esc(state.kindroidTranslation.language)+'"></label><button class="primary">保存翻译模型</button><p class="muted">接口、Key 与模型来自所选预设。请先在上方保存 API 预设，再为角色开启翻译卡片。</p></form></section>';
+}
+function autoTranslateMessage(id,index){
+  const c=contact(id);if(!c?.autoTranslate||!translationAvailable(c)||c.messages[index]?.role!=='assistant')return;
+  kindroidTranslationOpen.add(kindroidTranslationViewKey(c,c.messages[index],index));
+  void translateKindroid(id,index);
+}
 const kindroidTranslationJobs=new Set();
 const kindroidTranslationOpen=new Set();
 const kindroidTranslationViewKey=(c,m,index)=>JSON.stringify([c.id,index,m.sentAt,m.content]);
@@ -2186,7 +2202,7 @@ function kindroidTranslationMarkup(c,message,index){
   return open&&saved&&saved.source===message.content?'<div class="kin-translation-text" lang="'+esc(saved.language)+'"><p>'+esc(saved.text)+'</p></div>':'';
 }
 async function toggleKindroidTranslation(id,index){
-  const c=contact(id),message=c?.messages[index];if(!message||c.provider!=='kindroid'||deviceLocked)return;
+  const c=contact(id),message=c?.messages[index];if(!message||!translationAvailable(c)||deviceLocked)return;
   const key=kindroidTranslationViewKey(c,message,index);
   if(kindroidTranslationOpen.has(key))kindroidTranslationOpen.delete(key);
   else{
@@ -2198,9 +2214,9 @@ async function toggleKindroidTranslation(id,index){
 }
 async function translateKindroid(id,index){
   const c=contact(id),message=c?.messages[index],job=id+':'+index;
-  if(c?.provider!=='kindroid'||!message||kindroidTranslationJobs.has(job)||deviceLocked)return;
+  if(!translationAvailable(c)||!message||kindroidTranslationJobs.has(job)||deviceLocked)return;
   const setting=state.kindroidTranslation,p=state.profiles.find(p=>p.id===setting.preset);
-  if(!state.kindroid.unlocked||!p){toast('请在神秘小入口下方选择翻译 API，预设来自主 API 已保存的列表。');return;}
+  if(!p){toast('请在 API 设置的翻译模型卡片中选择预设。');return;}
   const original=message.content,sentAt=message.sentAt,language=setting.language||'简体中文';
   kindroidTranslationJobs.add(job);if(page==='chat'&&activeContact===id)render();
   try{
@@ -2217,18 +2233,16 @@ async function translateKindroid(id,index){
 }
 function kindroidSettings(){
   if(!state.kindroid.unlocked)return '';
-  return '<section class="panel"><h2>Kindroid 专属接入</h2><form id="kindroidSetup" class="fields">'+apiKeyField('kindroidKey','Kindroid API Key',state.kindroid.key)+'<label>翻译 API（使用主 API 已保存的预设）<select name="translationPreset"><option value="">不启用翻译</option>'+state.profiles.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===state.kindroidTranslation.preset?'selected':'')+'>'+esc(p.name+' · '+p.model)+'</option>').join('')+'</select></label><label>翻译目标语言<input name="translationLanguage" maxlength="40" value="'+esc(state.kindroidTranslation.language)+'"></label>'+'<label>角色 ID（Kin ID）<input name="aiId" maxlength="160" required value="'+esc(state.kindroid.aiId)+'" autocomplete="off" spellcheck="false"></label><button class="primary">保存并创建角色</button><p class="muted">填写后会加入私聊通讯录。名字和头像可在人设卡中修改。聊天延续 Kindroid 中的角色与记忆；本地改名不会修改 Kindroid 资料。Key 保存在本机，请求通过在线服务转接且不写入聊天数据库。</p></form></section>';
+  return '<section class="panel"><h2>Kindroid 专属接入</h2><form id="kindroidSetup" class="fields">'+apiKeyField('kindroidKey','Kindroid API Key',state.kindroid.key)+'<label>角色 ID（Kin ID）<input name="aiId" maxlength="160" required value="'+esc(state.kindroid.aiId)+'" autocomplete="off" spellcheck="false"></label><button class="primary">保存并创建角色</button><p class="muted">填写后会加入私聊通讯录。名字和头像可在人设卡中修改。聊天延续 Kindroid 中的角色与记忆；本地改名不会修改 Kindroid 资料。Key 保存在本机，请求通过在线服务转接且不写入聊天数据库。</p></form></section>';
 }
 function saveKindroid(form){
   if(!state.kindroid.unlocked)throw Error('请先解锁 Kindroid 接入口。');
   const data=new FormData(form),key=String(data.get('key')||'').trim(),aiId=String(data.get('aiId')||'').trim();
   if(!/^kn_[A-Za-z0-9_-]+$/.test(key)||key.length>512)throw Error('请填写有效的 Kindroid API Key（kn_ 开头）。');
   if(!aiId||aiId.length>160||/\s/.test(aiId))throw Error('请填写正确的 Kin ID。');
-  const preset=String(data.get('translationPreset')||''),language=String(data.get('translationLanguage')||'简体中文').trim()||'简体中文';
-  if(preset&&!state.profiles.some(p=>p.id===preset))throw Error('翻译预设已移除，请重新选择。');
   const existing=state.contacts.find(c=>c.provider==='kindroid'&&c.kindroidId===aiId);
   const role=existing||{...contactDefaults(crypto.randomUUID(),'Kindroid'),provider:'kindroid',kindroidId:aiId,actionWriting:true};
-  if(commit({...state,kindroid:{unlocked:true,key,aiId},kindroidTranslation:{preset,language:language.slice(0,40)},contacts:existing?state.contacts:[...state.contacts,role]})){
+  if(commit({...state,kindroid:{unlocked:true,key,aiId},contacts:existing?state.contacts:[...state.contacts,role]})){
     render();toast(existing?'Kindroid 接入已更新，角色姓名、头像和记录已保留。':'Kindroid 角色已加入通讯录，可修改名字和头像。');
   }
 }
@@ -2239,7 +2253,7 @@ async function sendKindroid(c,retry,reroll,gameTurn){
   const content=String(gameTurn?.content??c.draft).trim();if(!content)return;
   if(content.length>16000){toast('单条消息最多 16000 字。');return;}
   const qKey=quoteKey(c.id,'ai'),quote=!gameTurn&&chatQuotes.get(qKey);
-  const message=[quoteText(quote)?'[引用] '+quoteText(quote):'',content].filter(Boolean).join('\n');
+  const message=[characterLanguageRule(c),quoteText(quote)?'[引用] '+quoteText(quote):'',content].filter(Boolean).join('\n');
   if(message.length>16000){toast('消息与引用合计最多 16000 字。');return;}
   const history=[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{})}];
   if(!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
@@ -2249,6 +2263,7 @@ async function sendKindroid(c,retry,reroll,gameTurn){
     const latest=contact(c.id);if(!latest)throw Error('原角色已移除。');
     if(JSON.stringify(latest.messages)!==JSON.stringify(history))throw Error('本地会话已变化，回复已保存在 Kindroid，请在原站核对。');
     if(!replaceContact(c.id,{messages:[...latest.messages,{role:'assistant',content:reply.trim(),sentAt:Date.now(),name:displayName(latest)}]}))throw Error('回复已在 Kindroid 保存，本机写入失败。');
+    autoTranslateMessage(c.id,contact(c.id).messages.length-1);
   }catch(error){
     const detail=String(error.message||'Kindroid 连接中断。').replaceAll(state.kindroid.key,'[已隐藏]');
     replyErrors.set(c.id,detail);
@@ -2275,7 +2290,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
   if(!retry&&!reroll&&!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
   if(!retry&&!reroll&&!gameTurn){chatImages.delete(key);chatQuotes.delete(qKey);}
   const name=c.name||displayName(c);
-  const system=['你正在扮演'+name+'。','角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,...(c.speechRules?['该角色必须遵守的发言规则：'+c.speechRules]:[]),
+  const system=['你正在扮演'+name+'。',characterLanguageRule(c),'角色昵称：'+c.nickname,'角色性别：'+c.gender,'角色性格：'+c.personality,'角色设定：'+c.description,...(c.speechRules?['该角色必须遵守的发言规则：'+c.speechRules]:[]),
     'Char 与 User 的关系：'+c.relationship,...charRelationContext(c).map(line=>'Char 与 Char 的关系：'+line),'用户姓名：'+state.userName,'用户性别：'+state.userGender,'用户性格：'+state.userPersonality,'用户人设：'+state.user].join('\n');
   const front=worldContext('front',c.id),end=worldContext('end',c.id);
   threads.set(c.id,true);replyErrors.delete(c.id);render();
@@ -2319,6 +2334,7 @@ async function send(retry=false,reroll=null,gameTurn=null){
     const message={role:'assistant',sentAt:reroll?c.messages[reroll.index]?.sentAt:Date.now(),content:typeof gameResult==='string'?gameResult+'\n'+reply:reply,name,chatCard:card||undefined};
     const update=reroll?{messages:latest.messages.map((m,i)=>i===reroll.index?{...m,...message}:m),...memoryAfterMessageChange(latest,reroll.index)}:{messages:[...latest.messages,message]};
     if(!replaceContact(c.id,update))throw Error('收到回复，但写入本机存档失败。');
+    autoTranslateMessage(c.id,reroll?reroll.index:contact(c.id).messages.length-1);
   }catch(e){
     const message=e instanceof SyntaxError?'API 返回的内容无法解析。':e.message||'回信失败。';
     replyErrors.set(c.id,message);
@@ -4200,14 +4216,14 @@ function chatDisplaySettings(c){
   const p=chatDisplay(c);
   const toggle=(name,label,checked)=>'<label class="mode-toggle group-settings-switch"><input type="checkbox" role="switch" name="'+name+'" '+(checked?'checked':'')+'><span aria-hidden="true"></span>'+label+'</label>';
   return '<form id="chatDisplayForm" data-contact="'+esc(c.id)+'" class="chat-display-settings">'+
-    toggle('showTime','显示消息时间戳',p.showTime)+toggle('showName','在气泡里显示角色名',p.showName)+toggle('split','角色分句显示',p.split)+
+    (translationAvailable(c)?toggle('autoTranslate','自动翻译',c.autoTranslate===true):'')+toggle('showTime','显示消息时间戳',p.showTime)+toggle('showName','在气泡里显示角色名',p.showName)+toggle('split','角色分句显示',p.split)+
     '<label class="chat-bubble-limit">每次回复最多显示几条<input type="number" name="limit" min="1" max="30" step="1" required value="'+p.limit+'"></label></form>';
 }
 function saveChatDisplay(form){
   const c=contact(form.dataset.contact);if(!c)return;
   const {showTime,showName,split,limit}=form.elements,n=Number(limit.value);
   if(!Number.isInteger(n)||n<1||n>30)throw Error('回复条数请填写 1 到 30 的整数。');
-  if(replaceContact(c.id,{chatDisplay:{showTime:showTime.checked,showName:showName.checked,split:split.checked,limit:n}})){
+  if(replaceContact(c.id,{autoTranslate:translationAvailable(c)&&form.elements.autoTranslate?.checked===true,chatDisplay:{showTime:showTime.checked,showName:showName.checked,split:split.checked,limit:n}})){
     renderMessageTools();showChatSettingsSaved();
   }
 }
@@ -5037,7 +5053,7 @@ function validate(data){
     ['id','name','nickname','gender','personality','description','preset','draft'].every(k=>string(c[k]))&&c.id&&c.id!=='user'&&
     Array.isArray(c.messages)&&c.messages.every(x=>x&&['user','assistant','system'].includes(x.role)&&string(x.content)))||!unique(result.contacts)||
     !Array.isArray(result.worlds)||!result.worlds.every(x=>x&&['id','title','group','content'].every(k=>string(x[k]))&&typeof x.enabled==='boolean')||!unique(result.worlds))throw Error('通讯录或世界书存档无效');
-  result.contacts=result.contacts.map(c=>({...memoryDefaults(),...c,speechRules:string(c.speechRules)?c.speechRules.slice(0,2000):'',relationship:string(c.relationship)?c.relationship:''}));
+  result.contacts=result.contacts.map(c=>({...memoryDefaults(),...c,language:string(c.language)&&c.language.trim()?c.language.slice(0,40):'中文',translationEnabled:c.translationEnabled===true,autoTranslate:c.autoTranslate===true,speechRules:string(c.speechRules)?c.speechRules.slice(0,2000):'',relationship:string(c.relationship)?c.relationship:''}));
   if(typeof result.streamReplies!=='boolean'||!result.contacts.every(c=>validateChatModes(localConfig(c))))throw Error('聊天模式存档无效');
   if(!result.contacts.every(validMemories))throw Error('记忆档案存档无效');
   result.contacts=result.contacts.map(c=>{
@@ -5323,6 +5339,7 @@ function api(){
   '<section class="panel"><div class="row"><label>已保存预设<select id="profileSelect"><option value="">新建预设</option>'+state.profiles.map(x=>'<option value="'+esc(x.id)+'" '+(x===p?'selected':'')+'>'+esc(x.name)+' · '+esc(x.model)+'</option>').join('')+'</select></label><button data-action="newProfile">＋ 新建</button></div><form id="apiForm"><div class="fields"><label>预设名称<input name="name" required value="'+esc(p?.name)+'" placeholder="常用中转站"></label><label>Base URL<input name="url" type="url" required value="'+esc(p?.url)+'" placeholder="https://example.com/v1"></label>'+apiKeyField('textApiKey','API Key',p?.key)+'<label>模型 ID<input name="model" list="models" required value="'+esc(p?.model)+'" placeholder="可手动填写"><datalist id="models"></datalist></label></div><div class="row"><button class="primary">保存预设（含 Key）</button><button type="button" data-action="models">提取模型列表</button>'+(p?'<button type="button" data-action="deleteProfile">删除预设</button>':'')+'</div><p class="notice" id="apiStatus">Key 保存在当前浏览器。中转站需允许此网站通过浏览器访问。</p></form></section>'+
   '<section class="panel"><h2>流式输出</h2><label class="mode-toggle"><input type="checkbox" id="streamReplies" '+(state.streamReplies?'checked':'')+'><span></span>使用流式接收，完整回复后显示</label></section>'+
   '<section class="panel"><h2>图片专用 API</h2><form id="imageForm"><div class="fields"><label>图片 API Base URL<input name="url" type="url" value="'+esc(img.url)+'" placeholder="https://example.com/v1"></label>'+apiKeyField('imageApiKey','图片 API Key',img.key)+'<label>视觉识别模型 ID<input name="model" list="imageModels" value="'+esc(img.model)+'" placeholder="用于读取账单截图"></label><label>生图模型 ID（可选）<input name="generationModel" list="imageModels" value="'+esc(img.generationModel)+'" placeholder="单独保存生图模型配置"></label></div><datalist id="imageModels"></datalist><div class="row"><button class="primary">保存图片 API（含 Key）</button><button type="button" data-action="imageModels">提取图片模型列表</button></div><p class="muted" id="imageModelStatus" role="status"></p><p class="muted">账单识别使用支持图片输入的 OpenAI 兼容对话模型。纯生图模型可单独记录，但无法读取账单。</p></form></section>'+
+  translationModelCard()+
   '<section class="panel"><h2>皮肤</h2><div class="skin-grid">'+Object.entries(skins).filter(([id])=>skinAvailable(id,state)).map(([id,label])=>'<button type="button" class="'+(id===state.skin?'active':'')+'" data-skin="'+id+'" aria-pressed="'+(id===state.skin)+'"><span class="swatch '+id+'"></span>'+label+'</button>').join('')+'</div></section>'+
   '<section class="panel"><h2>字体</h2><div class="font-choice-row">'+Object.entries(fontOptions).map(([id,label])=>{
     const selected=id===activeLedgerFont(state.skin,state.skinFonts);
@@ -6130,6 +6147,7 @@ document.addEventListener('submit',e=>{
     if(f.id==='archiveFormatForm')formatArchive();
     if(f.id==='mysteryEntryForm')submitMysteryEntry(f);
     if(f.id==='kindroidSetup')saveKindroid(f);
+    if(f.id==='translationModelForm'){const data=new FormData(f),preset=String(data.get('preset')||''),language=String(data.get('language')||'简体中文').trim().slice(0,40)||'简体中文';if(preset&&!state.profiles.some(p=>p.id===preset))throw Error('请选择有效预设。');if(commit({...state,kindroidTranslation:{preset,language}})){render();toast('翻译模型已保存');}}
     if(f.id==='openingForm'){
       const opening=Math.round(Number(f.elements.opening.value)*100);
       if(!Number.isSafeInteger(opening))throw Error('期初余额超出有效范围。');
@@ -6288,6 +6306,7 @@ document.addEventListener('close',event=>{
 },true);
 </script>
 </body></html>
+
 
 
 
