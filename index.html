@@ -434,6 +434,19 @@ body.full-chat{overflow:hidden}
   .story-studio .story-entry{min-height:0}
 }
 
+@media(min-width:851px) and (hover:hover) and (pointer:fine){
+  #dialog.story-studio[data-story-orb-page="story"]:has(#storyGenerate,#storyLive,#storyReader)>:is(.story-header,.story-shell){
+    width:100%;
+  }
+  #dialog.story-studio #storyGenerate{
+    grid-template-columns:minmax(320px,min(40%,520px)) minmax(0,1fr);
+  }
+  #storyGenerate .story-draft textarea[name="guide"]{
+    width:100%;
+    min-width:0;
+  }
+}
+
 .story-folder-tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-start}
 .story-studio .story-folder-tools details{padding:10px 14px}
 .story-folder-tools summary{cursor:pointer;color:var(--gold)}
