@@ -2702,7 +2702,7 @@ async function sendKindroid(c,retry,reroll,gameTurn){
   const content=String(gameTurn?.content??c.draft).trim();if(!content)return;
   if(content.length>16000){toast('单条消息最多 16000 字。');return;}
   const qKey=quoteKey(c.id,'ai'),quote=!gameTurn&&chatQuotes.get(qKey);
-  const message=[characterLanguageRule(c),quoteText(quote)?'[引用] '+quoteText(quote):'',content,gameTurn?.note?'用户带话：'+gameTurn.note:''].filter(Boolean).join('\n');
+  const message=[quoteText(quote)?'[引用] '+quoteText(quote):'',content,gameTurn?.note?'用户带话：'+gameTurn.note:''].filter(Boolean).join('\n');
   if(message.length>16000){toast('消息与引用合计最多 16000 字。');return;}
   const history=[...c.messages,{role:'user',content,sentAt:Date.now(),...(quote?{quote}:{}),...(gameTurn?.readerExcerpt?{readerExcerpt:gameTurn.readerExcerpt}:{})},...(gameTurn?.note?[{role:'user',content:gameTurn.note,sentAt:Date.now()}]:[])];
   if(!replaceContact(c.id,{draft:gameTurn?c.draft:'',messages:history}))return;
