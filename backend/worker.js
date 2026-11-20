@@ -930,9 +930,9 @@ async function api(req, env, url, ledger, ctx) {
     return json({title:card.title,count:card.count,entries,more:entries.length>0&&entries.at(-1).position+1<card.count});
   }
   if(ledger&&req.method==='POST'&&['forward-message','external-forward'].includes(path)){
-    if(room.kind!=='group')throw fail('只能转发到在线群聊。',403);
     let entries=[],title;
     if(path==='forward-message'){
+      if(room.kind!=='group')throw fail('只能转发到在线群聊。',403);
       const source=await requireRoom(field(data,'sourceRoom',36));
       if(source.kind!=='group')throw fail('来源必须是在线群聊。');
       const ids=[...new Set(Array.isArray(data.ids)?data.ids:[data.id])];
@@ -955,7 +955,23 @@ async function api(req, env, url, ledger, ctx) {
         }
       }
       title=source.name+'的聊天记录';
+    }else if(Array.isArray(data.entries)){
+      if(!data.entries.length||data.entries.length>100)throw fail('请选择 1 至 100 条消息。');
+      let size=0;
+      entries=data.entries.map(entry=>{
+        if(!entry||typeof entry!=='object')throw fail('聊天记录格式无效。');
+        const speaker=field(entry,'speaker',120,false)||me.name;
+        const body=field(entry,'body',100000,false);
+        const image=visualSource(field(entry,'image',1500000,false));
+        const created=field(entry,'created',40,false);
+        if(!body&&!image)throw fail('选中的消息没有可转发的内容。');
+        size+=body.length*3+image.length;
+        if(size>12000000)throw fail('聊天记录和图片超出单次转发大小，请分批转发。',413);
+        return {speaker,body,created,humanOnly:true,...(image?{image}:{})};
+      });
+      title='转发的聊天记录';
     }else{
+      if(room.kind!=='group')throw fail('只能转发到在线群聊。',403);
       if(!Array.isArray(data.charIds)||!data.charIds.length||data.charIds.length>100)throw fail('涉及角色尚未开启在线群聊读取私聊记录。',403);
       for(const id of new Set(data.charIds))if(!await one('SELECT c.id FROM chars c JOIN ledger_char_personal_context p ON p.char_id=c.id WHERE c.id=? AND c.owner=? AND c.active=1',id,uid))throw fail('涉及角色尚未开启在线群聊读取私聊记录。',403);
       const body=field(data,'body',4000,false);
@@ -973,7 +989,7 @@ async function api(req, env, url, ledger, ctx) {
       statements.push(stmt('INSERT INTO ledger_forward_items (card,position,payload) SELECT column1,column2,column3 FROM (VALUES '+batch.map(()=>'(?,?,?)').join(',')+") WHERE EXISTS (SELECT 1 FROM messages WHERE room=? AND sender=? AND kind='forwarded-chat' AND json_extract(attachment,'$.card')=?)",...values,room.id,uid,card));
     }
     const results=await db.batch(statements);
-    if(!results[0].meta.changes)throw fail('你已离开该群聊。',403);
+    if(!results[0].meta.changes)throw fail('你已离开该会话。',403);
     return json({ok:true,message:results[0].meta.last_row_id});
   }
   async function quoteAttachment(){
