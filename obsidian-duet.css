@@ -45,7 +45,7 @@
   isolation: isolate;
 }
 [data-skin="obsidian-duet"] .hero > .eyebrow {
-  font-size: clamp(10px, 2.8vw, 12px);
+  font-size: clamp(0.625rem, calc(2.8vw * var(--ledger-text-scale, 1)), 0.75rem);
   letter-spacing: .12em;
   white-space: nowrap;
 }

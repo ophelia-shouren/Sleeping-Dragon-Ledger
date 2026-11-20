@@ -110,7 +110,7 @@
   background:#26375455; border-color:#a8bdd265; box-shadow:none;
 }
 [data-skin="mist"] :is(.chat-thread,.group-room) .chat-top .avatar { --size:28px; }
-[data-skin="mist"] :is(.chat-thread,.group-room) .chat-top h2 { font-size:16px; }
+[data-skin="mist"] :is(.chat-thread,.group-room) .chat-top h2 { font-size:1rem; }
 [data-skin="mist"] :is(.chat-thread,.group-room) .messages { padding:4px 5px 9px; }
 [data-skin="mist"] .message-row:has(>.mist-chat-meta) {
   flex-direction:column; align-items:flex-start; gap:4px; margin:0 0 13px;
@@ -118,13 +118,13 @@
 [data-skin="mist"] .message-row.user:has(>.mist-chat-meta) { align-items:flex-end; }
 [data-skin="mist"] .mist-chat-meta {
   display:flex; align-items:center; gap:6px; min-height:25px;
-  color:#f0f3ff; font-size:12px; line-height:1.2;
+  color:#f0f3ff; font-size:0.75rem; line-height:1.2;
 }
 [data-skin="mist"] .message-row.user>.mist-chat-meta { flex-direction:row-reverse; text-align:right; }
 [data-skin="mist"] .mist-chat-meta .avatar { --size:26px; }
 [data-skin="mist"] .mist-chat-meta .avatar-button { margin:0; }
-[data-skin="mist"] .mist-chat-meta small { display:block; font-size:12px; }
-[data-skin="mist"] .mist-chat-meta time { display:block; font-size:10px; color:#e1e8f7; }
+[data-skin="mist"] .mist-chat-meta small { display:block; font-size:0.75rem; }
+[data-skin="mist"] .mist-chat-meta time { display:block; font-size:0.625rem; color:#e1e8f7; }
 [data-skin="mist"] .mist-chat-meta+.bubble {
   max-width:100%; margin:0; padding:8px 10px; border-radius:4px;
   color:var(--ink); background:var(--mist-char-paper); border-color:var(--mist-char-edge);
@@ -140,7 +140,7 @@
 }
 [data-skin="mist"] :is(#chatForm,#groupChatForm) textarea {
   color:#f4f6ff; background:#26375366; border-color:#a6b6ce78;
-  font-size:16px; line-height:1.4; min-height:40px;
+  font-size:1rem; line-height:1.4; min-height:40px;
 }
 [data-skin="mist"] :is(#chatForm,#groupChatForm) textarea::placeholder { color:#e0e7f5; }
 
