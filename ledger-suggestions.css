@@ -26,3 +26,19 @@
   background:var(--selected,var(--control));color:var(--selected-ink,var(--ink));border-color:var(--line);
 }
 .ledger-suggestions-empty{margin:0;padding:10px 12px;color:var(--muted)}
+.ledger-select{display:block;margin-top:5px}
+.ledger-select-source{display:none!important}
+.ledger-select>.ledger-select-toggle{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  width:100%;min-height:44px;margin:0;padding:9px 12px;
+  color:var(--ink);background:var(--field,var(--panel));
+  border:1px solid var(--field-line,var(--line));border-radius:8px;text-align:start;
+}
+.ledger-select-toggle>span:first-child{min-width:0;overflow-wrap:anywhere}
+.ledger-select-arrow{flex:none;width:8px;height:8px;margin-inline:4px;border-inline-end:2px solid var(--gold);border-bottom:2px solid var(--gold);transform:rotate(45deg)}
+.ledger-select-toggle[aria-expanded=true] .ledger-select-arrow{transform:rotate(225deg)}
+.ledger-select>.ledger-select-toggle:is(:focus-visible,[aria-expanded=true]){border-color:var(--gold)}
+.ledger-select>.ledger-suggestions-menu{display:block;position:relative;inset:auto;margin-top:5px;max-height:min(30dvh,240px)}
+.ledger-select>.ledger-suggestions-menu[hidden]{display:none}
+.world-position>.ledger-select{margin:0;min-width:8em}
+#view[data-page=api] .row>label:has(#profileSelect){min-width:0;max-width:100%}

@@ -2,6 +2,11 @@
   let openPicker;
   const enhanced = new WeakSet();
   const observers = new Map();
+  const selectSelector = [
+    '#profileSelect', '#quickProfileForm select', '#teaLibraryMove select',
+    '#teaLibraryDelete select', 'select[data-world-position]'
+  ].join(', ');
+  let selectId = 0;
   const close = () => {
     if (!openPicker) return;
     openPicker.menu.hidden = true;
@@ -82,12 +87,99 @@
       }
     });
   }
+  function enhanceSelect(select) {
+    if (enhanced.has(select) || select.multiple || select.size > 1) return;
+    enhanced.add(select);
+    const picker = document.createElement('span');
+    picker.className = 'ledger-suggestions ledger-select';
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'ledger-select-toggle';
+    toggle.setAttribute('aria-expanded', 'false');
+    const value = document.createElement('span');
+    const arrow = document.createElement('span');
+    arrow.className = 'ledger-select-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    toggle.append(value, arrow);
+    const menu = document.createElement('span');
+    menu.className = 'ledger-suggestions-menu';
+    menu.id = 'ledger-select-options-' + ++selectId;
+    menu.hidden = true;
+    toggle.setAttribute('aria-controls', menu.id);
+    const label = select.getAttribute('aria-label') ||
+      [...(select.labels || [])].map(node => [...node.childNodes]
+        .filter(child => child.nodeType === 3).map(child => child.textContent.trim()).join(' ')).filter(Boolean).join(' ') ||
+      (select.hasAttribute('data-world-position') ? '世界书输入位置' : '选择选项');
+    select.before(picker);
+    picker.append(select, toggle, menu);
+    select.classList.add('ledger-select-source');
+    select.tabIndex = -1;
+    select.setAttribute('aria-hidden', 'true');
+    const sync = () => {
+      value.textContent = select.selectedOptions[0]?.label || '请选择';
+      toggle.setAttribute('aria-label', label + ' · ' + value.textContent);
+      toggle.disabled = select.matches(':disabled') || !select.options.length;
+      if (openPicker?.picker === picker) close();
+    };
+    sync();
+    select.addEventListener('change', sync);
+    const observer = new MutationObserver(sync);
+    observer.observe(select, {childList:true, subtree:true, characterData:true, attributes:true,
+      attributeFilter:['disabled','selected','label','value']});
+    observers.set(picker, observer);
+    function show() {
+      close();
+      menu.replaceChildren();
+      for (const [index, item] of [...select.options].entries()) {
+        if (item.hidden) continue;
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'ledger-suggestions-option';
+        option.textContent = item.label;
+        option.disabled = item.disabled || item.parentElement.matches('optgroup:disabled');
+        if (index === select.selectedIndex) option.setAttribute('aria-current', 'true');
+        option.onclick = () => {
+          const changed = index !== select.selectedIndex;
+          select.selectedIndex = index;
+          sync();
+          toggle.focus({preventScroll:true});
+          if (changed) {
+            select.dispatchEvent(new Event('input', {bubbles:true}));
+            select.dispatchEvent(new Event('change', {bubbles:true}));
+          }
+        };
+        menu.append(option);
+      }
+      menu.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      openPicker = {picker, toggle, menu};
+    }
+    toggle.onclick = () => { if (menu.hidden) show(); else close(); };
+    picker.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !menu.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        toggle.focus();
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (menu.hidden) show();
+        const options = [...menu.querySelectorAll('button:not(:disabled)')];
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const start = options.indexOf(event.target);
+        options[start < 0 ? (direction > 0 ? 0 : options.length - 1) :
+          Math.max(0, Math.min(options.length - 1, start + direction))]?.focus();
+      }
+    });
+  }
   document.addEventListener('pointerdown', event => {
     if (openPicker && !openPicker.picker.contains(event.target)) close();
   }, true);
   function scan(root) {
     if (root.matches?.('input[list]')) enhance(root);
     root.querySelectorAll?.('input[list]').forEach(enhance);
+    if (root.matches?.(selectSelector)) enhanceSelect(root);
+    root.querySelectorAll?.(selectSelector).forEach(enhanceSelect);
   }
   scan(document);
   new MutationObserver(records => {
