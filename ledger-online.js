@@ -500,7 +500,7 @@ const ledgerOnline = (() => {
   }
   function rooms(){
     room=null;
-    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button><button type="button" id="onlineUserProfile">在线 User 人设</button><button type="button" id="onlineAccountLogout">退出账号</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature" tabindex="0" role="button" aria-label="查看个人用户码">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">加入群聊</button>');
+    const serial=screen('在线聊天','<div class="row"><button class="primary" id="onlineNew">新建会话</button><button type="button" id="onlineUserProfile">在线 User 人设</button><button type="button" id="onlineAccountLogout">退出账号</button></div>'+end+'<div class="messages" id="onlineList"></div><p class="contact-signature" id="onlineSignature" tabindex="0" role="button" aria-label="查看个人用户码">BELONG TO S.J.&amp;L.S.R.</p>',undefined,'<button type="button" id="onlineJoin" style="margin-inline-start:auto;white-space:nowrap">输入邀请码</button>');
     const signature=el('onlineSignature');let revealingCode=false;
     const revealCode=async()=>{
       if(revealingCode)return;revealingCode=true;
@@ -559,9 +559,9 @@ const ledgerOnline = (() => {
     if(url.searchParams.has('onlineInvite')){
       url.searchParams.delete('onlineInvite');history.replaceState(null,'',url);
     }
-    screen(linked?'好友私聊邀请':'加入群聊','<form id="onlineJoinForm">'+(linked
-      ?'<p class="muted">如果你要加入在线群聊，请返回并输入群主提供的六位邀请码。</p>'
-      :'<label>六位邀请码<input name="invite" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="6" pattern="[A-Za-z0-9]{6}" required placeholder="例如 a7k2m9"></label>')+
+    screen(linked?'好友私聊邀请':'输入邀请码','<form id="onlineJoinForm">'+(linked
+      ?'<p class="muted">接受邀请后即可进入好友私聊。</p>'
+      :'<p class="muted">输入六位邀请码，加入在线群聊或好友私聊。</p><label>六位邀请码<input name="invite" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="6" pattern="[A-Za-z0-9]{6}" required placeholder="例如 a7k2m9"></label>')+
       '<button type="submit" class="primary">加入</button></form>'+end,rooms);
     form('onlineJoinForm',async(data,serial)=>{
       const invite=linked?linkInvite:data.invite.trim().toLowerCase();
@@ -1466,9 +1466,9 @@ const ledgerOnline = (() => {
     el('dialog').orbBack=el('onlineBack').onclick;
     function paint(info){
       if(!active(serial))return;
+      const creator=info.owner===me.id, owner=group&&creator, prefs=displayFor(current.id);
       const link=new URL('https://ophelia-shouren.github.io/Sleeping-Dragon-Ledger/');
       link.searchParams.set('onlineInvite',info.invite||'');
-      const owner=group&&info.owner===me.id, prefs=displayFor(current.id);
       if(group&&info.name)Object.assign(current,{name:info.name,avatar:info.avatar});
       const person=(id,name,avatar,note,canEdit,frame)=>{
         const tag=canEdit?'button':'div';
@@ -1482,7 +1482,7 @@ const ledgerOnline = (() => {
         info.chars.map(x=>person(x.id,x.name,x.avatar_image,'',owner||x.owner===me.id,x.frame)).join('')+
         (group?'<button type="button" class="group-settings-person" id="onlineAddChar"><b aria-hidden="true">＋</b><span>邀请角色</span></button>':'')+
         '</div><div id="onlineManage" style="margin-top:10px"></div></section>'+
-        (owner?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode||'')+'"></label><div class="row"><button id="onlineCopyCode" type="button">复制邀请码</button><button id="onlineRotateCode" type="button">重新生成邀请码</button></div></section>':
+        (creator&&info.inviteCode?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>六位邀请码<input id="onlineInviteCode" readonly value="'+esc(info.inviteCode||'')+'"></label><div class="row"><button id="onlineCopyCode" type="button">复制邀请码</button><button id="onlineRotateCode" type="button">重新生成邀请码</button></div></section>':
           !group&&info.invite?'<section class="group-settings-card group-settings-block"><h3>邀请成员</h3><label>邀请链接<input id="onlineLink" aria-label="邀请链接" readonly value="'+esc(link.href)+'"></label><button id="onlineCopy" type="button">复制邀请链接</button></section>':'')+
         (owner?'<section class="group-settings-card group-settings-block"><h3>群聊货币</h3><button type="button" id="onlineCurrencySettings">设置货币单位</button></section>':'')+
         (group?'<section class="group-settings-card group-settings-block"><h3>群公告</h3><button type="button" id="onlineAnnouncement">查看'+(owner?'／编辑':'')+'群公告</button></section>':'')+
