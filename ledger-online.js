@@ -1164,28 +1164,38 @@ const ledgerOnline = (() => {
       }catch(error){status(error.message);}finally{button.disabled=false;}
     };
   }
-  async function forwardExternal(scope,message){
-    if(!localStorage.getItem(sessionKey)||!me){pendingOnlineAction=()=>forwardExternal(scope,message);return open();}
+  async function forwardExternal(scope,messages){
+    if(!messages.length)return;
+    if(messages.length>100){toast('一次最多可转发 100 条消息，请分批选择。');return;}
+    if(!localStorage.getItem(sessionKey)||!me){pendingOnlineAction=()=>forwardExternal(scope,messages);return open();}
     const back=()=>{if(scope.group)openGroup(scope.group.id);else{el('dialog').close();render();}};
+    const serial=screen('转发到在线聊天','<p class="muted" id="onlineForwardLoading">正在读取可接收的在线会话…</p>'+end,back);
     try{
-      if(!me)throw Error('请先进入在线聊天完成身份同步。');
-      const authors=scope.group?(message.roleId?[message.roleId]:(message.audience||scope.group.members)):[scope.c.id];
-      const quoted=scope.group&&message.quote?scope.group.members.filter(id=>{const card=contact(id);return card&&[card.name,displayName(card)].includes(message.quote.speaker);}):[];
-      const localIds=[...new Set([...authors,...quoted])];
-      const groups=await readRooms(true),map=mapping(),remote=[];
-      for(const localId of localIds){
-        let enabled=null;
-        for(const group of groups.filter(x=>x.kind==='group')){
-          const info=await roomDetail(group.id);
-          enabled=info.chars.find(char=>char.owner===me.id&&char.personal_enabled&&map[char.id]?.card===localId);
-          if(enabled)break;
+      const rooms=await readRooms(true);
+      if(!active(serial))return;
+      const options=rooms.filter(room=>room.kind==='group'||room.kind==='dm').map(room=>
+        '<option value="'+esc(room.id)+'">'+(room.kind==='group'?'群聊 · ':'私聊 · ')+esc(room.name)+'</option>').join('');
+      if(!options){el('onlineForwardLoading').textContent='你还没有可接收转发的在线会话。';return;}
+      screen('转发到在线聊天','<p class="muted">将所选 '+messages.length+' 条消息合成一张聊天记录卡片，仅供接收会话的成员查看。</p>'+
+        '<form id="onlineExternalForward"><label>接收会话<select name="target" required><option value="">请选择</option>'+options+
+        '</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
+      form('onlineExternalForward',async(data,shown)=>{
+        const entries=[];
+        for(const message of messages){
+          const card=message.roleId?contact(message.roleId):scope.group?null:scope.c;
+          const speaker=message.speaker||(message.role==='system'?'系统':message.role==='user'?state.userName||'你':card?displayName(card):'角色');
+          let image=message.image?safePicture(message.image):'';
+          if(message.image&&!image)throw Error('选中的图片无法转发，请重新选择。');
+          if(image.startsWith('data:')&&image.length>1500000)image=await prepareImage(await (await fetch(image)).blob());
+          if(!active(shown))return;
+          const created=new Date(message.sentAt||0);
+          entries.push({speaker,body:[quoteText(message.quote),message.content].filter(Boolean).join('\n'),
+            created:message.sentAt&&Number.isFinite(created.getTime())?created.toISOString():'',image});
         }
-        if(!enabled)throw Error('涉及角色须先开启在线群聊内读取个人记忆与私聊记录。');
-        remote.push(enabled.id);
-      }
-      screen('转发到在线群聊','<form id="onlineExternalForward"><label>接收群聊<select name="target" required><option value="">请选择</option>'+groups.filter(x=>x.kind==='group').map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('')+'</select></label><button type="submit" class="primary">转发</button></form>'+end,back);
-      form('onlineExternalForward',async(data,serial)=>{await request('external-forward',{room:data.target,charIds:remote,speaker:message.speaker||(message.role==='user'?me?.name:displayName(scope.c)),body:[quoteText(message.quote),message.content].filter(Boolean).join('\n'),created:message.sentAt?new Date(message.sentAt).toISOString():'',image:message.image||''});if(active(serial)){back();toast('已转发');}});
-    }catch(error){toast(error.message);}
+        await request('external-forward',{room:data.target,entries});
+        if(active(shown)){back();toast('已转发聊天记录');}
+      });
+    }catch(error){if(active(serial))status(error.message);}
   }
   function chatRoom(current){
     if(!current)return rooms();
