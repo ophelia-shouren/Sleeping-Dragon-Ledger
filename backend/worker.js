@@ -832,7 +832,7 @@ async function api(req, env, url, ledger, ctx) {
     }
     return json({ok:true});
   }
-  async function groupInviteCode(room){
+  async function roomInviteCode(room){
     for(let attempt=0;attempt<8;attempt++){
       const existing=await one('SELECT code FROM ledger_invite_codes WHERE room=?',room);
       if(existing)return existing.code;
@@ -870,7 +870,7 @@ async function api(req, env, url, ledger, ctx) {
     const id = uuid();
     const name = kind === 'dm' ? '好友私聊' : field(data,'name',40);
     const rows=[stmt('INSERT INTO rooms VALUES (?,?,?,?,?)',id,name,kind,uid,uuid()),stmt('INSERT INTO members VALUES (?,?)',id,uid)];
-    if(ledger&&kind==='group')rows.push(stmt('INSERT OR IGNORE INTO ledger_invite_codes (room,code) VALUES (?,?)',id,randomInviteCode()));
+    if(ledger)rows.push(stmt('INSERT OR IGNORE INTO ledger_invite_codes (room,code) VALUES (?,?)',id,randomInviteCode()));
     await db.batch(rows);
     return json({id});
   }
@@ -878,18 +878,21 @@ async function api(req, env, url, ledger, ctx) {
     const invite=field(data,'invite',80);
     const byCode=ledger&&/^[a-z0-9]{6}$/.test(invite);
     const match=byCode
-      ? "r.kind='group' AND EXISTS (SELECT 1 FROM ledger_invite_codes c WHERE c.room=r.id AND c.code=?)"
+      ? "EXISTS (SELECT 1 FROM ledger_invite_codes c WHERE c.room=r.id AND c.code=?)"
       : ledger?"r.kind='dm' AND r.invite=?":'r.invite=?';
     const available=' AND NOT EXISTS (SELECT 1 FROM ledger_dissolved_groups d WHERE d.room=r.id)';
     const group=await one('SELECT r.id,r.kind,r.owner FROM rooms r WHERE '+match+available,invite);
-    if(!group||isLedgerId(group.owner)!==ledger)throw fail('邀请码无效或已更新。在线群聊请在眠龙内输入群主提供的六位邀请码。',404);
+    if(!group||isLedgerId(group.owner)!==ledger)throw fail('邀请码无效或已更新。请输入会话创建者提供的六位邀请码。',404);
     const insert=stmt("INSERT OR IGNORE INTO members (room,uid) SELECT r.id,? FROM rooms r WHERE r.id=? AND "+match+available+
       " AND (r.kind='group' OR (SELECT COUNT(*) FROM members WHERE room=r.id)<2)",uid,group.id,invite);
     if(ledger&&group.kind==='group'){
       const [joined]=await db.batch([insert,stmt("INSERT INTO messages (room,sender,body,kind) SELECT ?,?,?,'member-joined' WHERE changes()=1",group.id,uid,me.name+' 加入了群聊')]);
       if(joined.meta.changes)await run('INSERT INTO ledger_room_reads (room,uid,cursor) VALUES (?,?,COALESCE((SELECT MAX(id) FROM messages WHERE room=?),0)) ON CONFLICT(room,uid) DO UPDATE SET cursor=excluded.cursor',group.id,uid,group.id);
       if(!joined.meta.changes&&!await one('SELECT 1 FROM ledger_invite_codes WHERE room=? AND code=?',group.id,invite))throw fail('邀请码已更新，请输入新邀请码。',404);
-    }else await insert.run();
+    }else {
+      const joined=await insert.run();
+      if(byCode&&!joined.meta.changes&&!await one('SELECT 1 FROM ledger_invite_codes WHERE room=? AND code=?',group.id,invite))throw fail('邀请码已更新，请输入新邀请码。',404);
+    }
     await requireRoom(group.id).catch(()=>{throw fail(group.kind==='dm'?'这个私聊已经有两位成员。':'此邀请已失效。',group.kind==='dm'?409:404);});
     return json({id:group.id});
   }
@@ -1009,8 +1012,8 @@ async function api(req, env, url, ledger, ctx) {
     const usage = await one("SELECT COALESCE((SELECT messages FROM ledger_daily_usage WHERE day=date('now')),0) messages, strftime('%Y-%m-%dT00:00:00Z','now','start of day','+1 day') resets");
     return json({messages:usage.messages,resetsAt:usage.resets,d1:await accountD1Usage(env)});
   }
-  if (ledger && req.method==='POST' && path==='rotate-invite-code' && room.kind==='group') {
-    if(room.owner!==uid)throw fail('只有群主可以重新生成邀请码。',403);
+  if (ledger && req.method==='POST' && path==='rotate-invite-code') {
+    if(room.owner!==uid)throw fail('只有会话创建者可以重新生成邀请码。',403);
     for(let attempt=0;attempt<8;attempt++){
       const code=randomInviteCode();
       const result=await run(`INSERT INTO ledger_invite_codes (room,code)
@@ -1097,7 +1100,7 @@ async function api(req, env, url, ledger, ctx) {
       for(const member of members)member.avatar='online-look:user:'+member.id;
       for(const char of chars)char.avatar_image='online-look:char:'+char.id;
     }
-    const inviteCode=ledger&&room.kind==='group'&&room.owner===uid?await groupInviteCode(room.id):null;
+    const inviteCode=ledger&&room.owner===uid?await roomInviteCode(room.id):null;
     for(const char of chars)char.can_configure_api=char.owner===uid;
     return json({members,chars,...(room.kind==='group'?{name:room.name,avatar:look?.avatar||''}:{}),owner:room.owner,invite:room.owner===uid&&(!ledger||room.kind==='dm') ? room.invite : null,inviteCode});
   }
