@@ -759,7 +759,7 @@ const ledgerOnline = (() => {
       rememberChat(current.id);
       const back=()=>forwardPosition===null?chatRoom(current):readForwardCard(current,id);
       const body=card.type==='moon'
-        ? storyHtmlPreview(card.body,card.title).replace('sandbox="allow-scripts"','sandbox=""')
+        ? storyHtmlPreview(card.body,card.title)
         : '<article class="story-paper story-reader" style="font-size:'+state.storyFont+'px">'+esc(card.body)+'</article>';
       storyDialog(card.title,body+'<footer class="story-reader-exit"><button type="button" data-action="storyBack">返回聊天</button></footer>','reader',back);
       const exit=el('dialog').querySelector('.story-header-exit');
