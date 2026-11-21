@@ -4439,6 +4439,8 @@ function firstCardReplyMs(cfg){
 }
 const cardSettingsLabels={decks:'我的字卡',replies:'回复设置',pokes:'拍一拍',statuses:'状态',emojis:'表情'};
 const cardSettingsPackKeys={pokes:['pokes','pokePresets'],statuses:['statuses'],emojis:['emojis','blockedEmojis']};
+const cardBackgroundIdle=cfg=>cfg.backgroundIdle??cfg.idle;
+const validCardIdle=value=>Number.isInteger(value)&&value>=1&&value<=86400;
 const cardReplyKeys=['firstReplyRange','speed','count','idle','proactive','multiple'];
 function cardSettingsFile(label,attributes){
   return '<label class="card-settings-file">'+label+'<input type="file" '+attributes+' accept=".json,application/json"></label>';
@@ -4531,7 +4533,9 @@ function openLocalChatSettings(c=contact(activeContact),initialPage=''){
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
     (keyword?billRuleEditor(cfg.billRules||[]):'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button type="submit" class="primary">保存字卡</button></div></section></form>'+
-      '<form id="cardReplyForm" data-id="'+esc(c.id)+'" data-card-settings-page="replies" hidden><section class="card-settings-section"><fieldset class="card-settings-reply-range"><legend>首条回复等待（秒）</legend><div class="local-chat-fields"><label>最短<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>最长<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label></div></fieldset><div class="local-chat-fields card-reply-options"><label>主动发消息前等待（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
+      '<form id="cardReplyForm" data-id="'+esc(c.id)+'" data-card-settings-page="replies" hidden><section class="card-settings-section"><fieldset class="card-settings-reply-range"><legend>首条回复等待（秒）</legend><div class="local-chat-fields"><label>最短<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>最长<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label></div></fieldset><div class="local-chat-fields card-reply-options"><label>'+(androidCardBackground()?'前台主动来信等待（秒）':'主动来信等待（秒）')+'<input name="idle" type="number" min="1" max="86400" required value="'+cfg.idle+'"></label>'+
+      (androidCardBackground()?'<label>后台主动来信等待（秒）<input name="backgroundIdle" type="number" min="1" max="86400" required value="'+cardBackgroundIdle(cfg)+'"><small class="muted">切到后台后使用此时间，需允许眠龙在后台运行</small></label>':'')+
+      '<label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     (keyword?'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>':
@@ -4635,6 +4639,7 @@ function saveCardReplyForm(form){
   const c=contact(form.dataset.id),e=form.elements;
   if(!c||localConfig(c).mode!=='cards')return;
   const patch={firstReplyRange:[Number(e.firstReplyMin.value),Number(e.firstReplyMax.value)],speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
+  if(e.backgroundIdle)patch.backgroundIdle=Number(e.backgroundIdle.value);
   if(!validFirstCardReplyRange(patch.firstReplyRange))throw Error('首条回复的最短等待不能超过最长等待。');
   if(saveChatModes(c,patch)){
     transitionCardSettings(()=>showCardSettingsPage(''));
@@ -4646,7 +4651,7 @@ function exportCardSettings(kind){
   if(!c||localConfig(c).mode!=='cards')return;
   const cfg=localConfig(c),pack=cfg.cardPack||{};
   const data=kind==='decks'?{decks:cfg.decks}:kind==='replies'?
-    {replies:Object.fromEntries(cardReplyKeys.map(key=>[key,key==='firstReplyRange'?firstCardReplyRange(cfg):cfg[key]]))}:
+    {replies:{...Object.fromEntries(cardReplyKeys.map(key=>[key,key==='firstReplyRange'?firstCardReplyRange(cfg):cfg[key]])),backgroundIdle:cardBackgroundIdle(cfg)}}:
     Object.fromEntries(cardSettingsPackKeys[kind].map(key=>[key,pack[key]??[]]));
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const name=cardSettingsLabels[kind]+'.json';
@@ -4675,6 +4680,7 @@ async function importCardSettings(input){
   if(kind==='replies'){
     if(!data.replies||!cardReplyKeys.every(key=>Object.hasOwn(data.replies,key)))throw Error('请选择回复设置 JSON。');
     patch=Object.fromEntries(cardReplyKeys.map(key=>[key,data.replies[key]]));
+    patch.backgroundIdle=Object.hasOwn(data.replies,'backgroundIdle')?data.replies.backgroundIdle:patch.idle;
   }else{
     const keys=cardSettingsPackKeys[kind],current=cfg.cardPack||{};
     const fields=companionDeckFields[kind]||[companionTextFields[kind]];
@@ -4692,6 +4698,7 @@ async function importCardSettings(input){
     const form=$('cardReplyForm'),e=form.elements;
     [e.firstReplyMin.value,e.firstReplyMax.value]=patch.firstReplyRange;
     for(const key of ['speed','count','idle'])e[key].value=patch[key];
+    if(e.backgroundIdle)e.backgroundIdle.value=patch.backgroundIdle;
     for(const key of ['proactive','multiple'])e[key].checked=patch[key];
   }
   repaintChat();resetIdleTimer();toast(cardSettingsLabels[kind]+'已导入');
@@ -4727,7 +4734,9 @@ function cancelDirectCardReplies(){
 }
 function resetIdleTimer(){
   clearTimeout(idleTimer);
-  const now=Date.now(),canRun=androidCardBackground()||(!deviceLocked&&!document.hidden);
+  const now=Date.now(),android=androidCardBackground();
+  const inBackground=android&&document.hidden;
+  const canRun=android||(!deviceLocked&&!document.hidden);
   const eligible=new Set();
   let next=Infinity;
   for(const c of state.contacts){
@@ -4737,15 +4746,17 @@ function resetIdleTimer(){
     if(localRuns.has(id))continue;
     const last=cfg.cards.messages.at(-1);
     let clock=cardIdleDeadlines.get(id);
-    if(!clock||clock.last!==last||clock.idle!==cfg.idle){
-      clock={last,idle:cfg.idle,due:now+cfg.idle*1000};
+    if(!clock||clock.last!==last){
+      clock={last,since:now};
       cardIdleDeadlines.set(id,clock);
     }
     if(!canRun)continue;
-    if(clock.due<=now){
-      clock.due=now+cfg.idle*1000;
+    const idle=inBackground?cardBackgroundIdle(cfg):cfg.idle;
+    const due=clock.since+idle*1000;
+    if(due<=now){
+      clock.since=now;
       queueLocalCards(c);
-    }else next=Math.min(next,clock.due);
+    }else next=Math.min(next,due);
   }
   for(const id of cardIdleDeadlines.keys())if(!eligible.has(id))cardIdleDeadlines.delete(id);
   if(Number.isFinite(next))idleTimer=setTimeout(resetIdleTimer,Math.max(0,next-Date.now()));
@@ -4991,7 +5002,7 @@ function validateChatModes(cfg){
     (cfg.firstReplyRange===undefined||validFirstCardReplyRange(cfg.firstReplyRange))&&
     (cfg.firstReplyDelay===undefined||(Number.isFinite(cfg.firstReplyDelay)&&cfg.firstReplyDelay>=0&&cfg.firstReplyDelay<=120))&&
     Number.isFinite(cfg.speed)&&cfg.speed>=0&&cfg.speed<=120&&Number.isInteger(cfg.count)&&cfg.count>=1&&cfg.count<=10&&
-    Number.isInteger(cfg.idle)&&cfg.idle>=1&&cfg.idle<=86400&&typeof cfg.multiple==='boolean'&&typeof cfg.proactive==='boolean'&&log(cfg.keyword)&&log(cfg.cards);
+    validCardIdle(cfg.idle)&&(cfg.backgroundIdle===undefined||validCardIdle(cfg.backgroundIdle))&&typeof cfg.multiple==='boolean'&&typeof cfg.proactive==='boolean'&&log(cfg.keyword)&&log(cfg.cards);
 }
 
 const chatClock=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
