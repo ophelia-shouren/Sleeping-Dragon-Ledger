@@ -4584,7 +4584,10 @@ function saveLocalChatForm(form){
   const patch=form.dataset.mode==='keyword'?{rules:items,billRules:readBillRules(form,localConfig(c).billRules||[])}:{decks:items};
   if(saveChatModes(c,patch)){
     if(form.dataset.mode==='keyword'){refreshBillReplies(c.id);$('dialog').close();}
-    else refreshSavedCardDecks(form,localConfig(contact(c.id)).decks);
+    else{
+      refreshSavedCardDecks(form,localConfig(contact(c.id)).decks);
+      transitionCardSettings(()=>showCardSettingsPage(''));
+    }
     render();resetIdleTimer();toast('已保存');
   }
 }
@@ -4593,7 +4596,10 @@ function saveCardReplyForm(form){
   if(!c||localConfig(c).mode!=='cards')return;
   const patch={firstReplyRange:[Number(e.firstReplyMin.value),Number(e.firstReplyMax.value)],speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
   if(!validFirstCardReplyRange(patch.firstReplyRange))throw Error('首条回复的最短等待不能超过最长等待。');
-  if(saveChatModes(c,patch)){resetIdleTimer();toast('回复设置已保存');}
+  if(saveChatModes(c,patch)){
+    transitionCardSettings(()=>showCardSettingsPage(''));
+    resetIdleTimer();toast('回复设置已保存');
+  }
 }
 function exportCardSettings(kind){
   const c=contact(activeContact);
