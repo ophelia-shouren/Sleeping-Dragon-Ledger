@@ -4379,6 +4379,7 @@ async function importLocalChat(input){
   $('deckImportCategories').innerHTML=deckPresetMenu(saved);
   $('deckImportStatus').textContent='已保存 '+added.length+' 个新分组，共 '+added.reduce((count,deck)=>count+deck.items.length,0)+' 张字卡。'+(pack?' 其他素材已保存至「字卡资料与工具」。':'');
   input.value='';
+  repaintChat();
   resetIdleTimer();
 }
 
@@ -4432,10 +4433,12 @@ function queueLocalCards(c,afterUserMessage=false){
   let sent=0;
   function schedule(ms){
     dueAt=Date.now()+ms;
-    timer=setTimeout(step,ms);
+    const scheduled=setTimeout(()=>{if(timer===scheduled)step();},ms);
+    timer=scheduled;
   }
   function step(){
     clearTimeout(timer);
+    timer=undefined;
     const latest=contact(id);
     if(!latest||localRuns.get(id)!==run)return;
     if(teaLock([id])||mysteryChatBlocked([id])){localRuns.delete(id);return;}
