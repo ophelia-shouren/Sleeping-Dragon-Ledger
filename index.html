@@ -4151,7 +4151,7 @@ function openLocalChatSettings(c=contact(activeContact)){
       '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
-    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
+    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>你发消息后多久回第一条（秒）<input name="firstReplyDelay" type="number" min="0" max="120" step=".1" required value="'+(cfg.firstReplyDelay??cfg.speed)+'"></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
@@ -4229,7 +4229,7 @@ function saveLocalChatForm(form){
   const c=contact(form.dataset.id);if(!c)return;
   if(form.dataset.mode==='cards'&&localConfig(c).decks!==form.savedDecks)throw Error('字卡分组已更新，请重新打开设置再保存。');
   const items=parseLocalForm(form),e=form.elements;
-  const patch=form.dataset.mode==='keyword'?{rules:items,billRules:readBillRules(form,localConfig(c).billRules||[])}:{decks:items,speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
+  const patch=form.dataset.mode==='keyword'?{rules:items,billRules:readBillRules(form,localConfig(c).billRules||[])}:{decks:items,firstReplyDelay:Number(e.firstReplyDelay.value),speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
   if(saveChatModes(c,patch)){if(form.dataset.mode==='keyword')refreshBillReplies(c.id);$('dialog').close();render();resetIdleTimer();toast('已保存');}
 }
 function changeChatMode(mode){
@@ -4258,7 +4258,7 @@ function resetIdleTimer(){
   if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!enabledCardPool(cfg).length)return;
   idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
 }
-function queueLocalCards(c){
+function queueLocalCards(c,afterUserMessage=false){
   if(mysteryChatBlocked([c.id])||teaLock([c.id]))return;
   const cfg=localConfig(c),run=Symbol(),id=c.id;
   if(!enabledCardPool(cfg).length){repaintChat();return;}
@@ -4281,7 +4281,8 @@ function queueLocalCards(c){
     if(page==='chat'&&activeContact===id&&!deviceLocked)repaintChat();
     resetIdleTimer();
   }
-  repaintChat();setTimeout(step,delay);
+  const firstDelay=afterUserMessage?Math.max(500,(cfg.firstReplyDelay??cfg.speed)*1000):delay;
+  repaintChat();setTimeout(step,firstDelay);
 }
 function repaintChat(){
   const input=document.querySelector('#chatForm textarea');
@@ -4301,7 +4302,7 @@ function sendLocalChat(c){
   }
   if(!patchSession(c,cfg.mode,{messages,draft:''}))return;
   chatImages.delete(k);chatQuotes.delete(qKey);
-  if(cfg.mode==='cards')queueLocalCards(contact(c.id));
+  if(cfg.mode==='cards')queueLocalCards(contact(c.id),true);
   else repaintChat();
 }
 
@@ -4355,6 +4356,7 @@ function validateChatModes(cfg){
   const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
   return cfg&&(cfg.billRules===undefined||(Array.isArray(cfg.billRules)&&cfg.billRules.every(validBillRule)&&new Set(cfg.billRules.map(x=>x.id)).size===cfg.billRules.length))&&Object.hasOwn(chatModeLabels,cfg.mode)&&Array.isArray(cfg.rules)&&cfg.rules.every(x=>x&&strings(x.triggers)&&x.triggers.length&&typeof x.reply==='string')&&
     Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&(x.disabledItems===undefined||strings(x.disabledItems))&&typeof x.enabled==='boolean')&&
+    (cfg.firstReplyDelay===undefined||(Number.isFinite(cfg.firstReplyDelay)&&cfg.firstReplyDelay>=0&&cfg.firstReplyDelay<=120))&&
     Number.isFinite(cfg.speed)&&cfg.speed>=0&&cfg.speed<=120&&Number.isInteger(cfg.count)&&cfg.count>=1&&cfg.count<=10&&
     Number.isInteger(cfg.idle)&&cfg.idle>=1&&cfg.idle<=86400&&typeof cfg.multiple==='boolean'&&typeof cfg.proactive==='boolean'&&log(cfg.keyword)&&log(cfg.cards);
 }
