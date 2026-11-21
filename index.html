@@ -276,6 +276,8 @@ body.full-chat{overflow:hidden}
 #dialog .deck-category-grid button{display:grid;gap:5px;text-align:start;min-width:0;overflow-wrap:anywhere;padding:12px 14px;background:var(--control);color:var(--ink);border:1px solid var(--line);border-radius:10px}
 #dialog .deck-category-grid button small{color:var(--muted)}
 .deck-card-list{display:grid;gap:8px;margin-top:12px}
+.deck-card-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+#dialog .deck-card-switch{margin:0;min-height:44px;padding:0 4px}
 #dialog .deck-card{width:100%;min-height:46px;display:block;text-align:start;white-space:pre-wrap;overflow-wrap:anywhere;padding:11px 14px;color:var(--ink);background:var(--field,var(--panel));border:1px solid var(--line);border-inline-start:3px solid var(--gold);border-radius:9px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-y}
 #dialog .deck-card[aria-pressed=true]{background:var(--selected,var(--control));color:var(--selected-ink,var(--ink));outline:2px solid var(--gold);outline-offset:-2px}
 .deck-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
@@ -4089,7 +4091,7 @@ function parseCardDecks(raw,format='auto'){
     const data=JSON.parse(source),list=data?.categories??data?.decks??data;
     if(Array.isArray(list)){
       if(list.every(x=>typeof x==='string'))result=[{name:'默认',items:words(list),enabled:true}];
-      else result=list.map(x=>({name:x?.name??x?.category??x?.['分类'],items:words(x?.items??x?.cards??x?.['字卡']),enabled:x?.enabled!==false}));
+      else result=list.map(x=>({name:x?.name??x?.category??x?.['分类'],items:words(x?.items??x?.cards??x?.['字卡']),enabled:x?.enabled!==false,disabledItems:words(x?.disabledItems)}));
     }else if(list&&typeof list==='object')result=Object.entries(list).map(([name,items])=>({name,items:words(items),enabled:true}));
   }else{
     result=source.split(/\r?\n/).filter(x=>x.trim()).map(line=>{
@@ -4101,7 +4103,7 @@ function parseCardDecks(raw,format='auto'){
   for(const deck of result){
     if(typeof deck.name!=='string'||!deck.name.trim()||!deck.items.length)continue;
     const name=deck.name.trim(),previous=groups.get(name);
-    groups.set(name,{name,items:[...new Set([...(previous?.items||[]),...deck.items])],enabled:previous?.enabled??deck.enabled});
+    groups.set(name,{name,items:[...new Set([...(previous?.items||[]),...deck.items])],enabled:previous?.enabled??deck.enabled,disabledItems:[...new Set([...(previous?.disabledItems||[]),...(deck.disabledItems||[])])].filter(item=>deck.items.includes(item)||previous?.items.includes(item))});
   }
   if(!groups.size)throw Error('未识别到字卡。可使用「问候：早安，好久不见，晚安」。');
   return [...groups.values()];
@@ -4142,7 +4144,7 @@ function openLocalChatSettings(c=contact(activeContact)){
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
     cfg.decks.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
   dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+(keyword?'':deckPresetMenu(cfg.decks)+'<details class="deck-bulk-editor"><summary>批量编辑与导入</summary>')+fields+
-    '<label>导入'+(keyword?' Markdown／JSON':' JSON')+'<input id="localChatImport" type="file" accept="'+(keyword?'.md,.markdown,.json':'.json')+'"></label>'+
+    '<label>导入'+(keyword?' Markdown／JSON':' JSON（追加为新分组）')+'<input id="localChatImport" type="file" accept="'+(keyword?'.md,.markdown,.json':'.json')+'"></label>'+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
     (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
@@ -4159,11 +4161,11 @@ function localFormPreview(form,items){
     items.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
 }
 function parseLocalForm(form){
-  const enabled=new Map(form.parsed.map((d,i)=>[d.name,form.querySelector('[name=deckEnabled][value="'+i+'"]')?.checked??d.enabled]));
+  const previous=new Map(form.parsed.map((d,i)=>[d.name,{...d,enabled:form.querySelector('[name=deckEnabled][value="'+i+'"]')?.checked??d.enabled}]));
   const value=form.elements.source.value;
   const keyword=form.dataset.mode==='keyword';
   const items=value===form.sourceSnapshot?form.parsed:parseManualChat(value,keyword);
-  return keyword?items:items.map(d=>({...d,enabled:enabled.get(d.name)??true}));
+  return keyword?items:items.map(deck=>({...deck,enabled:previous.get(deck.name)?.enabled??true,disabledItems:(previous.get(deck.name)?.disabledItems||[]).filter(item=>deck.items.includes(item))}));
 }
 async function importLocalChat(input){
   const form=input.form,file=input.files[0];if(!form||!file)return;
@@ -4171,7 +4173,23 @@ async function importLocalChat(input){
   const format=file.name.toLowerCase().endsWith('.json')?'json':'markdown',raw=await file.text();
   if(!form.isConnected)return;
   const keyword=form.dataset.mode==='keyword';
-  const items=keyword?parseKeywordRules(raw,format):parseCardDecks(raw,'json');
+  let items;
+  if(keyword)items=parseKeywordRules(raw,format);
+  else{
+    const current=parseLocalForm(form), incoming=parseCardDecks(raw,'json');
+    const used=new Set(current.map(deck=>deck.name));
+    const reserved=new Set(incoming.map(deck=>deck.name));
+    items=[...current,...incoming.map(deck=>{
+      let name=deck.name;
+      if(used.has(name)){
+        name=deck.name+'（导入）';
+        for(let number=2;used.has(name)||reserved.has(name);number++)name=deck.name+'（导入 '+number+'）';
+      }
+      used.add(name);
+      return {...deck,name};
+    })];
+    toast('已追加 '+incoming.length+' 个新分组，请点击保存。');
+  }
   form.elements.source.value=manualChatSource(items,keyword);
   localFormPreview(form,items);
   input.value='';
@@ -4186,8 +4204,14 @@ function changeChatMode(mode){
   const c=contact(activeContact);if(!c||!Object.hasOwn(chatModeLabels,mode)||localConfig(c).mode===mode)return;
   if(saveChatModes(c,{mode})){if(mode==='keyword')refreshBillReplies(c.id);localRuns.delete(c.id);render();resetIdleTimer();}
 }
+function enabledCardPool(cfg){
+  return [...new Set(cfg.decks.filter(deck=>deck.enabled).flatMap(deck=>{
+    const disabled=new Set(deck.disabledItems);
+    return deck.items.filter(item=>!disabled.has(item));
+  }))];
+}
 function chooseCard(cfg){
-  const pool=[...new Set(cfg.decks.filter(d=>d.enabled).flatMap(d=>d.items))];
+  const pool=enabledCardPool(cfg);
   if(!pool.length)return '';
   const count=cfg.multiple?Math.min(pool.length,2+Math.floor(Math.random()*3)):1;
   const picked=[];
@@ -4295,7 +4319,7 @@ function validateChatModes(cfg){
   const strings=x=>Array.isArray(x)&&x.every(y=>typeof y==='string'&&y.trim());
   const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
   return cfg&&(cfg.billRules===undefined||(Array.isArray(cfg.billRules)&&cfg.billRules.every(validBillRule)&&new Set(cfg.billRules.map(x=>x.id)).size===cfg.billRules.length))&&Object.hasOwn(chatModeLabels,cfg.mode)&&Array.isArray(cfg.rules)&&cfg.rules.every(x=>x&&strings(x.triggers)&&x.triggers.length&&typeof x.reply==='string')&&
-    Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&typeof x.enabled==='boolean')&&
+    Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&(x.disabledItems===undefined||strings(x.disabledItems))&&typeof x.enabled==='boolean')&&
     Number.isFinite(cfg.speed)&&cfg.speed>=0&&cfg.speed<=120&&Number.isInteger(cfg.count)&&cfg.count>=1&&cfg.count<=10&&
     Number.isInteger(cfg.idle)&&cfg.idle>=1&&cfg.idle<=86400&&typeof cfg.multiple==='boolean'&&typeof cfg.proactive==='boolean'&&log(cfg.keyword)&&log(cfg.cards);
 }
@@ -4633,13 +4657,18 @@ function openDeckPreset(index,edit=false){
     '<div class="row actions"><button class="primary">保存此分组</button><button type="button" data-action="localChatSettings">返回字卡设置</button></div></form>');
   const form=$('deckPresetForm');form.originalItems=deck?.items;form.originalText=form.elements.deckItems.value;
 }
+function deckCardSwitch(label,checked,attributes){
+  return '<label class="mode-toggle deck-card-switch"><input type="checkbox" role="switch" '+attributes+' aria-label="'+esc(label)+'" '+(checked?'checked':'')+'><span aria-hidden="true"></span></label>';
+}
 function openDeckCards(c,index){
   const decks=localConfig(c).decks,deck=decks[index];
   if(!deck)return;
+  const disabled=new Set(deck.disabledItems);
   dialog('<h2>'+esc(deck.name)+'</h2><div class="row"><button type="button" id="deckBack">‹ 字卡分类</button><button type="button" id="deckSettings">分组设置</button><button type="button" id="deckAdd">＋ 添加字卡</button></div>'+
+    '<div class="row">启用分组'+deckCardSwitch('启用分组 '+deck.name,deck.enabled,'id="deckGroupSwitch"')+'</div>'+
     '<p class="muted">'+deck.items.length+' 张字卡 · 长按或点按可选中</p>'+
     '<div class="deck-card-actions" id="deckActions" hidden><span id="deckCount" aria-live="polite"></span><button type="button" id="deckEdit">修改</button><button type="button" id="deckMove">移动分组</button><button type="button" id="deckDelete" class="archive-danger">删除</button><button type="button" id="deckClear">取消选择</button></div>'+
-    '<div id="deckEditor"></div><div class="deck-card-list" id="deckCardList">'+(deck.items.map((card,position)=>'<button type="button" class="deck-card" aria-pressed="false" data-deck-card="'+position+'">'+esc(card)+'</button>').join('')||'<p class="muted">这个分类还没有字卡。</p>')+'</div>');
+    '<div id="deckEditor"></div><div class="deck-card-list" id="deckCardList">'+(deck.items.map((card,position)=>'<div class="deck-card-row"><button type="button" class="deck-card" aria-pressed="false" data-deck-card="'+position+'">'+esc(card)+'</button>'+deckCardSwitch('启用字卡 '+card,!disabled.has(card),'data-deck-switch="'+position+'"')+'</div>').join('')||'<p class="muted">这个分类还没有字卡。</p>')+'</div>');
   const list=$('deckCardList'),selected=new Set(),editor=$('deckEditor');
   let pressTimer,origin,longPressed;
   const cancelPress=()=>{clearTimeout(pressTimer);origin=null;};
@@ -4678,7 +4707,11 @@ function openDeckCards(c,index){
   const save=next=>{
     const current=contact(c.id);
     if(!current||localConfig(current).decks!==decks){toast('字卡分组已更新，请重新打开后再操作。');return;}
-    if(saveChatModes(current,{decks:next})){resetIdleTimer();openDeckCards(contact(c.id),index);}
+    if(!saveChatModes(current,{decks:next}))return false;
+    const top=$('dialog').scrollTop;
+    resetIdleTimer();openDeckCards(contact(c.id),index);
+    $('dialog').scrollTop=top;
+    return true;
   };
   const clear=()=>{selected.clear();for(const button of list.querySelectorAll('[aria-pressed=true]'))button.setAttribute('aria-pressed','false');editor.replaceChildren();paint();};
   function editCard(position){
@@ -4692,10 +4725,22 @@ function openDeckCards(c,index){
       if(deck.items.some((item,i)=>i!==position&&item===value)){toast('该分组已有相同字卡。');return;}
       const items=deck.items.slice();
       if(position===null)items.push(value);else items[position]=value;
-      save(decks.map((group,i)=>i===index?{...group,items}:group));
+      const disabledItems=position===null?[...disabled]:[...disabled].map(item=>item===deck.items[position]?value:item);
+      save(decks.map((group,i)=>i===index?{...group,items,disabledItems}:group));
     };
     form.elements.card.focus();
   }
+  $('deckGroupSwitch').onchange=event=>{
+    const input=event.target;
+    if(!save(decks.map((group,i)=>i===index?{...group,enabled:input.checked}:group)))input.checked=deck.enabled;
+  };
+  list.addEventListener('change',event=>{
+    const input=event.target;
+    if(!input.hasAttribute('data-deck-switch'))return;
+    const card=deck.items[Number(input.dataset.deckSwitch)], next=new Set(disabled);
+    if(input.checked)next.delete(card);else next.add(card);
+    if(!save(decks.map((group,i)=>i===index?{...group,disabledItems:[...next]}:group)))input.checked=!disabled.has(card);
+  });
   $('deckBack').onclick=()=>openLocalChatSettings(contact(c.id));
   $('deckSettings').onclick=()=>openDeckPreset(index,true);
   $('deckAdd').onclick=()=>editCard(null);
@@ -4703,15 +4748,18 @@ function openDeckCards(c,index){
   $('deckEdit').onclick=()=>editCard([...selected][0]);
   $('deckDelete').onclick=()=>{
     if(selected.size&&confirm('确认删除选中的 '+selected.size+' 张字卡？删除后无法撤销。')){
-      save(decks.map((group,i)=>i===index?{...group,items:group.items.filter((_,j)=>!selected.has(j))}:group));
+      const items=deck.items.filter((_,j)=>!selected.has(j));
+      save(decks.map((group,i)=>i===index?{...group,items,disabledItems:[...disabled].filter(item=>items.includes(item))}:group));
     }
   };
   $('deckMove').onclick=()=>{
     editor.innerHTML='<section class="deck-card-editor"><h3>移到哪个分组？</h3><div class="deck-category-grid">'+decks.map((group,i)=>i===index?'':'<button type="button" data-deck-target="'+i+'">'+esc(group.name)+'</button>').join('')+'</div></section>';
     editor.querySelectorAll('[data-deck-target]').forEach(button=>button.onclick=()=>{
       const target=Number(button.dataset.deckTarget),moved=deck.items.filter((_,i)=>selected.has(i));
-      save(decks.map((group,i)=>i===index?{...group,items:group.items.filter((_,j)=>!selected.has(j))}:
-        i===target?{...group,items:[...new Set([...group.items,...moved])]}:group));
+      const remaining=deck.items.filter((_,j)=>!selected.has(j));
+      save(decks.map((group,i)=>i===index?{...group,items:remaining,disabledItems:[...disabled].filter(item=>remaining.includes(item))}:
+        i===target?{...group,items:[...new Set([...group.items,...moved])],
+          disabledItems:[...(group.disabledItems||[]),...moved.filter(item=>disabled.has(item)&&!group.items.includes(item))]}:group));
     });
   };
   paint();
@@ -4724,7 +4772,7 @@ function saveDeckPreset(form){
   const items=form.originalItems&&value===form.originalText?form.originalItems:[...new Set(value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean))];
   if(!name)throw Error('请填写分组名称。');
   if(cfg.decks.some(d=>d.name===name&&d.name!==original))throw Error('这个分组名已存在。');
-  const next={name,items,enabled:form.elements.deckActive.checked};
+  const next={name,items,enabled:form.elements.deckActive.checked,disabledItems:(cfg.decks.find(deck=>deck.name===original)?.disabledItems||[]).filter(item=>items.includes(item))};
   const decks=original?cfg.decks.map(d=>d.name===original?next:d):[...cfg.decks,next];
   if(saveChatModes(c,{decks})){openLocalChatSettings(contact(c.id));resetIdleTimer();toast('分组预设已保存');}
 }
@@ -5120,7 +5168,7 @@ function regenerateMessage(scope,index,guide=''){
   if(scope.group){rerollGroup(scope.c.id,index,guide);return;}
   if(scope.mode==='ai'){send(false,{index,guide});return;}
   if(scope.mode!=='cards')return;
-  const cfg=localConfig(scope.c),pool=[...new Set(cfg.decks.filter(d=>d.enabled).flatMap(d=>d.items))];
+  const cfg=localConfig(scope.c),pool=enabledCardPool(cfg);
   const previous=scope.messages[index].content;
   const content=chooseCard(!cfg.multiple&&pool.some(x=>x!==previous)?{...cfg,decks:[{enabled:true,items:pool.filter(x=>x!==previous)}]}:cfg);
   if(!content){toast('请先启用一个字卡分组。');return;}
