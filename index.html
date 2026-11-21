@@ -283,6 +283,7 @@ body.full-chat{overflow:hidden}
 #dialog .deck-card[aria-pressed=true]{background:var(--selected,var(--control));color:var(--selected-ink,var(--ink));outline:2px solid var(--gold);outline-offset:-2px}
 .deck-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
 .deck-card-actions[hidden]{display:none}
+.card-pack-list{max-height:35dvh;overflow:auto;overscroll-behavior:contain}.card-pack-status{display:block;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .deck-card-editor{margin:10px 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .deck-bulk-editor{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px}.deck-bulk-editor summary{cursor:pointer;color:var(--gold)}
 .home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
@@ -2446,7 +2447,7 @@ function chat(){
   const typing=busy||(mode==='cards'&&localRuns.has(c.id));
   const now=Date.now(),selected=messageSelection(c,mode,session.messages);
   const history=chatHistoryWindow(session.messages,privateChatPage);
-  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2></div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开私聊设置" title="私聊设置">★</button></div></div>'+
+  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2>'+(mode==='cards'&&cardPackStatus(localConfig(c))?'<small class="card-pack-status">'+esc(cardPackStatus(localConfig(c)))+'</small>':'')+'</div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开私聊设置" title="私聊设置">★</button></div></div>'+
     messageActionBar(selected)+'<div id="messages" class="messages">'+
     (history.start?'<div class="chat-history-page"><button type="button" data-action="olderChatPage">查看更早的消息</button></div>':'')+
     (history.messages.length?history.messages.map((x,offset)=>{
@@ -3987,10 +3988,11 @@ function chatAttachments(c,busy,group){
   return '<div id="chatImagePreview">'+(src?renderChatImagePreview(src):'')+'</div>'+
     '<div id="composerMenu" class="composer-menu" hidden><h3>聊天工具</h3>'+
     (mode==='ai'?'<div class="chat-story-controls">'+(group?currentSceneButton(group,true)+actionWritingControl(group,true):currentSceneButton(c)+actionWritingControl(c))+'</div>':'')+
+    (mode==='cards'?'<button type="button" class="composer-tool" data-action="cardPackOpen">字卡资料与工具</button>':'')+
     '<div class="composer-tools"><button type="button" class="composer-tool composer-icon" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" aria-label="茶叙" title="茶叙" '+(busy?'disabled':'')+'>'+tea+'</button><button type="button" class="composer-tool bonus-tea-button" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" data-tea-bonus="true">✦ 番外茶叙</button><label class="chat-file composer-tool">'+photo+'<span>图片／表情包</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
     (mode==='ai'?'<button type="button" class="composer-tool composer-icon" data-action="chatGames" aria-label="小游戏" title="小游戏" aria-haspopup="dialog" '+(busy?'disabled':'')+'>'+dice+'</button></div></div>':
     '<button type="button" class="composer-tool" data-action="emojiPicker" aria-expanded="false" aria-controls="chatEmojis">'+emoji+'<span>插入表情</span></button></div>'+
-    '<div id="chatEmojis" class="chat-emojis" hidden>'+['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙'].map(x=>'<button type="button" data-emoji="'+x+'">'+x+'</button>').join('')+'</div></div>')+
+    '<div id="chatEmojis" class="chat-emojis" hidden>'+words([...((mode==='cards'&&localConfig(c).cardPack?.emojis)||[]),'😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙']).map(x=>'<button type="button" data-emoji="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div></div>')+
     '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" data-action="composerMenu" aria-label="聊天工具" aria-controls="composerMenu" aria-expanded="false">'+tools+'</button>'+
     '<button type="submit" class="composer-send composer-icon" aria-label="寄出信件" title="寄出信件" '+(busy?'disabled':'')+'>'+star+'</button></div>';
 }
@@ -4085,6 +4087,112 @@ function parseKeywordRules(raw,format='auto'){
   if(!grouped.size)throw Error('未识别到提示词规则。可使用「晚安，睡觉 => 晚安，做个好梦。」');
   return [...grouped].map(([reply,triggers])=>({triggers,reply}));
 }
+const companionDeckFields={replies:['customReplyGroups','customReplies'],pokes:['customPokeGroups','customPokes'],statuses:['customStatusGroups','customStatuses']};
+const companionTextFields={mottos:'customMottos',intros:'customIntros',emojis:'customEmojis'};
+function companionDecks(data,kind){
+  const [groupKey,flatKey]=companionDeckFields[kind];
+  const groups=(Array.isArray(data[groupKey])?data[groupKey]:[]).flatMap(group=>{
+    const items=words(group?.items),name=typeof group?.name==='string'?group.name.trim():'';
+    return name&&items.length?[{name,items,enabled:group.disabled!==true,
+      ...(/^#[0-9a-f]{6}$/i.test(group.color)?{color:group.color}:{})}]:[];
+  });
+  const grouped=new Set(groups.flatMap(group=>group.items));
+  const extra=words(data[flatKey]).filter(item=>!grouped.has(item));
+  if(extra.length)groups.push({name:'未分组',items:extra,enabled:true});
+  return groups;
+}
+function appendImportedDecks(current,incoming){
+  const used=new Set(current.map(deck=>deck.name));
+  const reserved=new Set(incoming.map(deck=>deck.name));
+  return incoming.map(deck=>{
+    let name=deck.name;
+    if(used.has(name)){
+      name=deck.name+'（导入）';
+      for(let number=2;used.has(name)||reserved.has(name);number++)name=deck.name+'（导入 '+number+'）';
+    }
+    used.add(name);
+    return {...deck,name};
+  });
+}
+function importCompanionDeck(data,previous={}){
+  if(!data||!Array.isArray(data.modules)||![...Object.values(companionDeckFields).flat(),...Object.values(companionTextFields),'announcementConfig'].some(key=>Object.hasOwn(data,key)))return null;
+  const extras={...previous};
+  for(const kind of ['pokes','statuses']){
+    const current=extras[kind]||[];
+    extras[kind]=[...current,...appendImportedDecks(current,companionDecks(data,kind))];
+  }
+  for(const [kind,key] of Object.entries(companionTextFields))extras[kind]=words([...(extras[kind]||[]),...words(data[key])]);
+  if(data.announcementConfig&&typeof data.announcementConfig==='object'&&!Array.isArray(data.announcementConfig)){
+    const current=extras.announcements||[];
+    if(!current.some(config=>JSON.stringify(config)===JSON.stringify(data.announcementConfig)))extras.announcements=[...current,data.announcementConfig];
+  }
+  return {incoming:companionDecks(data,'replies'),extras};
+}
+function cardPackPool(groups=[]){
+  return words(groups.filter(group=>group.enabled).flatMap(group=>group.items));
+}
+function cardPackStatus(cfg){
+  const pack=cfg.cardPack;
+  return pack?.status&&(cardPackPool(pack.statuses).includes(pack.status)||(pack.announcements||[]).some(config=>words(config?.statusPool).includes(pack.status)))?pack.status:'';
+}
+function cardPackAnnouncementTexts(config){
+  const values=Object.values(config?.customData||{});
+  return words(values.flatMap(value=>typeof value==='string'?[value]:
+    Array.isArray(value)?value:[value?.text??value?.content]));
+}
+function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();}){
+  if(!c||localConfig(c).mode!=='cards')return;
+  const pack=localConfig(c).cardPack||{};
+  const grouped=(kind,title)=>(pack[kind]||[]).length?'<h3>'+title+'分组</h3><div class="row">'+pack[kind].map((group,index)=>
+    '<button type="button" data-pack-group="'+kind+'" data-pack-index="'+index+'" aria-pressed="'+group.enabled+'">'+esc(group.name)+' · '+group.items.length+' · '+(group.enabled?'开启':'关闭')+'</button>').join('')+'</div>':'';
+  const formatIntro=value=>esc(value).replace(/\|/g,'<br>');
+  const section=(kind,title,items)=>items.length?'<details class="deck-bulk-editor"><summary>'+title+' · '+items.length+'</summary><div class="deck-card-list card-pack-list">'+items.map((value,index)=>
+    '<button type="button" class="deck-card" data-pack-choice="'+kind+'" data-pack-index="'+index+'">'+(kind==='intro'?formatIntro(value):esc(value))+'</button>').join('')+'</div></details>':'';
+  const configs=pack.announcements||[];
+  const choices={
+    status:words([...cardPackPool(pack.statuses),...configs.flatMap(config=>words(config?.statusPool))]),
+    motto:pack.mottos||[],intro:pack.intros||[],announcement:words(configs.flatMap(cardPackAnnouncementTexts))
+  };
+  dialog('<h2>字卡资料与工具</h2><div class="row"><button type="button" id="cardPackBack">‹ 返回</button>'+
+    (cardPackPool(pack.pokes).length?'<button type="button" id="cardPackPoke">拍一拍</button>':'')+
+    '<button type="button" id="cardPackClear">清除当前资料</button></div>'+
+    '<div class="deck-card-editor">'+[['当前状态',cardPackStatus(localConfig(c))],['签名',pack.motto],['简介',pack.intro]].filter(([,value])=>value).map(([label,value])=>'<p><strong>'+label+'</strong> · '+(label==='简介'?formatIntro(value):esc(value))+'</p>').join('')+
+    (!pack.status&&!pack.motto&&!pack.intro?'<p class="muted">可从下方选择要显示的资料。</p>':'')+'</div>'+
+    grouped('pokes','拍一拍')+grouped('statuses','状态')+
+    section('status','切换状态',choices.status)+section('motto','更换签名',choices.motto)+section('intro','更换简介',choices.intro)+section('announcement','发布公告',choices.announcement)+
+    (configs.length&&!choices.announcement.length?'<p class="muted">已导入公告配置，暂无公告内容。</p>':'')+
+    (!localConfig(c).cardPack?'<p class="muted">可以在「管理字卡」导入包含资料和工具的 JSON。</p>':''));
+  const panel=$('dialog');
+  $('cardPackBack').onclick=back;
+  const update=patch=>{
+    const latest=contact(c.id);
+    if(!latest||!saveChatModes(latest,{cardPack:{...pack,...patch}}))return;
+    repaintChat();
+    openCardPack(contact(c.id),back);
+  };
+  $('cardPackClear').onclick=()=>update({status:'',motto:'',intro:''});
+  if($('cardPackPoke'))$('cardPackPoke').onclick=()=>{
+    const latest=contact(c.id);
+    if(!latest||localRuns.has(c.id)||teaLock([c.id])||mysteryChatBlocked([c.id])){toast('角色暂时无法回复，请稍后再试。');return;}
+    const items=cardPackPool(localConfig(latest).cardPack?.pokes);
+    if(!items.length)return;
+    if(!patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'user',content:'拍了拍 '+displayName(latest),sentAt:Date.now()}]}))return;
+    panel.close();
+    queueLocalCards(contact(c.id),true,items[Math.floor(Math.random()*items.length)]);
+  };
+  panel.querySelectorAll('[data-pack-group]').forEach(button=>button.onclick=()=>{
+    const kind=button.dataset.packGroup,index=Number(button.dataset.packIndex);
+    update({[kind]:pack[kind].map((group,i)=>i===index?{...group,enabled:!group.enabled}:group)});
+  });
+  panel.querySelectorAll('[data-pack-choice]').forEach(button=>button.onclick=()=>{
+    const kind=button.dataset.packChoice,value=choices[kind][Number(button.dataset.packIndex)];
+    if(kind!=='announcement'){update({[kind]:value});return;}
+    const latest=contact(c.id);
+    if(latest&&confirm('将此公告发到当前字卡聊天？')&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'system',content:'公告：'+value,sentAt:Date.now()}]})){
+      panel.close();repaintChat();
+    }
+  });
+}
 function parseCardDecks(raw,format='auto'){
   const source=raw.trim();if(!source)return [];
   let result=[];
@@ -4147,7 +4255,7 @@ function openLocalChatSettings(c=contact(activeContact)){
   dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+
     (keyword?fields+'<label>导入 Markdown／JSON<input id="localChatImport" type="file" accept=".md,.markdown,.json"></label>':
       '<div id="deckImportCategories">'+deckPresetMenu(cfg.decks)+'</div><label>导入字卡到新分组<input id="localChatImport" type="file" accept=".json,application/json"></label>'+
-      '<p class="muted" id="deckImportStatus" role="status">导入后立即保存，新分组会显示在上方。</p>'+
+      '<p class="muted" id="deckImportStatus" role="status">导入后立即保存，新分组会显示在上方。</p><button type="button" data-action="cardPackSettings">字卡资料与工具</button>'+
       '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
@@ -4199,28 +4307,20 @@ async function importLocalChat(input){
     throw Error('批量编辑还有未保存的修改。请先保存或取消修改，再导入字卡。');
   }
 
-  const incoming=parseCardDecks(raw,'json');
-  if(incoming.length===1&&incoming[0].name==='默认'){
+  const data=JSON.parse(raw);
+  const pack=importCompanionDeck(data,localConfig(c).cardPack);
+  const incoming=pack?pack.incoming:parseCardDecks(raw,'json');
+  if(!pack&&incoming.length===1&&incoming[0].name==='默认'){
     incoming[0].name=file.name.replace(/\.json$/i,'').trim().slice(0,70)||'导入字卡';
   }
-  const used=new Set(current.map(deck=>deck.name));
-  const reserved=new Set(incoming.map(deck=>deck.name));
-  const added=incoming.map(deck=>{
-    let name=deck.name;
-    if(used.has(name)){
-      name=deck.name+'（导入）';
-      for(let number=2;used.has(name)||reserved.has(name);number++)name=deck.name+'（导入 '+number+'）';
-    }
-    used.add(name);
-    return {...deck,name};
-  });
-  if(!saveChatModes(c,{decks:[...current,...added]})){input.value='';return;}
+  const added=appendImportedDecks(current,incoming);
+  if(!saveChatModes(c,{decks:[...current,...added],...(pack?{cardPack:pack.extras}:{})})){input.value='';return;}
   const saved=localConfig(contact(c.id)).decks;
   form.savedDecks=saved;
   form.elements.source.value=manualChatSource(saved,false);
   localFormPreview(form,saved);
   $('deckImportCategories').innerHTML=deckPresetMenu(saved);
-  $('deckImportStatus').textContent='已保存 '+added.length+' 个新分组，共 '+added.reduce((count,deck)=>count+deck.items.length,0)+' 张字卡。';
+  $('deckImportStatus').textContent='已保存 '+added.length+' 个新分组，共 '+added.reduce((count,deck)=>count+deck.items.length,0)+' 张字卡。'+(pack?' 其他素材已保存至「字卡资料与工具」。':'');
   input.value='';
   resetIdleTimer();
 }
@@ -4258,21 +4358,21 @@ function resetIdleTimer(){
   if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!enabledCardPool(cfg).length)return;
   idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
 }
-function queueLocalCards(c,afterUserMessage=false){
+function queueLocalCards(c,afterUserMessage=false,pokeReply=''){
   if(mysteryChatBlocked([c.id])||teaLock([c.id]))return;
   const cfg=localConfig(c),run=Symbol(),id=c.id;
-  if(!enabledCardPool(cfg).length){repaintChat();return;}
+  if(!pokeReply&&!enabledCardPool(cfg).length){repaintChat();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
   // Leave enough time for the typing indicator to paint even at zero delay.
   const delay=Math.max(500,cfg.speed*1000);
-  const sendCount=1+Math.floor(Math.random()*cfg.count);
+  const sendCount=pokeReply?1:1+Math.floor(Math.random()*cfg.count);
   let sent=0;
   function step(){
     const latest=contact(id);
     if(!latest||localRuns.get(id)!==run)return;
     if(teaLock([id])){localRuns.delete(id);return;}
     if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&!deviceLocked&&!document.hidden){
-      const content=chooseCard(localConfig(latest));
+      const content=pokeReply||chooseCard(localConfig(latest));
       if(content&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
         if(++sent<sendCount){repaintChat();setTimeout(step,delay);return;}
       }
@@ -4353,6 +4453,13 @@ async function readChatStream(response,onDelta,htmlStream=false){
 }
 function validateChatModes(cfg){
   const strings=x=>Array.isArray(x)&&x.every(y=>typeof y==='string'&&y.trim());
+  const pack=cfg?.cardPack;
+  if(pack!==undefined&&(!pack||typeof pack!=='object'||Array.isArray(pack)||
+    ['pokes','statuses'].some(key=>pack[key]!==undefined&&(!Array.isArray(pack[key])||
+      !pack[key].every(group=>group&&typeof group.name==='string'&&typeof group.enabled==='boolean'&&strings(group.items))))||
+    ['mottos','intros','emojis'].some(key=>pack[key]!==undefined&&!strings(pack[key]))||
+    ['status','motto','intro'].some(key=>pack[key]!==undefined&&typeof pack[key]!=='string')||
+    (pack.announcements!==undefined&&(!Array.isArray(pack.announcements)||!pack.announcements.every(config=>config&&typeof config==='object'&&!Array.isArray(config))))))return false;
   const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
   return cfg&&(cfg.billRules===undefined||(Array.isArray(cfg.billRules)&&cfg.billRules.every(validBillRule)&&new Set(cfg.billRules.map(x=>x.id)).size===cfg.billRules.length))&&Object.hasOwn(chatModeLabels,cfg.mode)&&Array.isArray(cfg.rules)&&cfg.rules.every(x=>x&&strings(x.triggers)&&x.triggers.length&&typeof x.reply==='string')&&
     Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&(x.disabledItems===undefined||strings(x.disabledItems))&&typeof x.enabled==='boolean')&&
@@ -4867,7 +4974,7 @@ function saveDeckPreset(form){
   const items=form.originalItems&&value===form.originalText?form.originalItems:[...new Set(value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean))];
   if(!name)throw Error('请填写分组名称。');
   if(cfg.decks.some(d=>d.name===name&&d.name!==original))throw Error('这个分组名已存在。');
-  const next={name,items,enabled:form.elements.deckActive.checked,disabledItems:(cfg.decks.find(deck=>deck.name===original)?.disabledItems||[]).filter(item=>items.includes(item))};
+  const next={...cfg.decks.find(deck=>deck.name===original),name,items,enabled:form.elements.deckActive.checked,disabledItems:(cfg.decks.find(deck=>deck.name===original)?.disabledItems||[]).filter(item=>items.includes(item))};
   const decks=original?cfg.decks.map(d=>d.name===original?next:d):[...cfg.decks,next];
   if(saveChatModes(c,{decks})){openLocalChatSettings(contact(c.id));resetIdleTimer();toast('分组预设已保存');}
 }
@@ -6742,6 +6849,8 @@ document.addEventListener('click',e=>{
     }
     case 'rollChatDice':playChatGame('dice');break;
     case 'playChatRps':playChatGame('rps');break;
+    case 'cardPackOpen':openCardPack();break;
+    case 'cardPackSettings':openCardPack(contact(activeContact),()=>openLocalChatSettings());break;
     case 'emojiPicker':{const list=$('chatEmojis');list.hidden=!list.hidden;b.setAttribute('aria-expanded',String(!list.hidden));break;}
     case 'groupInvite':case 'groupRemove':
       groupSettingsPicker($('groupSettings'),d.action==='groupRemove');break;
