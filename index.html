@@ -4455,7 +4455,7 @@ function openLocalChatSettings(c=contact(activeContact),initialPage=''){
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     (keyword?'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>':
       '<button type="submit" class="primary">保存回复设置</button>'+cardSettingsTransfer('replies')+'</section></form>'+
-      '<section class="card-settings-section card-settings-upload" data-card-settings-page="full" hidden><span class="card-settings-icon" aria-hidden="true">↓</span><p>选择完整的字卡资料包</p><p class="muted" id="fullCardPackStatus" role="status">支持 JSON，最大 1 MB。</p>'+cardSettingsFile('选择 JSON 文件','id="fullCardPackImport"')+'<div class="card-settings-danger"><button type="button" id="formatCardSettings">一键格式化</button></div></section>'));
+      '<section class="card-settings-section card-settings-upload" data-card-settings-page="full" hidden><span class="card-settings-icon" aria-hidden="true">↓</span><p>选择完整的字卡资料包</p><p class="muted" id="fullCardPackStatus" role="status">支持 JSON。</p>'+cardSettingsFile('选择 JSON 文件','id="fullCardPackImport"')+'<div class="card-settings-danger"><button type="button" id="formatCardSettings">一键格式化</button></div></section>'));
   const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
   if(!keyword){
     form.savedDecks=cfg.decks;
@@ -4489,7 +4489,7 @@ function parseLocalForm(form){
 }
 async function importLocalChat(input){
   const full=input.id==='fullCardPackImport',form=full?$('localChatForm'):input.form,file=input.files[0];if(!form||!file)return;
-  if(file.size>1_000_000)throw Error('规则文件请控制在 1 MB 以内。');
+  if(form.dataset.mode==='keyword'&&file.size>1_000_000)throw Error('规则文件请控制在 1 MB 以内。');
   const format=file.name.toLowerCase().endsWith('.json')?'json':'markdown',raw=await file.text();
   if(!form.isConnected||!input.isConnected||!$('dialog').open)return;
   const keyword=form.dataset.mode==='keyword';
@@ -4580,7 +4580,6 @@ function exportCardSettings(kind){
 async function importCardSettings(input){
   const kind=input.dataset.cardSettingsImport,file=input.files[0],id=activeContact;
   if(!file)return;
-  if(file.size>1_000_000)throw Error('请上传 1 MB 以内的 JSON。');
   const data=JSON.parse(await file.text()),c=contact(id);
   if(!input.isConnected||!$('dialog').open||activeContact!==id||!c||localConfig(c).mode!=='cards')return;
   const cfg=localConfig(c);
