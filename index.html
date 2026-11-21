@@ -283,7 +283,7 @@ body.full-chat{overflow:hidden}
 #dialog .deck-card[aria-pressed=true]{background:var(--selected,var(--control));color:var(--selected-ink,var(--ink));outline:2px solid var(--gold);outline-offset:-2px}
 .deck-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
 .deck-card-actions[hidden]{display:none}
-.card-pack-list{max-height:35dvh;overflow:auto;overscroll-behavior:contain}.card-pack-status{display:block;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-card-poke-avatar]{touch-action:manipulation}.card-pack-list{max-height:35dvh;overflow:auto;overscroll-behavior:contain}.card-pack-status{display:block;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .deck-card-editor{margin:10px 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .deck-bulk-editor{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px}.deck-bulk-editor summary{cursor:pointer;color:var(--gold)}
 .home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
@@ -950,8 +950,8 @@ function avatarMarkup(person,cls=''){
   const a=avatarImageSource(person.avatar),f=person.frame,frame=avatarImageSource(f.src);
   return '<span class="avatar '+cls+(f.ring?' ring':'')+'" aria-hidden="true"><span class="avatar-face">'+(a?'<img src="'+esc(a)+'" alt="" decoding="async" referrerpolicy="no-referrer">':esc((person.nickname||person.name||'✦').slice(0,1)))+'</span>'+(frame?'<img class="avatar-overlay" src="'+esc(frame)+'" alt="" decoding="async" referrerpolicy="no-referrer" style="--scale:'+f.scale+';--dx:'+f.x+'%;--dy:'+f.y+'%">':'')+'</span>';
 }
-function avatarButton(id,person,cls=''){
-  return '<button type="button" class="avatar-button '+cls+'" data-look="'+esc(id)+'" aria-label="编辑'+esc(person.nickname||person.name||'角色')+'的头像与头像框">'+avatarMarkup(person)+'</button>';
+function avatarButton(id,person,cls='',cardPoke=false){
+  return '<button type="button" class="avatar-button '+cls+'" data-look="'+esc(id)+'"'+(cardPoke?' data-card-poke-avatar title="双击拍一拍"':'')+' aria-label="编辑'+esc(person.nickname||person.name||'角色')+'的头像与头像框">'+avatarMarkup(person)+'</button>';
 }
 const storyStyles=['治愈日常','温柔抒情','轻喜剧','慢热浪漫','哥特奇谭','魔法冒险','悬疑推理','复古书信','诗意童话','电影叙事'];
 const storySequelRequest='<Request：以上为故事前文，请以此为序章生成一篇20000字以上的后续发展，请有头有尾并进行扩展续写，不得ooc，禁止照搬原文。内容不能含性暗示，不得输出nsfw剧情。>';
@@ -2447,7 +2447,7 @@ function chat(){
   const typing=busy||(mode==='cards'&&localRuns.has(c.id));
   const now=Date.now(),selected=messageSelection(c,mode,session.messages);
   const history=chatHistoryWindow(session.messages,privateChatPage);
-  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c)+'<div class="chat-name"><h2>'+esc(name)+'</h2>'+(mode==='cards'&&cardPackStatus(localConfig(c))?'<small class="card-pack-status">'+esc(cardPackStatus(localConfig(c)))+'</small>':'')+'</div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开私聊设置" title="私聊设置">★</button></div></div>'+
+  return '<section class="panel chat-thread"><div class="chat-top"><button data-action="contacts" aria-label="返回通讯录">‹</button>'+avatarButton(c.id,c,'',mode==='cards')+'<div class="chat-name"><h2>'+esc(name)+'</h2>'+(mode==='cards'&&cardPackStatus(localConfig(c))?'<small class="card-pack-status">'+esc(cardPackStatus(localConfig(c)))+'</small>':'')+'</div>'+avatarButton('user',chatUser,'user-avatar')+'<div class="chat-tools"><button class="star-button" data-action="chatDirectory" aria-label="打开私聊设置" title="私聊设置">★</button></div></div>'+
     messageActionBar(selected)+'<div id="messages" class="messages">'+
     (history.start?'<div class="chat-history-page"><button type="button" data-action="olderChatPage">查看更早的消息</button></div>':'')+
     (history.messages.length?history.messages.map((x,offset)=>{
@@ -2458,7 +2458,7 @@ function chat(){
       if(x.role==='system')return '<article class="imported-system'+(selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+(selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'"><small>系统提示</small><div>'+esc(x.content)+'</div>'+(prefs.showTime?chatTimestamp(x):'')+'</article>';
       const card=displayedChatCard(x);
       const parts=card||x.readerExcerpt?[x.content]:chatBubbleParts(x,prefs);
-      const avatar=avatarButton(mine?'user':c.id,person);
+      const avatar=avatarButton(mine?'user':c.id,person,'',mode==='cards'&&!mine);
       const label=!mine&&prefs.showName?'<small>'+esc(name)+'</small>':'';
       return parts.map((part,j)=>{
         const last=j===parts.length-1;
@@ -4131,6 +4131,45 @@ function importCompanionDeck(data,previous={}){
 function cardPackPool(groups=[]){
   return words(groups.filter(group=>group.enabled).flatMap(group=>group.items));
 }
+function cardPackCharacterEmojis(pack={}){
+  const blocked=new Set(pack.blockedEmojis);
+  return (pack.emojis||[]).filter(emoji=>!blocked.has(emoji));
+}
+function openCardPoke(c,back=()=>$('dialog').close()){
+  if(!c||localConfig(c).mode!=='cards'||activeContact!==c.id)return;
+  const pack=localConfig(c).cardPack||{};
+  const presets=words([...cardPackPool(pack.pokes),...(pack.pokePresets||[])]);
+  dialog('<h2>我拍一拍 '+esc(displayName(c))+'</h2><form id="cardPokeForm">'+
+    '<label>拍一拍内容<textarea name="content" maxlength="1000" required placeholder="写下你想做的动作…"></textarea></label>'+
+    (presets.length?'<div class="deck-card-list card-pack-list">'+presets.map((value,index)=>
+      '<button type="button" class="deck-card" data-poke-preset="'+index+'">'+esc(value)+'</button>').join('')+'</div>':'')+
+    '<div class="row"><button type="button" id="cardPokeBack">返回</button><button type="button" id="savePokePreset">保存为预设</button><button type="submit" class="primary">发送</button></div></form>');
+  const form=$('cardPokeForm'),input=form.elements.content;
+  $('cardPokeBack').onclick=back;
+  form.querySelectorAll('[data-poke-preset]').forEach(button=>button.onclick=()=>{
+    input.value=presets[Number(button.dataset.pokePreset)];
+  });
+  $('savePokePreset').onclick=()=>{
+    const content=input.value.trim(),latest=contact(c.id);
+    if(!content||!latest){toast('请填写拍一拍内容。');return;}
+    const current=localConfig(latest).cardPack||{};
+    if(!saveChatModes(latest,{cardPack:{...current,pokePresets:words([...(current.pokePresets||[]),content])}}))return;
+    openCardPoke(contact(c.id),back);
+    $('cardPokeForm').elements.content.value=content;
+  };
+  form.onsubmit=event=>{
+    event.preventDefault();
+    const latest=contact(c.id),content=input.value.trim();
+    if(!latest||!content||activeContact!==c.id||localConfig(latest).mode!=='cards')return;
+    if(teaLock([c.id])||mysteryChatBlocked([c.id])){toast('当前暂时无法发送。');return;}
+    const cfg=localConfig(latest);
+    if(!patchSession(latest,'cards',{messages:[...cfg.cards.messages,
+      {role:'user',content:'拍了拍 '+displayName(latest)+' · '+content,sentAt:Date.now()}]}))return;
+    $('dialog').close();
+    if(localRuns.has(c.id))repaintChat();
+    else queueLocalCards(contact(c.id),true);
+  };
+}
 function cardPackStatus(cfg){
   const pack=cfg.cardPack;
   return pack?.status&&(cardPackPool(pack.statuses).includes(pack.status)||(pack.announcements||[]).some(config=>words(config?.statusPool).includes(pack.status)))?pack.status:'';
@@ -4154,11 +4193,14 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();}){
     motto:pack.mottos||[],intro:pack.intros||[],announcement:words(configs.flatMap(cardPackAnnouncementTexts))
   };
   dialog('<h2>字卡资料与工具</h2><div class="row"><button type="button" id="cardPackBack">‹ 返回</button>'+
-    (cardPackPool(pack.pokes).length?'<button type="button" id="cardPackPoke">拍一拍</button>':'')+
+    '<button type="button" id="cardPackPoke">我拍一拍</button>'+
     '<button type="button" id="cardPackClear">清除当前资料</button></div>'+
     '<div class="deck-card-editor">'+[['当前状态',cardPackStatus(localConfig(c))],['签名',pack.motto],['简介',pack.intro]].filter(([,value])=>value).map(([label,value])=>'<p><strong>'+label+'</strong> · '+(label==='简介'?formatIntro(value):esc(value))+'</p>').join('')+
     (!pack.status&&!pack.motto&&!pack.intro?'<p class="muted">可从下方选择要显示的资料。</p>':'')+'</div>'+
     grouped('pokes','拍一拍')+grouped('statuses','状态')+
+    ((pack.emojis||[]).length?'<details class="deck-bulk-editor"><summary>对方可发表情 · '+cardPackCharacterEmojis(pack).length+'/'+pack.emojis.length+'</summary>'+
+      '<p class="muted">勾选允许对方随机发送的表情。输入栏的表情面板始终包含全部。</p>'+
+      '<div class="deck-card-list card-pack-list">'+pack.emojis.map((emoji,index)=>'<label class="deck-card"><input type="checkbox" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'>'+esc(emoji)+'</label>').join('')+'</div></details>':'')+
     section('status','切换状态',choices.status)+section('motto','更换签名',choices.motto)+section('intro','更换简介',choices.intro)+section('announcement','发布公告',choices.announcement)+
     (configs.length&&!choices.announcement.length?'<p class="muted">已导入公告配置，暂无公告内容。</p>':'')+
     (!localConfig(c).cardPack?'<p class="muted">可以在「管理字卡」导入包含资料和工具的 JSON。</p>':''));
@@ -4166,20 +4208,23 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();}){
   $('cardPackBack').onclick=back;
   const update=patch=>{
     const latest=contact(c.id);
-    if(!latest||!saveChatModes(latest,{cardPack:{...pack,...patch}}))return;
+    if(!latest||!saveChatModes(latest,{cardPack:{...localConfig(latest).cardPack,...patch}}))return;
     repaintChat();
     openCardPack(contact(c.id),back);
   };
   $('cardPackClear').onclick=()=>update({status:'',motto:'',intro:''});
-  if($('cardPackPoke'))$('cardPackPoke').onclick=()=>{
+  $('cardPackPoke').onclick=()=>openCardPoke(contact(c.id),()=>openCardPack(contact(c.id),back));
+  panel.querySelectorAll('[data-character-emoji]').forEach(input=>input.onchange=()=>{
     const latest=contact(c.id);
-    if(!latest||localRuns.has(c.id)||teaLock([c.id])||mysteryChatBlocked([c.id])){toast('角色暂时无法回复，请稍后再试。');return;}
-    const items=cardPackPool(localConfig(latest).cardPack?.pokes);
-    if(!items.length)return;
-    if(!patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'user',content:'拍了拍 '+displayName(latest),sentAt:Date.now()}]}))return;
-    panel.close();
-    queueLocalCards(contact(c.id),true,items[Math.floor(Math.random()*items.length)]);
-  };
+    if(!latest)return;
+    const current=localConfig(latest).cardPack||{},emoji=pack.emojis[Number(input.dataset.characterEmoji)];
+    const blocked=new Set(current.blockedEmojis);
+    if(input.checked)blocked.delete(emoji);
+    else blocked.add(emoji);
+    if(!saveChatModes(latest,{cardPack:{...current,blockedEmojis:[...blocked]}})){input.checked=!input.checked;return;}
+    resetIdleTimer();
+    input.closest('details').querySelector('summary').textContent='对方可发表情 · '+cardPackCharacterEmojis({...current,blockedEmojis:[...blocked]}).length+'/'+pack.emojis.length;
+  });
   panel.querySelectorAll('[data-pack-group]').forEach(button=>button.onclick=()=>{
     const kind=button.dataset.packGroup,index=Number(button.dataset.packIndex);
     update({[kind]:pack[kind].map((group,i)=>i===index?{...group,enabled:!group.enabled}:group)});
@@ -4243,11 +4288,23 @@ function parseManualChat(value,keyword){
   }
   return [...groups].map(([name,items])=>({name,items:[...items],enabled:true}));
 }
+function firstCardReplyRange(cfg){
+  const previous=cfg.firstReplyDelay??cfg.speed;
+  return cfg.firstReplyRange??[previous,previous];
+}
+function validFirstCardReplyRange(range){
+  return Array.isArray(range)&&range.length===2&&range.every(value=>Number.isFinite(value)&&value>=0&&value<=120)&&range[0]<=range[1];
+}
+function firstCardReplyMs(cfg){
+  const [min,max]=firstCardReplyRange(cfg).map(value=>Math.round(value*10));
+  return (min+Math.floor(Math.random()*(max-min+1)))*100;
+}
 function openLocalChatSettings(c=contact(activeContact)){
   if(!c)return;
   const cfg=localConfig(c),keyword=cfg.mode==='keyword';
   if(cfg.mode==='ai')return;
   const source=manualChatSource(keyword?cfg.rules:cfg.decks,keyword);
+  const [firstReplyMin,firstReplyMax]=firstCardReplyRange(cfg);
   const fields=keyword?'<p class="muted">每行一条「输入→输出」，例如「晚安→做个好梦。」同一句回复可分行配置多个输入。</p>':
     '<p class="muted">每行一张字卡，逗号保留在卡片里。单独写一行 [分类名]，下一行起就是该分类的字卡。</p>';
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
@@ -4259,7 +4316,7 @@ function openLocalChatSettings(c=contact(activeContact)){
       '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
-    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>你发消息后多久回第一条（秒）<input name="firstReplyDelay" type="number" min="0" max="120" step=".1" required value="'+(cfg.firstReplyDelay??cfg.speed)+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
+    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>首条回复最短等待（秒）<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>首条回复最长等待（秒）<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
@@ -4322,6 +4379,7 @@ async function importLocalChat(input){
   $('deckImportCategories').innerHTML=deckPresetMenu(saved);
   $('deckImportStatus').textContent='已保存 '+added.length+' 个新分组，共 '+added.reduce((count,deck)=>count+deck.items.length,0)+' 张字卡。'+(pack?' 其他素材已保存至「字卡资料与工具」。':'');
   input.value='';
+  repaintChat();
   resetIdleTimer();
 }
 
@@ -4329,7 +4387,8 @@ function saveLocalChatForm(form){
   const c=contact(form.dataset.id);if(!c)return;
   if(form.dataset.mode==='cards'&&localConfig(c).decks!==form.savedDecks)throw Error('字卡分组已更新，请重新打开设置再保存。');
   const items=parseLocalForm(form),e=form.elements;
-  const patch=form.dataset.mode==='keyword'?{rules:items,billRules:readBillRules(form,localConfig(c).billRules||[])}:{decks:items,firstReplyDelay:Number(e.firstReplyDelay.value),speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
+  const patch=form.dataset.mode==='keyword'?{rules:items,billRules:readBillRules(form,localConfig(c).billRules||[])}:{decks:items,firstReplyRange:[Number(e.firstReplyMin.value),Number(e.firstReplyMax.value)],speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
+  if(patch.firstReplyRange&&!validFirstCardReplyRange(patch.firstReplyRange))throw Error('首条回复的最短等待不能超过最长等待。');
   if(saveChatModes(c,patch)){if(form.dataset.mode==='keyword')refreshBillReplies(c.id);$('dialog').close();render();resetIdleTimer();toast('已保存');}
 }
 function changeChatMode(mode){
@@ -4350,39 +4409,56 @@ function chooseCard(cfg){
   for(let i=0;i<count;i++)picked.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   return picked.join(cfg.multiple?' ':'');
 }
+function hasCardReplyContent(cfg){
+  return enabledCardPool(cfg).length||cardPackCharacterEmojis(cfg.cardPack).length||cardPackPool(cfg.cardPack?.pokes).length;
+}
 function resetIdleTimer(){
   clearTimeout(idleTimer);
   const c=page==='chat'&&!deviceLocked&&!document.hidden&&contact(activeContact);
   if(!c||teaLock([c.id]))return;
   const cfg=localConfig(c);
-  if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!enabledCardPool(cfg).length)return;
+  if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!hasCardReplyContent(cfg))return;
   idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
 }
-function queueLocalCards(c,afterUserMessage=false,pokeReply=''){
+function queueLocalCards(c,afterUserMessage=false){
   if(mysteryChatBlocked([c.id])||teaLock([c.id]))return;
-  const cfg=localConfig(c),run=Symbol(),id=c.id;
-  if(!pokeReply&&!enabledCardPool(cfg).length){repaintChat();return;}
+  const cfg=localConfig(c),id=c.id,android=typeof window.LedgerExport?.save==='function';
+  const run={resume:()=>{if(Date.now()>=dueAt)step();}};
+  let timer,dueAt;
+  if(!hasCardReplyContent(cfg)){repaintChat();resetIdleTimer();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
   // Leave enough time for the typing indicator to paint even at zero delay.
   const delay=Math.max(500,cfg.speed*1000);
-  const sendCount=pokeReply?1:1+Math.floor(Math.random()*cfg.count);
+  const sendCount=1+Math.floor(Math.random()*cfg.count);
   let sent=0;
+  function schedule(ms){
+    dueAt=Date.now()+ms;
+    const scheduled=setTimeout(()=>{if(timer===scheduled)step();},ms);
+    timer=scheduled;
+  }
   function step(){
+    clearTimeout(timer);
+    timer=undefined;
     const latest=contact(id);
     if(!latest||localRuns.get(id)!==run)return;
-    if(teaLock([id])){localRuns.delete(id);return;}
-    if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&!deviceLocked&&!document.hidden){
-      const content=pokeReply||chooseCard(localConfig(latest));
-      if(content&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
-        if(++sent<sendCount){repaintChat();setTimeout(step,delay);return;}
+    if(teaLock([id])||mysteryChatBlocked([id])){localRuns.delete(id);return;}
+    const visible=!deviceLocked&&!document.hidden;
+    if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&(visible||android)){
+      const current=localConfig(latest),card=chooseCard(current);
+      const replies=card?[card]:[];
+      const emojis=cardPackCharacterEmojis(current.cardPack),pokes=cardPackPool(current.cardPack?.pokes);
+      if(emojis.length&&Math.random()<.2)replies.push(emojis[Math.floor(Math.random()*emojis.length)]);
+      if(pokes.length&&Math.random()<.1)replies.push('拍了拍你 · '+pokes[Math.floor(Math.random()*pokes.length)]);
+      const content=replies[Math.floor(Math.random()*replies.length)];
+      if(content&&patchSession(latest,'cards',{messages:[...current.cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
+        if(++sent<sendCount){if(visible)repaintChat();schedule(delay);return;}
       }
     }
     localRuns.delete(id);
-    if(page==='chat'&&activeContact===id&&!deviceLocked)repaintChat();
+    if(page==='chat'&&activeContact===id&&visible)repaintChat();
     resetIdleTimer();
   }
-  const firstDelay=afterUserMessage?Math.max(500,(cfg.firstReplyDelay??cfg.speed)*1000):delay;
-  repaintChat();setTimeout(step,firstDelay);
+  repaintChat();schedule(afterUserMessage?firstCardReplyMs(cfg):delay);
 }
 function repaintChat(){
   const input=document.querySelector('#chatForm textarea');
@@ -4457,12 +4533,13 @@ function validateChatModes(cfg){
   if(pack!==undefined&&(!pack||typeof pack!=='object'||Array.isArray(pack)||
     ['pokes','statuses'].some(key=>pack[key]!==undefined&&(!Array.isArray(pack[key])||
       !pack[key].every(group=>group&&typeof group.name==='string'&&typeof group.enabled==='boolean'&&strings(group.items))))||
-    ['mottos','intros','emojis'].some(key=>pack[key]!==undefined&&!strings(pack[key]))||
+    ['mottos','intros','emojis','blockedEmojis','pokePresets'].some(key=>pack[key]!==undefined&&!strings(pack[key]))||
     ['status','motto','intro'].some(key=>pack[key]!==undefined&&typeof pack[key]!=='string')||
     (pack.announcements!==undefined&&(!Array.isArray(pack.announcements)||!pack.announcements.every(config=>config&&typeof config==='object'&&!Array.isArray(config))))))return false;
   const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
   return cfg&&(cfg.billRules===undefined||(Array.isArray(cfg.billRules)&&cfg.billRules.every(validBillRule)&&new Set(cfg.billRules.map(x=>x.id)).size===cfg.billRules.length))&&Object.hasOwn(chatModeLabels,cfg.mode)&&Array.isArray(cfg.rules)&&cfg.rules.every(x=>x&&strings(x.triggers)&&x.triggers.length&&typeof x.reply==='string')&&
     Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&(x.disabledItems===undefined||strings(x.disabledItems))&&typeof x.enabled==='boolean')&&
+    (cfg.firstReplyRange===undefined||validFirstCardReplyRange(cfg.firstReplyRange))&&
     (cfg.firstReplyDelay===undefined||(Number.isFinite(cfg.firstReplyDelay)&&cfg.firstReplyDelay>=0&&cfg.firstReplyDelay<=120))&&
     Number.isFinite(cfg.speed)&&cfg.speed>=0&&cfg.speed<=120&&Number.isInteger(cfg.count)&&cfg.count>=1&&cfg.count<=10&&
     Number.isInteger(cfg.idle)&&cfg.idle>=1&&cfg.idle<=86400&&typeof cfg.multiple==='boolean'&&typeof cfg.proactive==='boolean'&&log(cfg.keyword)&&log(cfg.cards);
@@ -6659,6 +6736,7 @@ function archive(includeKeys){
   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
   const a=document.createElement('a');a.href=url;a.download='sleeping-dragon-'+dateString()+(includeKeys?'-with-keys':'')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
+let cardAvatarTap;
 document.addEventListener('click',e=>{
   if(desktopSiteMenu.matches&&!document.body.classList.contains('full-chat')&&
      !$('siteMenu').hidden&&e.target.closest('main')&&
@@ -6732,6 +6810,20 @@ document.addEventListener('click',e=>{
   }
   if(d.card)openCard(d.card);
   if(d.deleteContact)removeContact(d.deleteContact);
+  if(b.hasAttribute('data-card-poke-avatar')&&e.detail!==0){
+    if(cardAvatarTap?.button===b){
+      clearTimeout(cardAvatarTap.timer);
+      cardAvatarTap=null;
+      openCardPoke(contact(d.look));
+    }else{
+      clearTimeout(cardAvatarTap?.timer);
+      cardAvatarTap={button:b,timer:setTimeout(()=>{
+        cardAvatarTap=null;
+        if(b.isConnected&&!$('dialog').open)openLook(d.look,'');
+      },350)};
+    }
+    return;
+  }
   if(d.look)openLook(d.look,$('dialog').open?$('contactForm')?.dataset.id||'':'');
   if(d.world)openWorld(d.world);
   if(b.hasAttribute('data-world-scope'))openWorldScope(d.worldScope);
@@ -7165,7 +7257,14 @@ initMessageTools();
 setTimeout(scheduleSharedMemory,1200);
 initDeviceLock();
 resumeNativeStory().catch(error=>toast(error.message));
-document.addEventListener('visibilitychange',resetIdleTimer);
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&typeof window.LedgerExport?.save==='function'){
+    const run=localRuns.get(activeContact);
+    if(run)run.resume();
+    if(page==='chat'&&activeContact&&!deviceLocked)repaintChat();
+  }
+  resetIdleTimer();
+});
 $('dialog').addEventListener('close',()=>{
   $('dialog').readerCleanup?.();$('dialog').readerCleanup=null;
   const panel=$('dialog'),orb=$('homeOrb');
