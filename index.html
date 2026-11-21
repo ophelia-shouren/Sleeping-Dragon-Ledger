@@ -271,8 +271,17 @@ body.full-chat{overflow:hidden}
 .full-chat .messages{flex:1 1 auto;height:auto;min-height:0;overscroll-behavior:contain}
 :is(.full-chat #chatForm,.group-room #groupChatForm){min-width:0;max-height:45%;overflow:auto;overscroll-behavior:contain}
 :is(.full-chat #chatForm,.group-room #groupChatForm) textarea{width:100%;min-height:48px;max-height:120px;margin-bottom:4px}
-.deck-presets h3{margin-top:12px}
-.deck-presets{margin:12px 0;padding:10px 0;border-top:1px solid var(--line)}
+.deck-presets{margin:14px 0}
+.deck-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr));gap:10px}
+#dialog .deck-category-grid button{display:grid;gap:5px;text-align:start;min-width:0;overflow-wrap:anywhere;padding:12px 14px;background:var(--control);color:var(--ink);border:1px solid var(--line);border-radius:10px}
+#dialog .deck-category-grid button small{color:var(--muted)}
+.deck-card-list{display:grid;gap:8px;margin-top:12px}
+#dialog .deck-card{width:100%;min-height:46px;display:block;text-align:start;white-space:pre-wrap;overflow-wrap:anywhere;padding:11px 14px;color:var(--ink);background:var(--field,var(--panel));border:1px solid var(--line);border-inline-start:3px solid var(--gold);border-radius:9px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:pan-y}
+#dialog .deck-card[aria-pressed=true]{background:var(--selected,var(--control));color:var(--selected-ink,var(--ink));outline:2px solid var(--gold);outline-offset:-2px}
+.deck-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
+.deck-card-actions[hidden]{display:none}
+.deck-card-editor{margin:10px 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.deck-bulk-editor{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px}.deck-bulk-editor summary{cursor:pointer;color:var(--gold)}
 .home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
 .home-orb[hidden],.home-orb [hidden]{display:none}
 .home-orb>button,.home-orb>#storyOrbStatus{touch-action:none}
@@ -4132,11 +4141,11 @@ function openLocalChatSettings(c=contact(activeContact)){
     '<p class="muted">每行一张字卡，逗号保留在卡片里。单独写一行 [分类名]，下一行起就是该分类的字卡。</p>';
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
     cfg.decks.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
-  dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+fields+
+  dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+(keyword?'':deckPresetMenu(cfg.decks)+'<details class="deck-bulk-editor"><summary>批量编辑与导入</summary>')+fields+
     '<label>导入'+(keyword?' Markdown／JSON':' JSON')+'<input id="localChatImport" type="file" accept="'+(keyword?'.md,.markdown,.json':'.json')+'"></label>'+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
-    '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+
-    (keyword?billRuleEditor(cfg.billRules||[]):deckPresetMenu(cfg.decks)+'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
+    '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
+    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
@@ -4608,20 +4617,104 @@ function openChatDirectory(){
     '<div class="clear-chat-row">'+clearChatButton(localSession(c).messages.length)+'</div></div></div>',true);
 }
 function deckPresetMenu(decks){
-  return '<section class="deck-presets"><h3>分组预设</h3><p class="muted">每个分组可单独编辑和保存。</p><div class="row">'+
-    decks.map((d,i)=>'<button type="button" data-deck-preset="'+i+'">'+esc(d.name)+' · '+d.items.length+' 张</button>').join('')+
+  return '<section class="deck-presets"><h3>字卡分类</h3><div class="deck-category-grid">'+
+    decks.map((d,i)=>'<button type="button" data-deck-preset="'+i+'">'+'<strong>'+esc(d.name)+'</strong><small>'+d.items.length+' 张 · '+(d.enabled?'已启用':'已停用')+'</small></button>').join('')+
     '<button type="button" data-deck-preset="-1">＋ 新建分组预设</button></div></section>';
 }
-function openDeckPreset(index){
+function openDeckPreset(index,edit=false){
   const c=contact(activeContact);
   if(!c||localConfig(c).mode!=='cards')return;
   const deck=localConfig(c).decks[index];
+  if(deck&&!edit){openDeckCards(c,index);return;}
   dialog('<h2>'+(deck?'编辑分组预设':'新建分组预设')+'</h2><form id="deckPresetForm" data-id="'+esc(c.id)+'" data-name="'+esc(deck?.name||'')+'">'+
     '<label>分组名称<input name="deckName" required maxlength="80" value="'+esc(deck?.name||'')+'"></label>'+
-    '<label>字卡，每行一张<textarea name="deckItems" rows="8" required>'+esc(deck?.items.join('\n')||'')+'</textarea></label>'+
+    '<label>字卡，每行一张<textarea name="deckItems" rows="8">'+esc(deck?.items.join('\n')||'')+'</textarea></label>'+
     '<label class="mode-toggle"><input type="checkbox" name="deckActive" '+(deck?.enabled===false?'':'checked')+'><span></span>启用该分组</label>'+
     '<div class="row actions"><button class="primary">保存此分组</button><button type="button" data-action="localChatSettings">返回字卡设置</button></div></form>');
   const form=$('deckPresetForm');form.originalItems=deck?.items;form.originalText=form.elements.deckItems.value;
+}
+function openDeckCards(c,index){
+  const decks=localConfig(c).decks,deck=decks[index];
+  if(!deck)return;
+  dialog('<h2>'+esc(deck.name)+'</h2><div class="row"><button type="button" id="deckBack">‹ 字卡分类</button><button type="button" id="deckSettings">分组设置</button><button type="button" id="deckAdd">＋ 添加字卡</button></div>'+
+    '<p class="muted">'+deck.items.length+' 张字卡 · 长按或点按可选中</p>'+
+    '<div class="deck-card-actions" id="deckActions" hidden><span id="deckCount" aria-live="polite"></span><button type="button" id="deckEdit">修改</button><button type="button" id="deckMove">移动分组</button><button type="button" id="deckDelete" class="archive-danger">删除</button><button type="button" id="deckClear">取消选择</button></div>'+
+    '<div id="deckEditor"></div><div class="deck-card-list" id="deckCardList">'+(deck.items.map((card,position)=>'<button type="button" class="deck-card" aria-pressed="false" data-deck-card="'+position+'">'+esc(card)+'</button>').join('')||'<p class="muted">这个分类还没有字卡。</p>')+'</div>');
+  const list=$('deckCardList'),selected=new Set(),editor=$('deckEditor');
+  let pressTimer,origin,longPressed;
+  const cancelPress=()=>{clearTimeout(pressTimer);origin=null;};
+  const paint=()=>{
+    $('deckActions').hidden=!selected.size;
+    $('deckCount').textContent='已选 '+selected.size+' 张';
+    $('deckEdit').disabled=selected.size!==1;
+    $('deckMove').disabled=decks.length<2;
+  };
+  const pick=(button,force=false)=>{
+    const position=Number(button.dataset.deckCard),on=force||!selected.has(position);
+    if(on)selected.add(position);else selected.delete(position);
+    button.setAttribute('aria-pressed',String(on));
+    editor.replaceChildren();paint();
+  };
+  const cardAt=target=>target.closest('[data-deck-card]');
+  list.addEventListener('pointerdown',event=>{
+    const button=cardAt(event.target);if(!button||event.button!==0)return;
+    cancelPress();longPressed=null;origin={x:event.clientX,y:event.clientY};
+    pressTimer=setTimeout(()=>{pick(button,true);longPressed=button;},480);
+  });
+  list.addEventListener('pointermove',event=>{
+    if(origin&&Math.hypot(event.clientX-origin.x,event.clientY-origin.y)>10)cancelPress();
+  });
+  for(const type of ['pointerup','pointercancel','pointerleave'])list.addEventListener(type,cancelPress);
+  list.addEventListener('contextmenu',event=>{
+    const button=cardAt(event.target);if(!button)return;
+    event.preventDefault();cancelPress();pick(button,true);longPressed=button;
+  });
+  list.addEventListener('click',event=>{
+    const button=cardAt(event.target);
+    if(!button)return;
+    if(event.detail!==0&&longPressed===button){longPressed=null;return;}
+    pick(button);
+  });
+  const save=next=>{
+    const current=contact(c.id);
+    if(!current||localConfig(current).decks!==decks){toast('字卡分组已更新，请重新打开后再操作。');return;}
+    if(saveChatModes(current,{decks:next})){resetIdleTimer();openDeckCards(contact(c.id),index);}
+  };
+  const clear=()=>{selected.clear();for(const button of list.querySelectorAll('[aria-pressed=true]'))button.setAttribute('aria-pressed','false');editor.replaceChildren();paint();};
+  function editCard(position){
+    editor.innerHTML='<form class="deck-card-editor"><label>'+ (position===null?'添加字卡':'修改字卡')+'<textarea name="card" rows="3" required>'+esc(position===null?'':deck.items[position])+'</textarea></label><div class="row"><button type="submit" class="primary">保存字卡</button><button type="button">取消</button></div></form>';
+    const form=editor.querySelector('form');
+    form.querySelector('[type=button]').onclick=()=>editor.replaceChildren();
+    form.onsubmit=event=>{
+      event.preventDefault();event.stopPropagation();
+      const value=form.elements.card.value.trim();
+      if(!value){toast('请填写字卡内容。');return;}
+      if(deck.items.some((item,i)=>i!==position&&item===value)){toast('该分组已有相同字卡。');return;}
+      const items=deck.items.slice();
+      if(position===null)items.push(value);else items[position]=value;
+      save(decks.map((group,i)=>i===index?{...group,items}:group));
+    };
+    form.elements.card.focus();
+  }
+  $('deckBack').onclick=()=>openLocalChatSettings(contact(c.id));
+  $('deckSettings').onclick=()=>openDeckPreset(index,true);
+  $('deckAdd').onclick=()=>editCard(null);
+  $('deckClear').onclick=clear;
+  $('deckEdit').onclick=()=>editCard([...selected][0]);
+  $('deckDelete').onclick=()=>{
+    if(selected.size&&confirm('确认删除选中的 '+selected.size+' 张字卡？删除后无法撤销。')){
+      save(decks.map((group,i)=>i===index?{...group,items:group.items.filter((_,j)=>!selected.has(j))}:group));
+    }
+  };
+  $('deckMove').onclick=()=>{
+    editor.innerHTML='<section class="deck-card-editor"><h3>移到哪个分组？</h3><div class="deck-category-grid">'+decks.map((group,i)=>i===index?'':'<button type="button" data-deck-target="'+i+'">'+esc(group.name)+'</button>').join('')+'</div></section>';
+    editor.querySelectorAll('[data-deck-target]').forEach(button=>button.onclick=()=>{
+      const target=Number(button.dataset.deckTarget),moved=deck.items.filter((_,i)=>selected.has(i));
+      save(decks.map((group,i)=>i===index?{...group,items:group.items.filter((_,j)=>!selected.has(j))}:
+        i===target?{...group,items:[...new Set([...group.items,...moved])]}:group));
+    });
+  };
+  paint();
 }
 function saveDeckPreset(form){
   const c=contact(form.dataset.id);
@@ -4629,7 +4722,7 @@ function saveDeckPreset(form){
   const cfg=localConfig(c),original=form.dataset.name;
   const name=form.elements.deckName.value.trim(),value=form.elements.deckItems.value;
   const items=form.originalItems&&value===form.originalText?form.originalItems:[...new Set(value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean))];
-  if(!name||!items.length)throw Error('请填写分组名和至少一张字卡。');
+  if(!name)throw Error('请填写分组名称。');
   if(cfg.decks.some(d=>d.name===name&&d.name!==original))throw Error('这个分组名已存在。');
   const next={name,items,enabled:form.elements.deckActive.checked};
   const decks=original?cfg.decks.map(d=>d.name===original?next:d):[...cfg.decks,next];
