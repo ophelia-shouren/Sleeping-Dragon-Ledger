@@ -323,6 +323,15 @@ body.full-chat{overflow:hidden}
 #dialog .card-settings-emoji:focus-within{outline:2px solid var(--gold);outline-offset:2px}
 #dialog .card-settings-emoji:has(input:checked)::after{content:"✓";position:absolute;inset:2px 3px auto auto;font:10px system-ui;color:var(--gold);pointer-events:none}
 #dialog [data-card-settings-page][hidden]{display:none}
+#dialog .card-settings-danger{border-top:1px solid var(--line);margin-top:18px;padding-top:12px}
+#dialog .card-settings-danger button,dialog.card-delete-confirm .card-delete-action{color:var(--danger,#c65c69);border-color:currentColor;background:color-mix(in srgb,var(--danger,#c65c69) 12%,var(--panel))}
+dialog.card-delete-confirm{width:min(390px,calc(100vw - 32px));box-sizing:border-box;padding:20px;border:1px solid var(--line);border-radius:17px;background:var(--panel);color:var(--ink)}
+dialog.card-delete-confirm::backdrop{background:#0006}
+.card-delete-confirm h2{font-size:1.1rem;margin:10px 0 6px}
+.card-delete-confirm p{color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+.card-delete-confirm .row{justify-content:flex-end;gap:8px}
+.card-delete-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;color:var(--danger,#c65c69);background:color-mix(in srgb,currentColor 13%,transparent);font:bold 16px system-ui}
+@media (prefers-reduced-motion:no-preference){dialog.card-delete-confirm[open]{animation:card-confirm-in .18s ease-out both}@keyframes card-confirm-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}}
 .deck-card-editor{margin:10px 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .deck-bulk-editor{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px}.deck-bulk-editor summary{cursor:pointer;color:var(--gold)}
 .home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
@@ -4127,7 +4136,7 @@ function parseKeywordRules(raw,format='auto'){
   return [...grouped].map(([reply,triggers])=>({triggers,reply}));
 }
 const companionDeckFields={replies:['customReplyGroups','customReplies'],pokes:['customPokeGroups','customPokes'],statuses:['customStatusGroups','customStatuses']};
-const companionTextFields={mottos:'customMottos',intros:'customIntros',emojis:'customEmojis'};
+const companionTextFields={emojis:'customEmojis'};
 function companionDecks(data,kind){
   const [groupKey,flatKey]=companionDeckFields[kind];
   const groups=(Array.isArray(data[groupKey])?data[groupKey]:[]).flatMap(group=>{
@@ -4240,24 +4249,17 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
   const pack=localConfig(c).cardPack||{};
   const grouped=(kind,title)=>(pack[kind]||[]).length?'<h3>'+title+'分组</h3><div class="row">'+pack[kind].map((group,index)=>
     '<button type="button" data-pack-group="'+kind+'" data-pack-index="'+index+'" aria-pressed="'+group.enabled+'">'+esc(group.name)+' · '+group.items.length+' · '+(group.enabled?'开启':'关闭')+'</button>').join('')+'</div>':'';
-  const formatIntro=value=>esc(value).replace(/\|/g,'<br>');
-  const section=(kind,title,items)=>items.length?'<details class="deck-bulk-editor"><summary>'+title+' · '+items.length+'</summary><div class="deck-card-list card-pack-list">'+items.map((value,index)=>
-    '<button type="button" class="deck-card" data-pack-choice="'+kind+'" data-pack-index="'+index+'" aria-pressed="'+(pack[kind]===value)+'">'+(kind==='intro'?formatIntro(value):esc(value))+'</button>').join('')+'</div></details>':'';
-  const choices={status:cardPackStatuses(pack),motto:pack.mottos||[],intro:pack.intros||[]};
-  const current=(label,value,format=esc)=>value?'<div class="card-settings-current"><small>'+label+'</small>'+format(value)+'</div>':'';
-
+  const statuses=cardPackStatuses(pack);
+  const status=cardPackStatus(c);
   const content={
     pokes:'<button type="button" id="cardPackPoke">我拍一拍</button>'+grouped('pokes','拍一拍'),
-    statuses:current('当前状态',cardPackStatus(c))+'<p class="muted">状态约每 4～12 小时随机换一次，显示在字卡聊天的角色名字下方。</p>'+grouped('statuses','状态')+
-      (choices.status.length?'<details class="deck-bulk-editor"><summary>可轮换状态 · '+choices.status.length+'</summary><div class="deck-card-list card-pack-list">'+choices.status.map(value=>'<div class="deck-card">'+esc(value)+'</div>').join('')+'</div></details>':''),
+    statuses:(status?'<div class="card-settings-current"><small>当前状态</small>'+esc(status)+'</div>':'')+'<p class="muted">状态约每 4～12 小时随机换一次，显示在字卡聊天的角色名字下方。</p>'+grouped('statuses','状态')+
+      (statuses.length?'<details class="deck-bulk-editor"><summary>可轮换状态 · '+statuses.length+'</summary><div class="deck-card-list card-pack-list">'+statuses.map(value=>'<div class="deck-card">'+esc(value)+'</div>').join('')+'</div></details>':''),
     emojis:(pack.emojis||[]).length?'<details class="deck-bulk-editor" open><summary>对方可发表情 · '+cardPackCharacterEmojis(pack).length+'/'+pack.emojis.length+'</summary>'+
       '<p class="muted">勾选允许对方随机发送的表情。输入栏的表情面板包含全部。</p>'+
-      '<div class="card-settings-emoji-grid card-pack-list">'+pack.emojis.map((emoji,index)=>'<label class="card-settings-emoji"><input type="checkbox" aria-label="'+esc(emoji)+'" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'><span aria-hidden="true">'+esc(emoji)+'</span></label>').join('')+'</div></details>':'',
-    mottos:current('当前签名',pack.motto)+section('motto','更换签名',choices.motto),
-    intros:current('当前简介',pack.intro,formatIntro)+section('intro','更换简介',choices.intro)
+      '<div class="card-settings-emoji-grid card-pack-list">'+pack.emojis.map((emoji,index)=>'<label class="card-settings-emoji"><input type="checkbox" aria-label="'+esc(emoji)+'" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'><span aria-hidden="true">'+esc(emoji)+'</span></label>').join('')+'</div></details>':''
   };
-  dialog('<div class="card-settings-head"><button type="button" id="cardPackBack">‹ 返回</button><h2>'+(only?cardSettingsLabels[only]:'字卡资料与工具')+'</h2>'+
-    (!only?'<button type="button" id="cardPackClear">清除资料</button>':'')+'</div>'+
+  dialog('<div class="card-settings-head"><button type="button" id="cardPackBack">‹ 返回</button><h2>'+(only?cardSettingsLabels[only]:'字卡资料与工具')+'</h2></div>'+
     (only?'<section class="card-settings-section">'+(content[only]||'<p class="muted">暂无素材。</p>')+cardSettingsTransfer(only)+'</section>':
       Object.entries(content).filter(([,value])=>value).map(([kind,value])=>'<section class="card-settings-section"><h3>'+cardSettingsLabels[kind]+'</h3>'+value+'</section>').join('')));
   const panel=$('dialog');
@@ -4275,8 +4277,7 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
     repaintChat();
     openCardPack(contact(c.id),back,only);
   };
-  if($('cardPackClear'))$('cardPackClear').onclick=()=>update({status:'',motto:'',intro:''});
-  if($('cardPackPoke'))$('cardPackPoke').onclick=()=>openCardPoke(contact(c.id),()=>openCardPack(contact(c.id),back,only));
+  if($('cardPackPoke'))$('cardPackPoke').onclick=()=>transitionCardSettings(()=>openCardPoke(contact(c.id),()=>transitionCardSettings(()=>openCardPack(contact(c.id),back,only))));
   panel.querySelectorAll('[data-character-emoji]').forEach(input=>input.onchange=()=>{
     const latest=contact(c.id);
     if(!latest)return;
@@ -4292,10 +4293,7 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
     const kind=button.dataset.packGroup,index=Number(button.dataset.packIndex);
     update({[kind]:pack[kind].map((group,i)=>i===index?{...group,enabled:!group.enabled}:group)});
   });
-  panel.querySelectorAll('[data-pack-choice]').forEach(button=>button.onclick=()=>{
-    const kind=button.dataset.packChoice,value=choices[kind][Number(button.dataset.packIndex)];
-    update({[kind]:value});
-  });
+
 }
 function parseCardDecks(raw,format='auto'){
   const source=raw.trim();if(!source)return [];
@@ -4358,8 +4356,8 @@ function firstCardReplyMs(cfg){
   const [min,max]=firstCardReplyRange(cfg).map(value=>Math.round(value*10));
   return (min+Math.floor(Math.random()*(max-min+1)))*100;
 }
-const cardSettingsLabels={decks:'我的字卡',replies:'回复设置',pokes:'拍一拍',statuses:'状态',emojis:'表情',mottos:'签名',intros:'简介'};
-const cardSettingsPackKeys={pokes:['pokes','pokePresets'],statuses:['statuses'],emojis:['emojis','blockedEmojis'],mottos:['mottos','motto'],intros:['intros','intro']};
+const cardSettingsLabels={decks:'我的字卡',replies:'回复设置',pokes:'拍一拍',statuses:'状态',emojis:'表情'};
+const cardSettingsPackKeys={pokes:['pokes','pokePresets'],statuses:['statuses'],emojis:['emojis','blockedEmojis']};
 const cardReplyKeys=['firstReplyRange','speed','count','idle','proactive','multiple'];
 function cardSettingsFile(label,attributes){
   return '<label class="card-settings-file">'+label+'<input type="file" '+attributes+' accept=".json,application/json"></label>';
@@ -4375,14 +4373,52 @@ const cardSettingsDescriptions={
   pokes:'管理分组与动作预设。',
   statuses:'管理角色名下的轮换状态。',
   emojis:'选择角色可发的表情。',
-  mottos:'管理和切换角色签名。',
-  intros:'管理和切换角色简介。',
   full:'一次导入字卡和角色资料。'
 };
-const cardSettingsIcons={decks:'▤',replies:'◷',pokes:'✦',statuses:'◉',emojis:'☺',mottos:'❝',intros:'≡',full:'↓'};
+const cardSettingsIcons={decks:'▤',replies:'◷',pokes:'✦',statuses:'◉',emojis:'☺',full:'↓'};
 function cardSettingsDirectory(){
   return '<div class="card-settings-directory" data-card-settings-page="">'+Object.entries(cardSettingsDescriptions).map(([kind,description])=>
     '<button type="button" class="card-settings-entry" data-card-settings-entry="'+kind+'"><i class="card-settings-icon" aria-hidden="true">'+cardSettingsIcons[kind]+'</i><span class="card-settings-arrow" aria-hidden="true">›</span><strong>'+(cardSettingsLabels[kind]||'完整导入')+'</strong><small>'+description+'</small></button>').join('')+'</div>';
+}
+const cardMotion=matchMedia('(prefers-reduced-motion: reduce)');
+let cardTransitionRunning=false;
+async function transitionCardSettings(update){
+  const panel=$('dialog'),anchor=panel.firstElementChild;
+  if(cardTransitionRunning)return;
+  if(cardMotion.matches||!panel.animate||!panel.open){update();return;}
+  cardTransitionRunning=true;
+  try{
+    const out=panel.animate([{opacity:1},{opacity:0}],{duration:115,easing:'ease-in',fill:'forwards'});
+    await out.finished;
+    if(!panel.open||panel.firstElementChild!==anchor){out.cancel();return;}
+    out.cancel();
+    update();
+    const incoming=panel.animate([{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'translateY(0)'}],
+      {duration:185,easing:'ease-out'});
+    await incoming.finished;
+  }finally{cardTransitionRunning=false;}
+}
+function confirmCardDeletion(title,message,action='确认删除'){
+  const modal=document.createElement('dialog');
+  modal.className='card-delete-confirm';
+  modal.innerHTML='<form method="dialog"><div class="card-delete-icon" aria-hidden="true">!</div><h2>'+esc(title)+'</h2><p>'+esc(message)+'</p><div class="row"><button value="cancel" autofocus>取消</button><button value="delete" class="card-delete-action">'+esc(action)+'</button></div></form>';
+  document.body.append(modal);
+  return new Promise(resolve=>{
+    modal.addEventListener('close',()=>{const accepted=modal.returnValue==='delete';modal.remove();resolve(accepted);},{once:true});
+    modal.showModal();
+  });
+}
+async function formatCardSettings(id,button){
+  if(!await confirmCardDeletion('格式化字卡资料？','将删除当前角色的所有字卡、分组和导入资料，并恢复默认回复设置。聊天记录会保留。此操作无法撤销。','确认格式化'))return;
+  const c=contact(id);
+  if(!button.isConnected||!c||localConfig(c).mode!=='cards')return;
+  const defaults=chatModeDefaults();
+  const patch={decks:[],cardPack:{},firstReplyDelay:undefined,firstReplyRange:undefined,
+    ...Object.fromEntries(cardReplyKeys.slice(1).map(key=>[key,defaults[key]]))};
+  if(!saveChatModes(c,patch))return;
+  localRuns.delete(id);
+  openLocalChatSettings(contact(id),'full');
+  repaintChat();resetIdleTimer();toast('字卡资料已格式化');
 }
 function showCardSettingsPage(kind){
   const panel=$('dialog');
@@ -4390,7 +4426,7 @@ function showCardSettingsPage(kind){
   const back=$('cardSettingsBack'),close=$('cardSettingsClose'),title=$('cardSettingsTitle');
   back.hidden=!kind;close.hidden=!!kind;
   title.textContent=kind?(cardSettingsLabels[kind]||'完整导入'):'字卡设置';
-  panel.orbBack=kind?()=>showCardSettingsPage(''):null;
+  panel.orbBack=kind?()=>transitionCardSettings(()=>showCardSettingsPage('')):null;
   panel.scrollTop=0;
   if(kind)title.focus();
   else panel.querySelector('[data-card-settings-entry="'+back.dataset.from+'"]')?.focus();
@@ -4419,17 +4455,20 @@ function openLocalChatSettings(c=contact(activeContact),initialPage=''){
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     (keyword?'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>':
       '<button type="submit" class="primary">保存回复设置</button>'+cardSettingsTransfer('replies')+'</section></form>'+
-      '<section class="card-settings-section card-settings-upload" data-card-settings-page="full" hidden><span class="card-settings-icon" aria-hidden="true">↓</span><p>选择完整的字卡资料包</p><p class="muted" id="fullCardPackStatus" role="status">支持 JSON，最大 1 MB。</p>'+cardSettingsFile('选择 JSON 文件','id="fullCardPackImport"')+'</section>'));
+      '<section class="card-settings-section card-settings-upload" data-card-settings-page="full" hidden><span class="card-settings-icon" aria-hidden="true">↓</span><p>选择完整的字卡资料包</p><p class="muted" id="fullCardPackStatus" role="status">支持 JSON，最大 1 MB。</p>'+cardSettingsFile('选择 JSON 文件','id="fullCardPackImport"')+'<div class="card-settings-danger"><button type="button" id="formatCardSettings">一键格式化</button></div></section>'));
   const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
   if(!keyword){
     form.savedDecks=cfg.decks;
     bindDeckGroupDelete(form);
-    $('cardSettingsBack').onclick=()=>showCardSettingsPage('');
+    $('cardSettingsBack').onclick=()=>transitionCardSettings(()=>showCardSettingsPage(''));
+    $('formatCardSettings').onclick=event=>void formatCardSettings(c.id,event.currentTarget);
     const panel=$('dialog');
     panel.querySelectorAll('[data-card-settings-entry]').forEach(button=>button.onclick=()=>{
       const kind=button.dataset.cardSettingsEntry;
-      if(Object.hasOwn(cardSettingsPackKeys,kind))openCardPack(contact(c.id),()=>openLocalChatSettings(contact(c.id)),kind);
-      else showCardSettingsPage(kind);
+      transitionCardSettings(()=>{
+        if(Object.hasOwn(cardSettingsPackKeys,kind))openCardPack(contact(c.id),()=>transitionCardSettings(()=>openLocalChatSettings(contact(c.id))),kind);
+        else showCardSettingsPage(kind);
+      });
     });
     if(initialPage)showCardSettingsPage(initialPage);
   }
@@ -4521,7 +4560,7 @@ function exportCardSettings(kind){
   const cfg=localConfig(c),pack=cfg.cardPack||{};
   const data=kind==='decks'?{decks:cfg.decks}:kind==='replies'?
     {replies:Object.fromEntries(cardReplyKeys.map(key=>[key,key==='firstReplyRange'?firstCardReplyRange(cfg):cfg[key]]))}:
-    Object.fromEntries(cardSettingsPackKeys[kind].map(key=>[key,pack[key]??(['motto','intro'].includes(key)?'':[])]));
+    Object.fromEntries(cardSettingsPackKeys[kind].map(key=>[key,pack[key]??[]]));
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const name=cardSettingsLabels[kind]+'.json';
   if(typeof window.LedgerExport?.save==='function'){
@@ -5054,7 +5093,7 @@ function bindDeckGroupDelete(form){
     if(press)clearTimeout(press.timer);
     press=null;
   };
-  function confirmRemoval(button){
+  async function confirmRemoval(button){
     if(handled===button||!form.isConnected||!button.isConnected)return;
     handled=button;
     const index=Number(button.dataset.deckPreset),c=contact(form.dataset.id),decks=form.savedDecks;
@@ -5065,8 +5104,10 @@ function bindDeckGroupDelete(form){
       form.querySelector('[name=deckEnabled][value="'+i+'"]')?.checked!==group.enabled)){
       toast('批量编辑还有未保存的修改。请先保存或取消修改，再删除分组。');return;
     }
-    if(!confirm('删除字卡分组「'+deck.name+'」及其中 '+deck.items.length+' 张字卡？此操作无法撤销。'))return;
-    if(!saveChatModes(c,{decks:decks.filter((_,i)=>i!==index)}))return;
+    if(!await confirmCardDeletion('删除字卡分组？','分组「'+deck.name+'」及其中 '+deck.items.length+' 张字卡将被删除。此操作无法撤销。'))return;
+    const latest=contact(c.id);
+    if(!form.isConnected||!latest||localConfig(latest).decks!==decks)return;
+    if(!saveChatModes(latest,{decks:decks.filter((_,i)=>i!==index)}))return;
     const saved=localConfig(contact(c.id)).decks;
     form.savedDecks=saved;
     form.elements.source.value=manualChatSource(saved,false);
@@ -5202,13 +5243,14 @@ function openDeckCards(c,index){
     if(!save(decks.map((group,i)=>i===index?{...group,disabledItems:[...next]}:group)))input.checked=!disabled.has(card);
   });
   $('deckBack').onclick=()=>$('dialog').orbBack?.();
-  $('dialog').orbBack=()=>openLocalChatSettings(contact(c.id),'decks');
+  $('dialog').orbBack=()=>transitionCardSettings(()=>openLocalChatSettings(contact(c.id),'decks'));
   $('deckSettings').onclick=()=>openDeckPreset(index,true);
   $('deckAdd').onclick=()=>editCard(null);
   $('deckClear').onclick=clear;
   $('deckEdit').onclick=()=>editCard([...selected][0]);
-  $('deckDelete').onclick=()=>{
-    if(selected.size&&confirm('确认删除选中的 '+selected.size+' 张字卡？删除后无法撤销。')){
+  $('deckDelete').onclick=async()=>{
+    const count=selected.size;
+    if(count&&await confirmCardDeletion('删除选中字卡？','选中的 '+count+' 张字卡将被删除。此操作无法撤销。')&&list.isConnected){
       const items=deck.items.filter((_,j)=>!selected.has(j));
       save(decks.map((group,i)=>i===index?{...group,items,disabledItems:[...disabled].filter(item=>items.includes(item))}:group));
     }
@@ -6959,7 +7001,7 @@ document.addEventListener('click',e=>{
     changeChatMode(d.chatMode);
   }
   if(d.cardSettingsExport)exportCardSettings(d.cardSettingsExport);
-  if(d.deckPreset!==undefined)openDeckPreset(Number(d.deckPreset));
+  if(d.deckPreset!==undefined)transitionCardSettings(()=>openDeckPreset(Number(d.deckPreset)));
   if(d.emoji){
     const input=document.querySelector('#chatForm textarea');
     if(input){input.setRangeText(d.emoji,input.selectionStart,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}
