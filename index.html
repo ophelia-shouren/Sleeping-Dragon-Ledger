@@ -285,10 +285,43 @@ body.full-chat{overflow:hidden}
 .deck-card-actions[hidden]{display:none}
 [data-card-poke-avatar]{touch-action:manipulation}.card-pack-list{max-height:35dvh;overflow:auto;overscroll-behavior:contain}.card-pack-status{display:block;max-width:min(45vw,25ch);color:var(--gold);font-size:.72em;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card-pack-status:empty{display:none}
 .card-settings-section{margin-block:10px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.card-settings-section h3{margin:0 0 8px}.card-settings-section .row{flex-wrap:wrap}
-#dialog .card-settings-directory{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-block:12px}
-#dialog .card-settings-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;align-items:center;width:100%;min-width:0;padding:12px clamp(8px,2vw,14px);text-align:start;background:var(--panel);border:1px solid var(--line);border-radius:12px}
-#dialog .card-settings-entry small{grid-column:1;color:var(--muted);font-weight:normal;white-space:normal}
-#dialog .card-settings-entry span{grid-column:2;grid-row:1/3;color:var(--gold)}
+#dialog:has(.card-settings-head){width:min(540px,calc(100vw - 28px));box-sizing:border-box}
+#dialog .card-settings-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px}
+#dialog .card-settings-head h2{margin:0;font-size:1.23rem;letter-spacing:.04em}
+#dialog .card-settings-head button{min-height:38px;padding:6px 12px;border-radius:99px;font-size:.8rem}
+#dialog .card-settings-head [hidden]{display:none}
+#dialog .card-settings-directory{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
+#dialog .card-settings-entry{display:grid;grid-template-columns:1fr auto;align-content:start;align-items:center;gap:6px;width:100%;min-width:0;padding:12px;text-align:start;color:var(--ink);border:1px solid var(--line);border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--gold) 10%,var(--panel)),var(--panel));transition:border-color .18s,background-color .18s,transform .18s}
+#dialog .card-settings-entry:hover,#dialog .card-settings-entry:focus-visible{border-color:var(--gold)}
+#dialog .card-settings-entry:active{transform:scale(.98)}
+#dialog .card-settings-entry strong{grid-column:1/-1;font-size:.93rem;line-height:1.3}
+#dialog .card-settings-entry small{grid-column:1/-1;color:var(--muted);font-size:.72rem;line-height:1.4;font-weight:normal;white-space:normal}
+#dialog .card-settings-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;color:var(--gold);background:color-mix(in srgb,var(--gold) 13%,transparent);font:normal 16px/1 system-ui}
+#dialog .card-settings-arrow{justify-self:end;color:var(--gold)}
+#dialog .card-settings-entry[data-card-settings-entry=full]{grid-column:1/-1;grid-template-columns:auto 1fr auto;column-gap:10px}
+#dialog [data-card-settings-entry=full] .card-settings-icon{grid-row:1/3}
+#dialog [data-card-settings-entry=full] strong,#dialog [data-card-settings-entry=full] small{grid-column:2}
+#dialog [data-card-settings-entry=full] .card-settings-arrow{grid-column:3;grid-row:1/3}
+#dialog .card-settings-section{background:color-mix(in srgb,var(--panel) 92%,var(--gold));margin-block:10px;padding:12px}
+#dialog .card-settings-section .deck-bulk-editor{margin-block:12px}
+#dialog .card-settings-transfer{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#dialog .card-settings-transfer button,#dialog .card-settings-file{flex:1;min-width:0;min-height:40px;margin:0}
+#dialog .card-settings-file{position:relative;display:grid;place-items:center;padding:8px 10px;border:1px dashed var(--accent-border,var(--line));border-radius:10px;background:var(--field,var(--panel));color:var(--ink);cursor:pointer;text-align:center}
+#dialog .card-settings-file:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+#dialog .card-settings-file input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+#dialog .card-settings-upload{text-align:center}
+#dialog .card-settings-upload .card-settings-icon{margin:4px auto 8px;width:42px;height:42px;font-size:22px}
+#dialog .card-settings-upload .card-settings-file{margin-top:12px;min-height:48px}
+#dialog .card-settings-reply-range{margin:0 0 12px;border:1px solid var(--line);border-radius:10px;padding:10px}
+#dialog .card-settings-reply-range legend{color:var(--gold);font-size:.85rem}
+#dialog .card-settings-current{padding:9px 12px;margin-block:10px;border-inline-start:2px solid var(--gold);background:var(--field,var(--panel));border-radius:7px;overflow-wrap:anywhere}
+#dialog .card-settings-current small{display:block;color:var(--muted);margin-bottom:4px}
+#dialog .card-settings-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:7px}
+#dialog .card-settings-emoji{position:relative;display:grid;place-items:center;min-height:44px;margin:0;border:1px solid var(--line);border-radius:10px;cursor:pointer;font-size:1.12rem;color:var(--ink);background:var(--panel)}
+#dialog .card-settings-emoji input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+#dialog .card-settings-emoji:has(input:checked),#dialog .deck-card[aria-pressed=true],#dialog [data-pack-group][aria-pressed=true]{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 15%,var(--field,var(--panel)))}
+#dialog .card-settings-emoji:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+#dialog .card-settings-emoji:has(input:checked)::after{content:"✓";position:absolute;inset:2px 3px auto auto;font:10px system-ui;color:var(--gold);pointer-events:none}
 #dialog [data-card-settings-page][hidden]{display:none}
 .deck-card-editor{margin:10px 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .deck-bulk-editor{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px}.deck-bulk-editor summary{cursor:pointer;color:var(--gold)}
@@ -4128,10 +4161,6 @@ function importCompanionDeck(data,previous={}){
     extras[kind]=[...current,...appendImportedDecks(current,companionDecks(data,kind))];
   }
   for(const [kind,key] of Object.entries(companionTextFields))extras[kind]=words([...(extras[kind]||[]),...words(data[key])]);
-  if(data.announcementConfig&&typeof data.announcementConfig==='object'&&!Array.isArray(data.announcementConfig)){
-    const current=extras.announcements||[];
-    if(!current.some(config=>JSON.stringify(config)===JSON.stringify(data.announcementConfig)))extras.announcements=[...current,data.announcementConfig];
-  }
   return {incoming:companionDecks(data,'replies'),extras};
 }
 function cardPackPool(groups=[]){
@@ -4145,15 +4174,17 @@ function openCardPoke(c,back=()=>$('dialog').close()){
   if(!c||localConfig(c).mode!=='cards'||activeContact!==c.id)return;
   const pack=localConfig(c).cardPack||{};
   const presets=words([...cardPackPool(pack.pokes),...(pack.pokePresets||[])]);
-  dialog('<h2>我拍一拍 '+esc(displayName(c))+'</h2><form id="cardPokeForm">'+
+  dialog('<div class="card-settings-head"><button type="button" id="cardPokeBack">‹ 返回</button><h2>我拍一拍 '+esc(displayName(c))+'</h2></div><form class="card-settings-section" id="cardPokeForm">'+
     '<label>拍一拍内容<textarea name="content" maxlength="1000" required placeholder="写下你想做的动作…"></textarea></label>'+
     (presets.length?'<div class="deck-card-list card-pack-list">'+presets.map((value,index)=>
-      '<button type="button" class="deck-card" data-poke-preset="'+index+'">'+esc(value)+'</button>').join('')+'</div>':'')+
-    '<div class="row"><button type="button" id="cardPokeBack">返回</button><button type="button" id="savePokePreset">保存为预设</button><button type="submit" class="primary">发送</button></div></form>');
+      '<button type="button" class="deck-card" data-poke-preset="'+index+'" aria-pressed="false">'+esc(value)+'</button>').join('')+'</div>':'')+
+    '<div class="row"><button type="button" id="savePokePreset">保存为预设</button><button type="submit" class="primary">发送</button></div></form>');
   const form=$('cardPokeForm'),input=form.elements.content;
   $('cardPokeBack').onclick=back;
   form.querySelectorAll('[data-poke-preset]').forEach(button=>button.onclick=()=>{
     input.value=presets[Number(button.dataset.pokePreset)];
+    form.querySelector('[data-poke-preset][aria-pressed=true]')?.setAttribute('aria-pressed','false');
+    button.setAttribute('aria-pressed','true');
   });
   $('savePokePreset').onclick=()=>{
     const content=input.value.trim(),latest=contact(c.id);
@@ -4177,7 +4208,7 @@ function openCardPoke(c,back=()=>$('dialog').close()){
   };
 }
 function cardPackStatuses(pack={}){
-  return words([...cardPackPool(pack.statuses),...(pack.announcements||[]).flatMap(config=>words(config?.statusPool))]);
+  return cardPackPool(pack.statuses);
 }
 function cardPackStatus(c,now=new Date()){
   const pool=cardPackStatuses(localConfig(c).cardPack);
@@ -4204,11 +4235,6 @@ function refreshCardPackStatus(){
   const status=cardPackStatus(c);
   if(node.textContent!==status)node.title=node.textContent=status;
 }
-function cardPackAnnouncementTexts(config){
-  const values=Object.values(config?.customData||{});
-  return words(values.flatMap(value=>typeof value==='string'?[value]:
-    Array.isArray(value)?value:[value?.text??value?.content]));
-}
 function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},only=''){
   if(!c||localConfig(c).mode!=='cards')return;
   const pack=localConfig(c).cardPack||{};
@@ -4216,27 +4242,23 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
     '<button type="button" data-pack-group="'+kind+'" data-pack-index="'+index+'" aria-pressed="'+group.enabled+'">'+esc(group.name)+' · '+group.items.length+' · '+(group.enabled?'开启':'关闭')+'</button>').join('')+'</div>':'';
   const formatIntro=value=>esc(value).replace(/\|/g,'<br>');
   const section=(kind,title,items)=>items.length?'<details class="deck-bulk-editor"><summary>'+title+' · '+items.length+'</summary><div class="deck-card-list card-pack-list">'+items.map((value,index)=>
-    '<button type="button" class="deck-card" data-pack-choice="'+kind+'" data-pack-index="'+index+'">'+(kind==='intro'?formatIntro(value):esc(value))+'</button>').join('')+'</div></details>':'';
-  const configs=pack.announcements||[];
-  const choices={
-    status:words([...cardPackPool(pack.statuses),...configs.flatMap(config=>words(config?.statusPool))]),
-    motto:pack.mottos||[],intro:pack.intros||[],announcement:words(configs.flatMap(cardPackAnnouncementTexts))
-  };
+    '<button type="button" class="deck-card" data-pack-choice="'+kind+'" data-pack-index="'+index+'" aria-pressed="'+(pack[kind]===value)+'">'+(kind==='intro'?formatIntro(value):esc(value))+'</button>').join('')+'</div></details>':'';
+  const choices={status:cardPackStatuses(pack),motto:pack.mottos||[],intro:pack.intros||[]};
+  const current=(label,value,format=esc)=>value?'<div class="card-settings-current"><small>'+label+'</small>'+format(value)+'</div>':'';
+
   const content={
     pokes:'<button type="button" id="cardPackPoke">我拍一拍</button>'+grouped('pokes','拍一拍'),
-    statuses:'<p class="muted">状态约每 4～12 小时随机换一次，显示在字卡聊天的角色名字下方。</p>'+grouped('statuses','状态')+
+    statuses:current('当前状态',cardPackStatus(c))+'<p class="muted">状态约每 4～12 小时随机换一次，显示在字卡聊天的角色名字下方。</p>'+grouped('statuses','状态')+
       (choices.status.length?'<details class="deck-bulk-editor"><summary>可轮换状态 · '+choices.status.length+'</summary><div class="deck-card-list card-pack-list">'+choices.status.map(value=>'<div class="deck-card">'+esc(value)+'</div>').join('')+'</div></details>':''),
     emojis:(pack.emojis||[]).length?'<details class="deck-bulk-editor" open><summary>对方可发表情 · '+cardPackCharacterEmojis(pack).length+'/'+pack.emojis.length+'</summary>'+
       '<p class="muted">勾选允许对方随机发送的表情。输入栏的表情面板包含全部。</p>'+
-      '<div class="deck-card-list card-pack-list">'+pack.emojis.map((emoji,index)=>'<label class="deck-card"><input type="checkbox" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'>'+esc(emoji)+'</label>').join('')+'</div></details>':'',
-    mottos:section('motto','更换签名',choices.motto),
-    intros:section('intro','更换简介',choices.intro),
-    announcements:section('announcement','发布公告',choices.announcement)
+      '<div class="card-settings-emoji-grid card-pack-list">'+pack.emojis.map((emoji,index)=>'<label class="card-settings-emoji"><input type="checkbox" aria-label="'+esc(emoji)+'" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'><span aria-hidden="true">'+esc(emoji)+'</span></label>').join('')+'</div></details>':'',
+    mottos:current('当前签名',pack.motto)+section('motto','更换签名',choices.motto),
+    intros:current('当前简介',pack.intro,formatIntro)+section('intro','更换简介',choices.intro)
   };
-  dialog('<h2>'+(only?cardSettingsLabels[only]:'字卡资料与工具')+'</h2><div class="row"><button type="button" id="cardPackBack">‹ 返回</button>'+
-    (!only?'<button type="button" id="cardPackClear">清除当前资料</button>':'')+'</div>'+
+  dialog('<div class="card-settings-head"><button type="button" id="cardPackBack">‹ 返回</button><h2>'+(only?cardSettingsLabels[only]:'字卡资料与工具')+'</h2>'+
+    (!only?'<button type="button" id="cardPackClear">清除资料</button>':'')+'</div>'+
     (only?'<section class="card-settings-section">'+(content[only]||'<p class="muted">暂无素材。</p>')+cardSettingsTransfer(only)+'</section>':
-      '<div class="deck-card-editor">'+[['当前状态',cardPackStatus(c)],['签名',pack.motto],['简介',pack.intro]].filter(([,value])=>value).map(([label,value])=>'<p><strong>'+label+'</strong> · '+(label==='简介'?formatIntro(value):esc(value))+'</p>').join('')+'</div>'+
       Object.entries(content).filter(([,value])=>value).map(([kind,value])=>'<section class="card-settings-section"><h3>'+cardSettingsLabels[kind]+'</h3>'+value+'</section>').join('')));
   const panel=$('dialog');
   $('cardPackBack').onclick=back;
@@ -4272,11 +4294,7 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
   });
   panel.querySelectorAll('[data-pack-choice]').forEach(button=>button.onclick=()=>{
     const kind=button.dataset.packChoice,value=choices[kind][Number(button.dataset.packIndex)];
-    if(kind!=='announcement'){update({[kind]:value});return;}
-    const latest=contact(c.id);
-    if(latest&&confirm('将此公告发到当前字卡聊天？')&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'system',content:'公告：'+value,sentAt:Date.now()}]})){
-      panel.close();repaintChat();
-    }
+    update({[kind]:value});
   });
 }
 function parseCardDecks(raw,format='auto'){
@@ -4340,27 +4358,31 @@ function firstCardReplyMs(cfg){
   const [min,max]=firstCardReplyRange(cfg).map(value=>Math.round(value*10));
   return (min+Math.floor(Math.random()*(max-min+1)))*100;
 }
-const cardSettingsLabels={decks:'我的字卡',replies:'回复设置',pokes:'拍一拍',statuses:'状态',emojis:'表情',mottos:'签名',intros:'简介',announcements:'公告'};
-const cardSettingsPackKeys={pokes:['pokes','pokePresets'],statuses:['statuses'],emojis:['emojis','blockedEmojis'],mottos:['mottos','motto'],intros:['intros','intro'],announcements:['announcements']};
+const cardSettingsLabels={decks:'我的字卡',replies:'回复设置',pokes:'拍一拍',statuses:'状态',emojis:'表情',mottos:'签名',intros:'简介'};
+const cardSettingsPackKeys={pokes:['pokes','pokePresets'],statuses:['statuses'],emojis:['emojis','blockedEmojis'],mottos:['mottos','motto'],intros:['intros','intro']};
 const cardReplyKeys=['firstReplyRange','speed','count','idle','proactive','multiple'];
+function cardSettingsFile(label,attributes){
+  return '<label class="card-settings-file">'+label+'<input type="file" '+attributes+' accept=".json,application/json"></label>';
+}
 function cardSettingsTransfer(kind){
-  return '<label>导入 JSON<input type="file" data-card-settings-import="'+kind+'" accept=".json,application/json"></label>'+
-    '<button type="button" data-card-settings-export="'+kind+'">导出 JSON</button>';
+  const attributes=kind==='decks'?'id="localChatImport"':'data-card-settings-import="'+kind+'"';
+  return '<div class="card-settings-transfer">'+cardSettingsFile(kind==='decks'?'导入字卡':'导入 JSON',attributes)+
+    '<button type="button" data-card-settings-export="'+kind+'">导出 JSON</button></div>';
 }
 const cardSettingsDescriptions={
-  decks:'查看字卡分类、批量编辑或单独导入导出字卡。',
-  replies:'设置首条等待时间、回复间隔和条数。',
-  pokes:'管理拍一拍分组和自定义预设。',
-  statuses:'管理显示在角色名字下方的轮换状态。',
-  emojis:'管理表情，并勾选角色可以发哪些。',
+  decks:'查看分类与批量编辑。',
+  replies:'调整等待时间、间隔和条数。',
+  pokes:'管理分组与动作预设。',
+  statuses:'管理角色名下的轮换状态。',
+  emojis:'选择角色可发的表情。',
   mottos:'管理和切换角色签名。',
   intros:'管理和切换角色简介。',
-  announcements:'管理公告素材并发送到聊天。',
-  full:'用一份完整 JSON 一次导入字卡和其他资料。'
+  full:'一次导入字卡和角色资料。'
 };
+const cardSettingsIcons={decks:'▤',replies:'◷',pokes:'✦',statuses:'◉',emojis:'☺',mottos:'❝',intros:'≡',full:'↓'};
 function cardSettingsDirectory(){
   return '<div class="card-settings-directory" data-card-settings-page="">'+Object.entries(cardSettingsDescriptions).map(([kind,description])=>
-    '<button type="button" class="card-settings-entry" data-card-settings-entry="'+kind+'"><strong>'+(cardSettingsLabels[kind]||'完整导入')+'</strong><small>'+description+'</small><span aria-hidden="true">›</span></button>').join('')+'</div>';
+    '<button type="button" class="card-settings-entry" data-card-settings-entry="'+kind+'"><i class="card-settings-icon" aria-hidden="true">'+cardSettingsIcons[kind]+'</i><span class="card-settings-arrow" aria-hidden="true">›</span><strong>'+(cardSettingsLabels[kind]||'完整导入')+'</strong><small>'+description+'</small></button>').join('')+'</div>';
 }
 function showCardSettingsPage(kind){
   const panel=$('dialog');
@@ -4384,20 +4406,20 @@ function openLocalChatSettings(c=contact(activeContact),initialPage=''){
     '<p class="muted">每行一张字卡，逗号保留在卡片里。单独写一行 [分类名]，下一行起就是该分类的字卡。</p>';
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
     cfg.decks.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
-  dialog((keyword?'<h2>提示词设置</h2>':'<div class="row between"><button type="button" id="cardSettingsBack" hidden>‹ 返回</button><h2 id="cardSettingsTitle" tabindex="-1">字卡设置</h2><button type="button" id="cardSettingsClose" data-action="close">关闭</button></div>'+cardSettingsDirectory())+'<form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'"'+(keyword?'':' data-card-settings-page="decks" hidden')+'>'+
+  dialog((keyword?'<h2>提示词设置</h2>':'<div class="card-settings-head"><button type="button" id="cardSettingsBack" hidden>‹ 返回</button><h2 id="cardSettingsTitle" tabindex="-1">字卡设置</h2><button type="button" id="cardSettingsClose" data-action="close">关闭</button></div>'+cardSettingsDirectory())+'<form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'"'+(keyword?'':' data-card-settings-page="decks" hidden')+'>'+
     (keyword?fields+'<label>导入 Markdown／JSON<input id="localChatImport" type="file" accept=".md,.markdown,.json"></label>':
-      '<section class="card-settings-section"><div id="deckImportCategories">'+deckPresetMenu(cfg.decks)+'</div><label>单独导入字卡<input id="localChatImport" type="file" accept=".json,application/json"></label>'+
-      '<button type="button" data-card-settings-export="decks">导出字卡 JSON</button><p class="muted" id="deckImportStatus" role="status">导入后立即保存，新分组会显示在上方。</p>'+
+      '<section class="card-settings-section"><div id="deckImportCategories">'+deckPresetMenu(cfg.decks)+'</div>'+cardSettingsTransfer('decks')+
+      '<p class="muted" id="deckImportStatus" role="status">导入后立即保存，新分组会显示在上方。</p>'+
       '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
     (keyword?billRuleEditor(cfg.billRules||[]):'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button type="submit" class="primary">保存字卡</button></div></section></form>'+
-      '<form id="cardReplyForm" data-id="'+esc(c.id)+'" data-card-settings-page="replies" hidden><section class="card-settings-section"><div class="local-chat-fields"><label>首条回复最短等待（秒）<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>首条回复最长等待（秒）<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
+      '<form id="cardReplyForm" data-id="'+esc(c.id)+'" data-card-settings-page="replies" hidden><section class="card-settings-section"><fieldset class="card-settings-reply-range"><legend>首条回复等待（秒）</legend><div class="local-chat-fields"><label>最短<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>最长<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label></div></fieldset><div class="local-chat-fields"><label>主动发消息前等待（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     (keyword?'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>':
       '<button type="submit" class="primary">保存回复设置</button>'+cardSettingsTransfer('replies')+'</section></form>'+
-      '<section class="card-settings-section" data-card-settings-page="full" hidden><p class="muted">上传完整的字卡资料包 JSON，一次导入字卡分类及文件自带的资料。</p><label>选择完整资料包<input type="file" id="fullCardPackImport" accept=".json,application/json"></label></section>'));
+      '<section class="card-settings-section card-settings-upload" data-card-settings-page="full" hidden><span class="card-settings-icon" aria-hidden="true">↓</span><p>选择完整的字卡资料包</p><p class="muted" id="fullCardPackStatus" role="status">支持 JSON，最大 1 MB。</p>'+cardSettingsFile('选择 JSON 文件','id="fullCardPackImport"')+'</section>'));
   const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
   if(!keyword){
     form.savedDecks=cfg.decks;
@@ -4466,7 +4488,7 @@ async function importLocalChat(input){
   input.value='';
   repaintChat();
   resetIdleTimer();
-  if(full)toast('完整资料包已导入');
+  if(full){$('fullCardPackStatus').textContent='导入完成 · 新增 '+added.length+' 个字卡分组';toast('完整资料包已导入');}
 }
 
 function refreshSavedCardDecks(form,decks){
@@ -4530,7 +4552,7 @@ async function importCardSettings(input){
     patch=Object.fromEntries(cardReplyKeys.map(key=>[key,data.replies[key]]));
   }else{
     const keys=cardSettingsPackKeys[kind],current=cfg.cardPack||{};
-    const fields=companionDeckFields[kind]||[companionTextFields[kind]||(kind==='announcements'?'announcementConfig':'')];
+    const fields=companionDeckFields[kind]||[companionTextFields[kind]];
     const fromSource=Object.fromEntries(fields.filter(key=>Object.hasOwn(data,key)).map(key=>[key,data[key]]));
     const own=Object.fromEntries(keys.filter(key=>Object.hasOwn(data,key)).map(key=>[key,data[key]]));
     if(!Object.keys(fromSource).length&&!Object.keys(own).length)throw Error('请选择'+cardSettingsLabels[kind]+' JSON。');
