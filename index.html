@@ -4255,14 +4255,16 @@ function resetIdleTimer(){
   const c=page==='chat'&&!deviceLocked&&!document.hidden&&contact(activeContact);
   if(!c||teaLock([c.id]))return;
   const cfg=localConfig(c);
-  if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!cfg.decks.some(d=>d.enabled&&d.items.length))return;
+  if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!enabledCardPool(cfg).length)return;
   idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
 }
 function queueLocalCards(c){
   if(mysteryChatBlocked([c.id])||teaLock([c.id]))return;
   const cfg=localConfig(c),run=Symbol(),id=c.id;
-  if(!cfg.decks.some(d=>d.enabled&&d.items.length)){repaintChat();return;}
+  if(!enabledCardPool(cfg).length){repaintChat();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
+  // Leave enough time for the typing indicator to paint even at zero delay.
+  const delay=Math.max(500,cfg.speed*1000);
   const sendCount=1+Math.floor(Math.random()*cfg.count);
   let sent=0;
   function step(){
@@ -4272,14 +4274,14 @@ function queueLocalCards(c){
     if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&!deviceLocked&&!document.hidden){
       const content=chooseCard(localConfig(latest));
       if(content&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
-        if(++sent<sendCount){repaintChat();setTimeout(step,cfg.speed*1000);return;}
+        if(++sent<sendCount){repaintChat();setTimeout(step,delay);return;}
       }
     }
     localRuns.delete(id);
     if(page==='chat'&&activeContact===id&&!deviceLocked)repaintChat();
     resetIdleTimer();
   }
-  repaintChat();setTimeout(step,cfg.speed*1000);
+  repaintChat();setTimeout(step,delay);
 }
 function repaintChat(){
   const input=document.querySelector('#chatForm textarea');
