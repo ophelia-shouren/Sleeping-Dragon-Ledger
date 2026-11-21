@@ -2296,7 +2296,7 @@ async function groupReply(g,c,guide=''){
   return gameResult?gameResult+'\n'+reply:reply;
 }
 function groupSpeakerLimit(roles){
-  return Math.max(1,Math.min(2,roles.length-1));
+  return Math.min(3,roles.length);
 }
 function parseGroupRound(value,roles,action){
   if(Array.isArray(value))value=value.map(part=>typeof part==='string'?part:part?.text||'').join('');
@@ -2321,14 +2321,20 @@ async function groupRoundReply(g,roles){
   const visible=g.messages.filter(m=>!m.tea?.bonus&&roles.every(c=>!m.audience||m.audience.includes(c.id)))
     .slice(-24).map(m=>Array.isArray(m.quote?.audience)&&roles.some(c=>!m.quote.audience.includes(c.id))?{...m,quote:undefined}:m);
   const latest=visible.findLast(m=>!m.roleId),gameResult=g.continueContext===true?null:latest?.gameResult;
-  const people=roles.map(c=>({
+  // Candidate order should carry no conversational meaning.
+  const candidatesInPrompt=roles.slice();
+  for(let i=candidatesInPrompt.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [candidatesInPrompt[i],candidatesInPrompt[j]]=[candidatesInPrompt[j],candidatesInPrompt[i]];
+  }
+  const people=candidatesInPrompt.map(c=>({
     roleId:c.id,姓名:displayName(c),性别:c.gender,性格:c.personality,人设:c.description,...(c.speechRules?{必须遵守的发言规则:c.speechRules}:{}),与用户的关系:c.relationship,
     角色关系:charRelationContext(c),世界书:[worldContext('front',c.id),worldContext('end',c.id)].filter(Boolean),
     ...(g.shared&&profileFor(c)?.id===p.id?{个人记忆:memoryContext(c),近期私聊:recentDialogue(c.messages).slice(-8)}:{})
   }));
   const system=[
     chatTimeContext(),
-    '你负责生成一轮自然的群聊。根据最新话题、提及对象和上下文选择最适合接话的角色，通常只需一到两位。没有话要说的角色省略。发言顺序由对话决定，候选名单顺序与上一轮顺序都不构成轮次要求。后发言的角色可以接前面角色的话。不要代替用户发言。每位角色只能使用自己的设定、世界书、个人记忆和私聊，以及共同可见的群聊内容。',
+    '你负责写一轮自然的群聊。先判断最新话题是谁在聊、这句话在对谁说，以及谁确实有理由加入。被点名或被引用的人优先回应；只有一位角色有话说时，就只写这一位。某位角色有自己的观点、能接梗、补充或反驳时，才让其加入。多人发言应相互承接，而不是各答一遍用户。刚说过话的人仍可以连续接话，无关的人可以连续几轮不说话。不要按名单、上一轮顺序或没发言的时长轮换，也不要为了凑人数让全员回应。不要代替用户发言。每位角色只能使用自己的设定、世界书、个人记忆和私聊，以及共同可见的群聊内容。',
     g.continueContext===true?'用户按了发送键让角色继续聊天，本轮没有新增用户消息。承接聊天记录里最后的发言或话题，自然接着聊，避免重复已有的回答。':'',
     '群聊成员：'+g.members.map(contact).filter(Boolean).map(displayName).join('、'),
     '本轮可发言的候选角色：'+JSON.stringify(people),
