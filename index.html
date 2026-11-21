@@ -317,6 +317,9 @@ body.full-chat{overflow:hidden}
 #dialog .card-settings-reply-range legend{color:var(--gold);font-size:.85rem}
 #dialog .card-settings-current{padding:9px 12px;margin-block:10px;border-inline-start:2px solid var(--gold);background:var(--field,var(--panel));border-radius:7px;overflow-wrap:anywhere}
 #dialog .card-settings-current small{display:block;color:var(--muted);margin-bottom:4px}
+#dialog .card-sticker-grid{margin-top:12px;grid-template-columns:repeat(auto-fill,minmax(62px,1fr))}
+#dialog .card-sticker-grid button{padding:4px;aspect-ratio:1;min-width:0}
+#dialog .card-sticker-grid img{display:block;width:100%;height:100%;object-fit:contain}
 #dialog .card-settings-emoji-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:7px}
 #dialog .card-settings-emoji{position:relative;display:grid;place-items:center;min-height:44px;margin:0;border:1px solid var(--line);border-radius:10px;cursor:pointer;font-size:1.12rem;color:var(--ink);background:var(--panel)}
 #dialog .card-settings-emoji input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
@@ -3687,6 +3690,7 @@ function teaBack(id,mode){
   $('dialog').close();render();
 }
 function openTea(id,mode,bonus=false){
+  if(mode==='cards')return;
   const saved=teaSession(id,mode,bonus)||(!bonus&&teaLock(mode==='group'?groupById(id)?.members||[]:[id]));
   if(saved){renderTea(saved.id);return;}
   const cast=mode==='group'?(groupById(id)?.members||[]).map(contact).filter(Boolean):[contact(id)].filter(Boolean);
@@ -4037,11 +4041,12 @@ function chatAttachments(c,busy,group){
   return '<div id="chatImagePreview">'+(src?renderChatImagePreview(src):'')+'</div>'+
     '<div id="composerMenu" class="composer-menu" hidden><h3>聊天工具</h3>'+
     (mode==='ai'?'<div class="chat-story-controls">'+(group?currentSceneButton(group,true)+actionWritingControl(group,true):currentSceneButton(c)+actionWritingControl(c))+'</div>':'')+
-    (mode==='cards'?'<button type="button" class="composer-tool" data-action="cardPackOpen">字卡资料与工具</button>':'')+
-    '<div class="composer-tools"><button type="button" class="composer-tool composer-icon" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" aria-label="茶叙" title="茶叙" '+(busy?'disabled':'')+'>'+tea+'</button><button type="button" class="composer-tool bonus-tea-button" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" data-tea-bonus="true">✦ 番外茶叙</button><label class="chat-file composer-tool">'+photo+'<span>图片／表情包</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
-    (mode==='ai'?'<button type="button" class="composer-tool composer-icon" data-action="chatGames" aria-label="小游戏" title="小游戏" aria-haspopup="dialog" '+(busy?'disabled':'')+'>'+dice+'</button></div></div>':
+    '<div class="composer-tools">'+(mode==='cards'?'':'<button type="button" class="composer-tool composer-icon" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" aria-label="茶叙" title="茶叙" '+(busy?'disabled':'')+'>'+tea+'</button><button type="button" class="composer-tool bonus-tea-button" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" data-tea-bonus="true">✦ 番外茶叙</button>')+'<label class="chat-file composer-tool">'+photo+'<span>图片</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
+    '<button type="button" class="composer-tool" data-action="cardStickers">'+emoji+'<span>表情包</span></button>'+
+    (mode==='ai'?'<button type="button" class="composer-tool composer-icon" data-action="chatGames" aria-label="小游戏" title="小游戏" aria-haspopup="dialog" '+(busy?'disabled':'')+'>'+dice+'</button></div></div>':mode==='cards'?
+    '</div></div>':
     '<button type="button" class="composer-tool" data-action="emojiPicker" aria-expanded="false" aria-controls="chatEmojis">'+emoji+'<span>插入表情</span></button></div>'+
-    '<div id="chatEmojis" class="chat-emojis" hidden>'+words([...((mode==='cards'&&localConfig(c).cardPack?.emojis)||[]),'😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙']).map(x=>'<button type="button" data-emoji="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div></div>')+
+    '<div id="chatEmojis" class="chat-emojis" hidden>'+words(['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙']).map(x=>'<button type="button" data-emoji="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div></div>')+
     '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" data-action="composerMenu" aria-label="聊天工具" aria-controls="composerMenu" aria-expanded="false">'+tools+'</button>'+
     '<button type="submit" class="composer-send composer-icon" aria-label="寄出信件" title="寄出信件" '+(busy?'disabled':'')+'>'+star+'</button></div>';
 }
@@ -4078,7 +4083,7 @@ function chatGameTurn(kind,source){
   }
   return turn;
 }
-function renderChatImagePreview(src){return '<div class="chat-image-preview"><img alt="待发送图片" src="'+esc(src)+'"><button type="button" data-action="removeChatImage">移除</button></div>';}
+function renderChatImagePreview(src,label='图片'){return '<div class="chat-image-preview"><img alt="待发送'+label+'" src="'+esc(src)+'"><button type="button" data-action="removeChatImage">移除</button></div>';}
 function imageInMessage(m){
   const src=safePicture(m.image||'');
   return src?'<img class="message-image" loading="lazy" decoding="async" src="'+esc(src)+'" alt="聊天图片">':'';
@@ -4180,10 +4185,43 @@ function cardPackCharacterEmojis(pack={}){
   const blocked=new Set(pack.blockedEmojis);
   return (pack.emojis||[]).filter(emoji=>!blocked.has(emoji));
 }
+function openCardStickers(groupId=''){
+  const c=contact(activeContact),group=groupById(groupId);
+  if(!group&&!c)return;
+  const owner=group||c,mode=group?'group':localConfig(c).mode;
+  const stickers=(group?group.stickers:localConfig(c).cardPack?.stickers)||[];
+  dialog('<div class="card-settings-head"><button type="button" data-action="close">‹ 返回</button><h2>表情包</h2></div>'+
+    '<section class="card-settings-section"><label class="card-settings-file">导入表情包<input id="cardStickerImport" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"></label>'+
+    (stickers.length?'<div class="card-settings-emoji-grid card-pack-list card-sticker-grid">'+stickers.map((src,index)=>
+      '<button type="button" data-card-sticker="'+index+'" aria-label="选择表情包 '+(index+1)+'"><img src="'+esc(safePicture(src))+'" alt="" loading="lazy"></button>').join('')+'</div>':'<p class="muted">可导入 JPG、JPEG、PNG、WebP 或 GIF。</p>')+'</section>');
+  const panel=$('dialog');
+  const input=$('cardStickerImport');
+  input.onchange=()=>importCardStickers(input,owner.id,mode).catch(error=>{input.value='';toast(error.message);});
+  panel.querySelectorAll('[data-card-sticker]').forEach(button=>button.onclick=()=>{
+    if(!$('chatImagePreview')||(!group&&(activeContact!==owner.id||localConfig(contact(owner.id)).mode!==mode)))return;
+    const src=stickers[Number(button.dataset.cardSticker)];
+    if(group)groupImages.set(owner.id,src);
+    else chatImages.set(imageKey(owner.id,mode),src);
+    $('chatImagePreview').innerHTML=renderChatImagePreview(src,'表情包');
+    panel.close();
+  });
+}
+async function importCardStickers(input,id,mode){
+  const files=Array.from(input.files),images=[];
+  for(const file of files)images.push(await encodeChatImage(file,320));
+  if(!files.length||!input.isConnected||!$('dialog').open)return;
+  const group=mode==='group'?groupById(id):null,c=contact(id);
+  if(mode==='group'?!group:(!c||activeContact!==id||localConfig(c).mode!==mode))return;
+  const pack=group||localConfig(c).cardPack||{};
+  const stickers=words([...(pack.stickers||[]),...images]);
+  if(group)patchGroup(group,{stickers});
+  else if(!saveChatModes(c,{cardPack:{...pack,stickers}}))return;
+  openCardStickers(group?id:'');toast('表情包已导入，点选后可发送');
+}
 function openCardPoke(c,back=()=>$('dialog').close()){
   if(!c||localConfig(c).mode!=='cards'||activeContact!==c.id)return;
   const pack=localConfig(c).cardPack||{};
-  const presets=words([...cardPackPool(pack.pokes),...(pack.pokePresets||[])]);
+  const presets=words(pack.pokePresets);
   dialog('<div class="card-settings-head"><button type="button" id="cardPokeBack">‹ 返回</button><h2>我拍一拍 '+esc(displayName(c))+'</h2></div><form class="card-settings-section" id="cardPokeForm">'+
     '<label>拍一拍内容<textarea name="content" maxlength="1000" required placeholder="写下你想做的动作…"></textarea></label>'+
     (presets.length?'<div class="deck-card-list card-pack-list">'+presets.map((value,index)=>
@@ -4253,7 +4291,7 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
   const statuses=cardPackStatuses(pack);
   const status=cardPackStatus(c);
   const content={
-    pokes:'<button type="button" id="cardPackPoke">我拍一拍</button>'+grouped('pokes','拍一拍'),
+    pokes:'<div class="row"><button type="button" id="cardPackPoke">我的拍一拍预设</button></div><p class="muted">对方拍你时，会从已开启的分组随机抽取一条后缀。</p>'+grouped('pokes','对方拍我'),
     statuses:(status?'<div class="card-settings-current"><small>当前状态</small>'+esc(status)+'</div>':'')+'<p class="muted">状态约每 4～12 小时随机换一次，显示在字卡聊天的角色名字下方。</p>'+grouped('statuses','状态')+
       (statuses.length?'<details class="deck-bulk-editor"><summary>可轮换状态 · '+statuses.length+'</summary><div class="deck-card-list card-pack-list">'+statuses.map(value=>'<div class="deck-card">'+esc(value)+'</div>').join('')+'</div></details>':''),
     emojis:(pack.emojis||[]).length?'<details class="deck-bulk-editor" open><summary>对方可发表情 · '+cardPackCharacterEmojis(pack).length+'/'+pack.emojis.length+'</summary>'+
@@ -4754,6 +4792,7 @@ function validateChatModes(cfg){
     ['pokes','statuses'].some(key=>pack[key]!==undefined&&(!Array.isArray(pack[key])||
       !pack[key].every(group=>group&&typeof group.name==='string'&&typeof group.enabled==='boolean'&&strings(group.items))))||
     ['mottos','intros','emojis','blockedEmojis','pokePresets'].some(key=>pack[key]!==undefined&&!strings(pack[key]))||
+    (pack.stickers!==undefined&&(!strings(pack.stickers)||!pack.stickers.every(src=>safePicture(src)===src&&src.startsWith('data:'))))||
     ['status','motto','intro'].some(key=>pack[key]!==undefined&&typeof pack[key]!=='string')||
     (pack.announcements!==undefined&&(!Array.isArray(pack.announcements)||!pack.announcements.every(config=>config&&typeof config==='object'&&!Array.isArray(config))))))return false;
   const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
@@ -7167,7 +7206,7 @@ document.addEventListener('click',e=>{
     }
     case 'rollChatDice':playChatGame('dice');break;
     case 'playChatRps':playChatGame('rps');break;
-    case 'cardPackOpen':openCardPack();break;
+    case 'cardStickers':openCardStickers(b.closest('[data-group-room]')?.dataset.groupRoom||'');break;
     case 'cardPackSettings':openCardPack(contact(activeContact),()=>openLocalChatSettings());break;
     case 'emojiPicker':{const list=$('chatEmojis');list.hidden=!list.hidden;b.setAttribute('aria-expanded',String(!list.hidden));break;}
     case 'groupInvite':case 'groupRemove':
