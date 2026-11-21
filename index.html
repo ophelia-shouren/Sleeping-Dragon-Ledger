@@ -2689,7 +2689,7 @@ function openThread(id){
     if(!patchSession(c,localConfig(c).mode,{draft:[localSession(c).draft,pendingShare].filter(Boolean).join('\n\n')}))return;
     pendingShare='';
   }
-  if(activeContact!==id)localRuns.clear();
+  if(activeContact!==id)cancelDirectCardReplies();
   activeContact=id;
   if(localConfig(c).mode==='keyword')refreshBillReplies(id);
   go('chat');
@@ -4718,21 +4718,45 @@ function chooseCard(cfg){
 function hasCardReplyContent(cfg){
   return enabledCardPool(cfg).length||cardPackCharacterEmojis(cfg.cardPack).length||cardPackPool(cfg.cardPack?.pokes).length;
 }
+const cardIdleDeadlines=new Map();
+function androidCardBackground(){
+  return typeof window.LedgerExport?.save==='function';
+}
+function cancelDirectCardReplies(){
+  for(const [id,run] of localRuns)if(!run.proactive)localRuns.delete(id);
+}
 function resetIdleTimer(){
   clearTimeout(idleTimer);
-  const c=page==='chat'&&!deviceLocked&&!document.hidden&&contact(activeContact);
-  if(!c||teaLock([c.id]))return;
-  const cfg=localConfig(c);
-  if(cfg.mode!=='cards'||!cfg.proactive||localRuns.has(c.id)||!hasCardReplyContent(cfg))return;
-  idleTimer=setTimeout(()=>{const latest=contact(c.id);if(latest&&page==='chat'&&activeContact===c.id&&!deviceLocked&&!document.hidden&&!$('dialog').open)queueLocalCards(latest);else resetIdleTimer();},cfg.idle*1000);
+  const now=Date.now(),canRun=androidCardBackground()||(!deviceLocked&&!document.hidden);
+  const eligible=new Set();
+  let next=Infinity;
+  for(const c of state.contacts){
+    const cfg=localConfig(c),id=c.id;
+    if(cfg.mode!=='cards'||!cfg.proactive||!hasCardReplyContent(cfg)||teaLock([id])||mysteryChatBlocked([id]))continue;
+    eligible.add(id);
+    if(localRuns.has(id))continue;
+    const last=cfg.cards.messages.at(-1);
+    let clock=cardIdleDeadlines.get(id);
+    if(!clock||clock.last!==last||clock.idle!==cfg.idle){
+      clock={last,idle:cfg.idle,due:now+cfg.idle*1000};
+      cardIdleDeadlines.set(id,clock);
+    }
+    if(!canRun)continue;
+    if(clock.due<=now){
+      clock.due=now+cfg.idle*1000;
+      queueLocalCards(c);
+    }else next=Math.min(next,clock.due);
+  }
+  for(const id of cardIdleDeadlines.keys())if(!eligible.has(id))cardIdleDeadlines.delete(id);
+  if(Number.isFinite(next))idleTimer=setTimeout(resetIdleTimer,Math.max(0,next-Date.now()));
 }
 function queueLocalCards(c,afterUserMessage=false){
   if(mysteryChatBlocked([c.id])||teaLock([c.id]))return;
-  const cfg=localConfig(c),id=c.id,android=typeof window.LedgerExport?.save==='function';
-  const run={resume:()=>{if(Date.now()>=dueAt)step();}};
+  const cfg=localConfig(c),id=c.id,android=androidCardBackground();
+  const run={proactive:!afterUserMessage,resume:()=>{if(Date.now()>=dueAt)step();}};
   let timer,dueAt;
   if(!hasCardReplyContent(cfg)){repaintChat();resetIdleTimer();return;}
-  localRuns.set(id,run);clearTimeout(idleTimer);
+  localRuns.set(id,run);
   // Leave enough time for the typing indicator to paint even at zero delay.
   const delay=Math.max(500,cfg.speed*1000);
   const sendCount=1+Math.floor(Math.random()*cfg.count);
@@ -4747,9 +4771,10 @@ function queueLocalCards(c,afterUserMessage=false){
     timer=undefined;
     const latest=contact(id);
     if(!latest||localRuns.get(id)!==run)return;
-    if(teaLock([id])||mysteryChatBlocked([id])){localRuns.delete(id);return;}
+    if(teaLock([id])||mysteryChatBlocked([id])){localRuns.delete(id);resetIdleTimer();return;}
     const visible=!deviceLocked&&!document.hidden;
-    if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&(visible||android)){
+    const currentChat=page==='chat'&&activeContact===id&&!$('dialog').open;
+    if((run.proactive||page==='chat'&&activeContact===id)&&localConfig(latest).mode==='cards'&&(visible||android)){
       const current=localConfig(latest),card=chooseCard(current);
       const replies=card?[card]:[];
       const emojis=cardPackCharacterEmojis(current.cardPack),pokes=cardPackPool(current.cardPack?.pokes);
@@ -4758,14 +4783,15 @@ function queueLocalCards(c,afterUserMessage=false){
       const content=replies[Math.floor(Math.random()*replies.length)];
       const quote=sent===0&&content===card?randomCardQuote(current.cards.messages):null;
       if(content&&patchSession(latest,'cards',{messages:[...current.cards.messages,{role:'assistant',content,sentAt:Date.now(),...(quote?{quote}:{})}]})){
-        if(++sent<sendCount){if(visible)repaintChat();schedule(delay);return;}
+        if(++sent<sendCount){if(visible&&currentChat)repaintChat();schedule(delay);return;}
       }
     }
     localRuns.delete(id);
-    if(page==='chat'&&activeContact===id&&visible)repaintChat();
+    if(visible&&currentChat)repaintChat();
     resetIdleTimer();
   }
-  repaintChat();schedule(afterUserMessage?firstCardReplyMs(cfg):delay);
+  if(page==='chat'&&activeContact===id&&!document.hidden&&!deviceLocked&&(!$('dialog').open||afterUserMessage))repaintChat();
+  schedule(afterUserMessage?firstCardReplyMs(cfg):0);
 }
 function repaintChat(){
   const input=document.querySelector('#chatForm textarea');
@@ -6562,7 +6588,7 @@ $('siteMenu').addEventListener('keydown',event=>{
   setSiteMenu(false);
   $('siteMenuToggle').focus();
 });
-function go(next){billSelection=null;selection=null;privateChatPage=0;if(next!=='chat')localRuns.clear();page=next;render();resetIdleTimer();window.scrollTo(0,0);}
+function go(next){billSelection=null;selection=null;privateChatPage=0;if(next!=='chat')cancelDirectCardReplies();page=next;render();resetIdleTimer();window.scrollTo(0,0);}
 function total(bills){return bills.reduce((a,x)=>{a[x.type]+=x.cents;return a;},{income:0,expense:0});}
 function bounds(unit, day=anchor||dateString()){
   const start=new Date(day+'T12:00:00'),end=new Date(start);
@@ -7008,7 +7034,7 @@ function handleLedgerAndroidBack(){
   if(page==='ledger'&&billSelection){stopBillSelection();return true;}
   if(page==='chat'&&activeContact){
     activeContact='';
-    localRuns.clear();
+    cancelDirectCardReplies();
     go('chat');
     return true;
   }
@@ -7353,7 +7379,7 @@ document.addEventListener('click',e=>{
         else if($('lookForm')?.dataset.returnCard)openCard($('lookForm').dataset.returnCard);
         else panel.close();
       }else if(page==='chat'&&activeContact){
-        localRuns.clear();activeContact='';go('chat');
+        cancelDirectCardReplies();activeContact='';go('chat');
       }else go('home');
       break;
     }
@@ -7395,7 +7421,7 @@ document.addEventListener('click',e=>{
       if(room)groupImages.delete(room.dataset.groupRoom);else if(c)chatImages.delete(imageKey(c.id,localConfig(c).mode));
       $('chatImage').value='';$('chatImagePreview').replaceChildren();break;
     }
-    case 'contacts':localRuns.clear();activeContact='';go('chat');break;
+    case 'contacts':cancelDirectCardReplies();activeContact='';go('chat');break;
     case 'olderGroupPage':case 'newerGroupPage':case 'latestGroupPage':{
       const id=b.closest('[data-group-room]')?.dataset.groupRoom;
       if(!id)break;
@@ -7522,7 +7548,7 @@ document.addEventListener('change',async e=>{
       if(threads.size||memoryJobs.size||mergeJobs.size)throw Error('请等当前回复完成后再恢复存档。');
       const data=validate(JSON.parse(await t.files[0].text()));
       if(threads.size||memoryJobs.size||mergeJobs.size)throw Error('请等当前回复完成后再恢复存档。');
-      if(confirm('用此备份替换当前账目、聊天和设置？')&&commit(data)){replyErrors.clear();memoryErrors.clear();localRuns.clear();chatImages.clear();activeContact='';pendingShare='';render();toast('存档已恢复');}
+      if(confirm('用此备份替换当前账目、聊天和设置？')&&commit(data)){replyErrors.clear();memoryErrors.clear();localRuns.clear();cardIdleDeadlines.clear();chatImages.clear();activeContact='';pendingShare='';render();toast('存档已恢复');}
       t.value='';
     }
     if(t.hasAttribute('data-persona-file')&&t.files[0]){
@@ -7689,11 +7715,11 @@ window.addEventListener('ledger-story-open',()=>{
 initMessageTools();
 setTimeout(scheduleSharedMemory,1200);
 initDeviceLock();
+resetIdleTimer();
 resumeNativeStory().catch(error=>toast(error.message));
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&typeof window.LedgerExport?.save==='function'){
-    const run=localRuns.get(activeContact);
-    if(run)run.resume();
+  if(!document.hidden&&androidCardBackground()){
+    for(const run of [...localRuns.values()])run.resume();
     if(page==='chat'&&activeContact&&!deviceLocked)repaintChat();
   }
   resetIdleTimer();
