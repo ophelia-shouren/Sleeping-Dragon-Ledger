@@ -4285,20 +4285,64 @@ function refreshCardPackStatus(){
   const status=cardPackStatus(c);
   if(node.textContent!==status)node.title=node.textContent=status;
 }
+function cardPackLines(value){
+  return words(value.split(/\r?\n/));
+}
+function openCardPackEditor(c,kind,index,back){
+  if(!c||localConfig(c).mode!=='cards')return;
+  const emoji=kind==='emojis',pack=localConfig(c).cardPack||{},group=pack[kind]?.[index];
+  if(!emoji&&!group)return;
+  dialog('<div class="card-settings-head"><button type="button" id="cardPackEditorBack">‹ 返回</button><h2>'+(emoji?'添加表情':esc(group.name))+'</h2></div>'+
+    '<form id="cardPackEditor" class="card-settings-section">'+(emoji?'':
+      '<label>分组名称<input name="name" value="'+esc(group.name)+'" required></label>'+
+      '<label class="mode-toggle"><input name="enabled" type="checkbox" '+(group.enabled?'checked':'')+'><span></span>启用此分组</label>')+
+    '<label>'+(emoji?'每行输入一个表情':'每行一条'+(kind==='pokes'?'拍一拍后缀':'状态'))+
+    '<textarea name="items" rows="7" required '+(emoji?'placeholder="😊&#10;✨"':'')+'>'+esc(emoji?'':group.items.join('\n'))+'</textarea></label>'+
+    (emoji?'<div class="card-settings-emoji-grid card-pack-list" id="cardPackEmojiPreview" aria-live="polite"></div>':'')+
+    '<button type="submit" class="primary">'+(emoji?'添加表情':'保存分组')+'</button></form>');
+  const panel=$('dialog'),form=$('cardPackEditor');
+  $('cardPackEditorBack').onclick=back;
+  panel.orbBack=back;
+  if(emoji)form.elements.items.oninput=()=>{
+    $('cardPackEmojiPreview').innerHTML=cardPackLines(form.elements.items.value).map(value=>'<span class="card-settings-emoji">'+esc(value)+'</span>').join('');
+  };
+  form.onsubmit=event=>{
+    event.preventDefault();
+    const latest=contact(c.id);
+    if(!latest||localConfig(latest).mode!=='cards')return;
+    const fresh=localConfig(latest).cardPack||{};
+    const value=form.elements.items.value;
+    const items=!emoji&&value===group.items.join('\n')?group.items:cardPackLines(value);
+    if(!items.length){toast(emoji?'请至少输入一个表情。':'请至少保留一条内容。');return;}
+    let next;
+    if(emoji){
+      next={...fresh,emojis:words([...(fresh.emojis||[]),...items])};
+    }else{
+      if(fresh[kind]?.[index]!==group){toast('分组已更新，请返回后重新打开。');return;}
+      const name=form.elements.name.value.trim();
+      if(!name){toast('请填写分组名称。');return;}
+      if(fresh[kind].some((entry,i)=>i!==index&&entry.name===name)){toast('已有同名分组。');return;}
+      next={...fresh,[kind]:fresh[kind].map((entry,i)=>i===index?{...entry,name,items,enabled:form.elements.enabled.checked}:entry)};
+    }
+    if(saveChatModes(latest,{cardPack:next})){
+      repaintChat();resetIdleTimer();back();toast(emoji?'表情已添加':'分组已保存');
+    }
+  };
+}
 function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},only=''){
   if(!c||localConfig(c).mode!=='cards')return;
   const pack=localConfig(c).cardPack||{};
   const grouped=(kind,title)=>(pack[kind]||[]).length?'<h3>'+title+'分组</h3><div class="row">'+pack[kind].map((group,index)=>
-    '<button type="button" data-pack-group="'+kind+'" data-pack-index="'+index+'" aria-pressed="'+group.enabled+'">'+esc(group.name)+' · '+group.items.length+' · '+(group.enabled?'开启':'关闭')+'</button>').join('')+'</div>':'';
+    '<button type="button" data-pack-group="'+kind+'" data-pack-index="'+index+'" aria-haspopup="dialog">'+esc(group.name)+' · '+group.items.length+' · '+(group.enabled?'开启':'关闭')+' ›</button>').join('')+'</div>':'';
   const statuses=cardPackStatuses(pack);
   const status=cardPackStatus(c);
   const content={
     pokes:'<div class="row"><button type="button" id="cardPackPoke">我的拍一拍预设</button></div><p class="muted">对方拍你时，会从已开启的分组随机抽取一条后缀。</p>'+grouped('pokes','对方拍我'),
     statuses:(status?'<div class="card-settings-current"><small>当前状态</small>'+esc(status)+'</div>':'')+'<p class="muted">状态约每 4～12 小时随机换一次，显示在字卡聊天的角色名字下方。</p>'+grouped('statuses','状态')+
       (statuses.length?'<details class="deck-bulk-editor"><summary>可轮换状态 · '+statuses.length+'</summary><div class="deck-card-list card-pack-list">'+statuses.map(value=>'<div class="deck-card">'+esc(value)+'</div>').join('')+'</div></details>':''),
-    emojis:(pack.emojis||[]).length?'<details class="deck-bulk-editor" open><summary>对方可发表情 · '+cardPackCharacterEmojis(pack).length+'/'+pack.emojis.length+'</summary>'+
-      '<p class="muted">勾选允许对方随机发送的表情。输入栏的表情面板包含全部。</p>'+
-      '<div class="card-settings-emoji-grid card-pack-list">'+pack.emojis.map((emoji,index)=>'<label class="card-settings-emoji"><input type="checkbox" aria-label="'+esc(emoji)+'" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'><span aria-hidden="true">'+esc(emoji)+'</span></label>').join('')+'</div></details>':''
+    emojis:'<details class="deck-bulk-editor" open><summary>对方可发表情 · '+cardPackCharacterEmojis(pack).length+'/'+(pack.emojis||[]).length+'</summary>'+
+      '<p class="muted">勾选允许对方随机发送的表情。点末尾的＋可添加。</p>'+
+      '<div class="card-settings-emoji-grid card-pack-list">'+(pack.emojis||[]).map((emoji,index)=>'<label class="card-settings-emoji"><input type="checkbox" aria-label="'+esc(emoji)+'" data-character-emoji="'+index+'" '+((pack.blockedEmojis||[]).includes(emoji)?'':'checked')+'><span aria-hidden="true">'+esc(emoji)+'</span></label>').join('')+'<button type="button" id="cardPackAddEmoji" class="card-settings-emoji" aria-label="添加表情">＋</button></div></details>'
   };
   dialog('<div class="card-settings-head"><button type="button" id="cardPackBack">‹ 返回</button><h2>'+(only?cardSettingsLabels[only]:'字卡资料与工具')+'</h2></div>'+
     (only?'<section class="card-settings-section">'+(content[only]||'<p class="muted">暂无素材。</p>')+cardSettingsTransfer(only)+'</section>':
@@ -4312,12 +4356,9 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
       event.stopPropagation();
     });
   }
-  const update=patch=>{
-    const latest=contact(c.id);
-    if(!latest||!saveChatModes(latest,{cardPack:{...localConfig(latest).cardPack,...patch}}))return;
-    repaintChat();
-    openCardPack(contact(c.id),back,only);
-  };
+  const edit=(kind,index)=>transitionCardSettings(()=>openCardPackEditor(contact(c.id),kind,index,
+    ()=>transitionCardSettings(()=>openCardPack(contact(c.id),back,only))));
+  if($('cardPackAddEmoji'))$('cardPackAddEmoji').onclick=()=>edit('emojis');
   if($('cardPackPoke'))$('cardPackPoke').onclick=()=>transitionCardSettings(()=>openCardPoke(contact(c.id),()=>transitionCardSettings(()=>openCardPack(contact(c.id),back,only))));
   panel.querySelectorAll('[data-character-emoji]').forEach(input=>input.onchange=()=>{
     const latest=contact(c.id);
@@ -4331,8 +4372,7 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
     input.closest('details').querySelector('summary').textContent='对方可发表情 · '+cardPackCharacterEmojis({...current,blockedEmojis:[...blocked]}).length+'/'+pack.emojis.length;
   });
   panel.querySelectorAll('[data-pack-group]').forEach(button=>button.onclick=()=>{
-    const kind=button.dataset.packGroup,index=Number(button.dataset.packIndex);
-    update({[kind]:pack[kind].map((group,i)=>i===index?{...group,enabled:!group.enabled}:group)});
+    edit(button.dataset.packGroup,Number(button.dataset.packIndex));
   });
 
 }
