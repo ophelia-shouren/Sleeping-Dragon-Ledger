@@ -353,6 +353,7 @@ dialog.card-delete-confirm::backdrop{background:#0006}
 #teaOrbJobs button{display:flex;align-items:center;gap:8px;text-align:left;padding:4px 6px;color:inherit}
 #teaOrbJobs [aria-hidden]{font-size:1rem}
 
+.card-voice-hold{margin-inline-start:auto;touch-action:none;user-select:none;-webkit-touch-callout:none}.card-voice-hold.recording{color:var(--panel);background:var(--gold)}.card-voice-bubble{display:flex;align-items:center;gap:10px;min-width:95px;min-height:40px;padding:5px 10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:inherit}.card-voice-bubble[aria-pressed=true]{border-color:var(--gold)}
 .composer-actions{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;padding:7px 0 1px}
 .composer-tools{display:flex;gap:5px;min-width:0;flex-wrap:wrap}
 .composer-tool,.composer-send{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:38px;white-space:nowrap}
@@ -2483,7 +2484,7 @@ function chat(){
   if(!c){
     const list=state.contacts.map(x=>{
       const last=localSession(x).messages.findLast(m=>!replyPending(m));
-      return '<div class="contact-row">'+avatarButton(x.id,x)+'<button class="contact-link" data-chat="'+esc(x.id)+'"><strong>'+esc(displayName(x))+'</strong><span>'+esc(last?(last.role==='user'?'你：':'')+(last.content||'[图片]'):'还没有对话')+'</span></button><span class="muted">›</span></div>';
+      return '<div class="contact-row">'+avatarButton(x.id,x)+'<button class="contact-link" data-chat="'+esc(x.id)+'"><strong>'+esc(displayName(x))+'</strong><span>'+esc(last?(last.role==='user'?'你：':'')+(last.content||(last.voice?'[语音]':'[图片]')):'还没有对话')+'</span></button><span class="muted">›</span></div>';
     }).join('');
     const splitDirectory=state.skin==='rose-graphite';
     return heading('MAGICAL CORRESPONDENCE','魔法通信','选择一位角色，打开你们的来往信件。')+
@@ -2519,7 +2520,7 @@ function chat(){
           (selected?.indices.has(i)?' message-picked':'')+'" tabindex="0" role="'+(selected?'checkbox':'button')+'" '+
           (selected?'aria-checked="'+selected.indices.has(i)+'" ':'')+'data-message-index="'+i+'">'+
           layout.name+(j===0?quoteMarkup(x.quote):'')+(x.readerExcerpt?readerExcerptCard(x.readerExcerpt):x.storyForward?forwardedStoryCard(x):card?renderChatCard(card):'<p>'+esc(part)+(last&&x.role==='assistant'&&mode==='ai'&&translationAvailable(c)&&!selected?kindroidTranslationStar(c,x,i):'')+'</p>')+
-          (last?image:'')+(last&&x.role==='assistant'&&mode==='ai'&&translationAvailable(c)&&!selected?kindroidTranslationMarkup(c,x,i):'')+layout.time+'</article></div>';
+          (last?image+cardVoiceMarkup(x):'')+(last&&x.role==='assistant'&&mode==='ai'&&translationAvailable(c)&&!selected?kindroidTranslationMarkup(c,x,i):'')+layout.time+'</article></div>';
       }).join('');
     }).join(''):'<div class="empty">✧　还没有来信。写下你的第一封信吧。</div>')+(history.current?'<div class="chat-history-page"><button type="button" data-action="newerChatPage">查看较新的消息</button><button type="button" data-action="latestChatPage">回到最新</button></div>':typing?typingBubble(c):'')+'</div>'+
     (ai&&c.provider!=='kindroid'&&!busy&&!lock&&c.messages.at(-1)?.role==='user'?'<div class="notice">'+esc(replyErrors.has(c.id)?'上一封信未收到回信。':'上一封信尚无回信。')+' <button data-action="retry">重试回信</button></div>':'')+
@@ -4048,6 +4049,7 @@ function chatAttachments(c,busy,group){
     '<button type="button" class="composer-tool" data-action="emojiPicker" aria-expanded="false" aria-controls="chatEmojis">'+emoji+'<span>插入表情</span></button></div>'+
     '<div id="chatEmojis" class="chat-emojis" hidden>'+words(['😊','😂','🥺','🥰','❤️','✨','👍','🦉','🐉','🐈','🐇','🌙']).map(x=>'<button type="button" data-emoji="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div></div>')+
     '<div class="composer-actions"><button type="button" class="composer-tool composer-icon" data-action="composerMenu" aria-label="聊天工具" aria-controls="composerMenu" aria-expanded="false">'+tools+'</button>'+
+    (mode==='cards'?'<button type="button" id="cardVoiceHold" class="composer-tool composer-icon card-voice-hold" aria-label="按住录音，松开发送" title="按住录音，松开发送">'+icon('<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0m-7 7v3m-4 0h8"/>')+'</button>':'')+
     '<button type="submit" class="composer-send composer-icon" aria-label="寄出信件" title="寄出信件" '+(busy?'disabled':'')+'>'+star+'</button></div>';
 }
 function openChatGames(){
@@ -4708,7 +4710,8 @@ function queueLocalCards(c,afterUserMessage=false){
       if(emojis.length&&Math.random()<.2)replies.push(emojis[Math.floor(Math.random()*emojis.length)]);
       if(pokes.length&&Math.random()<.1)replies.push('拍了拍你 · '+pokes[Math.floor(Math.random()*pokes.length)]);
       const content=replies[Math.floor(Math.random()*replies.length)];
-      if(content&&patchSession(latest,'cards',{messages:[...current.cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
+      const quote=sent===0&&content===card?randomCardQuote(current.cards.messages):null;
+      if(content&&patchSession(latest,'cards',{messages:[...current.cards.messages,{role:'assistant',content,sentAt:Date.now(),...(quote?{quote}:{})}]})){
         if(++sent<sendCount){if(visible)repaintChat();schedule(delay);return;}
       }
     }
@@ -4724,6 +4727,110 @@ function repaintChat(){
   render();
   if(cursor){const next=document.querySelector('#chatForm textarea');next?.focus();next?.setSelectionRange(...cursor);}
 }
+function randomCardQuote(messages){
+  const recent=[];
+  let userCount=0,assistantCount=0;
+  for(let i=messages.length-1;i>=0&&(userCount<10||assistantCount<4);i--){
+    const message=messages[i];
+    if(message.role==='assistant'&&assistantCount++<4&&message.quote)return null;
+    if(message.role==='user'&&userCount++<10&&message.content.trim()&&!message.voice)recent.push(message.content.trim());
+  }
+  if(!recent.length||Math.random()>=.08)return null;
+  return {speaker:'你',content:recent[Math.floor(Math.random()*recent.length)].slice(0,200)};
+}
+function validCardVoice(voice){
+  return voice&&typeof voice.src==='string'&&voice.src.length<=1_000_000&&
+    /^data:audio\/(?:webm|ogg|mp4)(?:;codecs=[a-z0-9.-]+)?;base64,[a-z0-9+/=]+$/i.test(voice.src)&&
+    Number.isInteger(voice.seconds)&&voice.seconds>=1&&voice.seconds<=60;
+}
+function cardVoiceMarkup(message){
+  if(!validCardVoice(message.voice))return '';
+  return '<button type="button" class="card-voice-bubble" data-card-voice aria-label="播放 '+message.voice.seconds+' 秒语音" aria-pressed="false"><span aria-hidden="true">▶</span><span>'+message.voice.seconds+'″</span></button>'+
+    '<audio preload="none" src="'+esc(message.voice.src)+'" hidden></audio>';
+}
+let playingCardVoice;
+function toggleCardVoice(button){
+  if(button.closest('[aria-checked]'))return;
+  const audio=button.nextElementSibling;
+  if(!audio.paused){audio.pause();audio.currentTime=0;return;}
+  playingCardVoice?.pause();
+  playingCardVoice=audio;
+  const paint=()=>{
+    const playing=!audio.paused&&!audio.ended;
+    button.setAttribute('aria-pressed',String(playing));
+    button.firstElementChild.textContent=playing?'■':'▶';
+    button.setAttribute('aria-label',playing?'停止语音':'播放语音');
+  };
+  audio.onplay=audio.onpause=audio.onended=paint;
+  audio.play().catch(()=>toast('这条语音无法播放。'));
+}
+let cardVoiceRecording;
+function finishCardVoice(send){
+  const job=cardVoiceRecording;
+  if(!job)return;
+  cardVoiceRecording=null;
+  job.send=send;
+  job.endedAt=Date.now();
+  clearTimeout(job.timer);
+  job.button.classList.remove('recording');
+  if(job.recorder?.state==='recording')job.recorder.stop();
+}
+async function startCardVoice(button){
+  const c=contact(activeContact);
+  if(cardVoiceRecording||!c||localConfig(c).mode!=='cards')return;
+  if(!navigator.mediaDevices?.getUserMedia||typeof MediaRecorder!=='function'){toast('当前环境无法录音，请使用支持麦克风的浏览器。');return;}
+  const job={button,id:c.id,send:false};
+  cardVoiceRecording=job;
+  let stream;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(cardVoiceRecording!==job){stream.getTracks().forEach(track=>track.stop());return;}
+    const mimeType=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'].find(type=>MediaRecorder.isTypeSupported(type));
+    const recorder=new MediaRecorder(stream,mimeType?{mimeType,audioBitsPerSecond:24000}:{audioBitsPerSecond:24000});
+    const chunks=[];
+    recorder.ondataavailable=event=>{if(event.data.size)chunks.push(event.data);};
+    recorder.onerror=()=>{if(cardVoiceRecording===job)finishCardVoice(false);stream.getTracks().forEach(track=>track.stop());toast('录音失败，请重试。');};
+    recorder.onstop=async()=>{
+      stream.getTracks().forEach(track=>track.stop());
+      if(!job.send)return;
+      const elapsed=job.endedAt-job.startedAt;
+      if(elapsed<500||!chunks.length){toast('按住至少半秒再松开。');return;}
+      const blob=new Blob(chunks,{type:recorder.mimeType||chunks[0].type});
+      if(blob.size>740000){toast('语音文件过大，请缩短录音。');return;}
+      try{
+        const src=await billImageData(blob),voice={src,seconds:Math.min(60,Math.max(1,Math.round(elapsed/1000)))};
+        const latest=contact(job.id);
+        if(!latest||activeContact!==job.id||page!=='chat'||deviceLocked||localConfig(latest).mode!=='cards'||teaLock([job.id])||mysteryChatBlocked([job.id]))return;
+        if(!validCardVoice(voice)){toast('当前设备的录音格式暂不支持。');return;}
+        const messages=localConfig(latest).cards.messages;
+        if(patchSession(latest,'cards',{messages:[...messages,{role:'user',content:'',voice,sentAt:Date.now()}]})){
+          privateChatPage=0;
+          queueLocalCards(contact(job.id),true);
+        }
+      }catch{toast('无法保存录音，请重试。');}
+    };
+    job.recorder=recorder;
+    job.startedAt=Date.now();
+    recorder.start();
+    button.classList.add('recording');
+    job.timer=setTimeout(()=>finishCardVoice(true),60000);
+  }catch(error){
+    if(cardVoiceRecording===job)finishCardVoice(false);
+    stream?.getTracks().forEach(track=>track.stop());
+    toast(error.name==='NotAllowedError'?'请允许麦克风权限，再长按录音。':'无法启动麦克风，请检查录音权限。');
+  }
+}
+document.addEventListener('pointerdown',event=>{
+  const button=event.target.closest('#cardVoiceHold');
+  if(!button||!event.isPrimary||event.button!==0)return;
+  event.preventDefault();
+  button.setPointerCapture(event.pointerId);
+  void startCardVoice(button);
+});
+document.addEventListener('pointerup',event=>{if(event.isPrimary)finishCardVoice(true);});
+document.addEventListener('pointercancel',event=>{if(event.isPrimary)finishCardVoice(false);});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)finishCardVoice(false);});
+window.addEventListener('pagehide',()=>finishCardVoice(false));
 function sendLocalChat(c){
   const cfg=localConfig(c),session=cfg[cfg.mode],k=imageKey(c.id,cfg.mode);
   const image=chatImages.get(k),content=session.draft.trim(),qKey=quoteKey(c.id,cfg.mode),quote=chatQuotes.get(qKey);
@@ -4795,7 +4902,7 @@ function validateChatModes(cfg){
     (pack.stickers!==undefined&&(!strings(pack.stickers)||!pack.stickers.every(src=>safePicture(src)===src&&src.startsWith('data:'))))||
     ['status','motto','intro'].some(key=>pack[key]!==undefined&&typeof pack[key]!=='string')||
     (pack.announcements!==undefined&&(!Array.isArray(pack.announcements)||!pack.announcements.every(config=>config&&typeof config==='object'&&!Array.isArray(config))))))return false;
-  const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string'));
+  const log=x=>x&&typeof x.draft==='string'&&Array.isArray(x.messages)&&x.messages.every(m=>m&&['user','assistant','system'].includes(m.role)&&typeof m.content==='string'&&(!m.image||typeof m.image==='string')&&(m.voice===undefined||validCardVoice(m.voice)));
   return cfg&&(cfg.billRules===undefined||(Array.isArray(cfg.billRules)&&cfg.billRules.every(validBillRule)&&new Set(cfg.billRules.map(x=>x.id)).size===cfg.billRules.length))&&Object.hasOwn(chatModeLabels,cfg.mode)&&Array.isArray(cfg.rules)&&cfg.rules.every(x=>x&&strings(x.triggers)&&x.triggers.length&&typeof x.reply==='string')&&
     Array.isArray(cfg.decks)&&cfg.decks.every(x=>x&&typeof x.name==='string'&&strings(x.items)&&(x.disabledItems===undefined||strings(x.disabledItems))&&typeof x.enabled==='boolean')&&
     (cfg.firstReplyRange===undefined||validFirstCardReplyRange(cfg.firstReplyRange))&&
@@ -7041,6 +7148,8 @@ document.addEventListener('click',e=>{
   }
   if(d.cardSettingsExport)exportCardSettings(d.cardSettingsExport);
   if(d.deckPreset!==undefined)transitionCardSettings(()=>openDeckPreset(Number(d.deckPreset)));
+  if(b.hasAttribute('data-card-voice')){toggleCardVoice(b);return;}
+  if(b.id==='cardVoiceHold'){if(e.detail===0)toast('请按住麦克风录音，松开后发送。');return;}
   if(d.emoji){
     const input=document.querySelector('#chatForm textarea');
     if(input){input.setRangeText(d.emoji,input.selectionStart,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}
