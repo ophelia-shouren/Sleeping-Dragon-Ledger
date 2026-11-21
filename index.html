@@ -4143,8 +4143,11 @@ function openLocalChatSettings(c=contact(activeContact)){
     '<p class="muted">每行一张字卡，逗号保留在卡片里。单独写一行 [分类名]，下一行起就是该分类的字卡。</p>';
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
     cfg.decks.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
-  dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+(keyword?'':deckPresetMenu(cfg.decks)+'<details class="deck-bulk-editor"><summary>批量编辑与导入</summary>')+fields+
-    '<label>导入'+(keyword?' Markdown／JSON':' JSON（追加为新分组）')+'<input id="localChatImport" type="file" accept="'+(keyword?'.md,.markdown,.json':'.json')+'"></label>'+
+  dialog('<h2>'+ (keyword?'提示词设置':'字卡设置') +'</h2><form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+
+    (keyword?fields+'<label>导入 Markdown／JSON<input id="localChatImport" type="file" accept=".md,.markdown,.json"></label>':
+      '<div id="deckImportCategories">'+deckPresetMenu(cfg.decks)+'</div><label>导入字卡到新分组<input id="localChatImport" type="file" accept=".json,application/json"></label>'+
+      '<p class="muted" id="deckImportStatus" role="status">导入后立即保存，新分组会显示在上方。</p>'+
+      '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
     (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
@@ -4152,6 +4155,7 @@ function openLocalChatSettings(c=contact(activeContact)){
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
   const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
+  if(!keyword)form.savedDecks=cfg.decks;
 }
 function localFormPreview(form,items){
   const keyword=form.dataset.mode==='keyword';
@@ -4173,29 +4177,53 @@ async function importLocalChat(input){
   const format=file.name.toLowerCase().endsWith('.json')?'json':'markdown',raw=await file.text();
   if(!form.isConnected)return;
   const keyword=form.dataset.mode==='keyword';
-  let items;
-  if(keyword)items=parseKeywordRules(raw,format);
-  else{
-    const current=parseLocalForm(form), incoming=parseCardDecks(raw,'json');
-    const used=new Set(current.map(deck=>deck.name));
-    const reserved=new Set(incoming.map(deck=>deck.name));
-    items=[...current,...incoming.map(deck=>{
-      let name=deck.name;
-      if(used.has(name)){
-        name=deck.name+'（导入）';
-        for(let number=2;used.has(name)||reserved.has(name);number++)name=deck.name+'（导入 '+number+'）';
-      }
-      used.add(name);
-      return {...deck,name};
-    })];
-    toast('已追加 '+incoming.length+' 个新分组，请点击保存。');
+  if(keyword){
+    const items=parseKeywordRules(raw,format);
+    form.elements.source.value=manualChatSource(items,true);
+    localFormPreview(form,items);
+    input.value='';
+    return;
   }
-  form.elements.source.value=manualChatSource(items,keyword);
-  localFormPreview(form,items);
+
+  const c=contact(form.dataset.id);
+  if(!c||localConfig(c).mode!=='cards')return;
+  const current=localConfig(c).decks;
+  if(current!==form.savedDecks)throw Error('字卡分组已在其他操作中更新，请重新打开设置再导入。');
+  const savedSource=manualChatSource(current,false);
+  if(form.elements.source.value!==savedSource||current.some((deck,index)=>
+    form.querySelector('[name=deckEnabled][value="'+index+'"]')?.checked!==deck.enabled)){
+    throw Error('批量编辑还有未保存的修改。请先保存或取消修改，再导入字卡。');
+  }
+
+  const incoming=parseCardDecks(raw,'json');
+  if(incoming.length===1&&incoming[0].name==='默认'){
+    incoming[0].name=file.name.replace(/\.json$/i,'').trim().slice(0,70)||'导入字卡';
+  }
+  const used=new Set(current.map(deck=>deck.name));
+  const reserved=new Set(incoming.map(deck=>deck.name));
+  const added=incoming.map(deck=>{
+    let name=deck.name;
+    if(used.has(name)){
+      name=deck.name+'（导入）';
+      for(let number=2;used.has(name)||reserved.has(name);number++)name=deck.name+'（导入 '+number+'）';
+    }
+    used.add(name);
+    return {...deck,name};
+  });
+  if(!saveChatModes(c,{decks:[...current,...added]})){input.value='';return;}
+  const saved=localConfig(contact(c.id)).decks;
+  form.savedDecks=saved;
+  form.elements.source.value=manualChatSource(saved,false);
+  localFormPreview(form,saved);
+  $('deckImportCategories').innerHTML=deckPresetMenu(saved);
+  $('deckImportStatus').textContent='已保存 '+added.length+' 个新分组，共 '+added.reduce((count,deck)=>count+deck.items.length,0)+' 张字卡。';
   input.value='';
+  resetIdleTimer();
 }
+
 function saveLocalChatForm(form){
   const c=contact(form.dataset.id);if(!c)return;
+  if(form.dataset.mode==='cards'&&localConfig(c).decks!==form.savedDecks)throw Error('字卡分组已更新，请重新打开设置再保存。');
   const items=parseLocalForm(form),e=form.elements;
   const patch=form.dataset.mode==='keyword'?{rules:items,billRules:readBillRules(form,localConfig(c).billRules||[])}:{decks:items,speed:Number(e.speed.value),count:Number(e.count.value),idle:Number(e.idle.value),proactive:e.proactive.checked,multiple:e.multiple.checked};
   if(saveChatModes(c,patch)){if(form.dataset.mode==='keyword')refreshBillReplies(c.id);$('dialog').close();render();resetIdleTimer();toast('已保存');}
