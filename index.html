@@ -4151,7 +4151,7 @@ function openLocalChatSettings(c=contact(activeContact)){
       '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
-    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
+    (keyword?billRuleEditor(cfg.billRules||[]):'<div class="local-chat-fields"><label>回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
@@ -4263,6 +4263,7 @@ function queueLocalCards(c){
   const cfg=localConfig(c),run=Symbol(),id=c.id;
   if(!cfg.decks.some(d=>d.enabled&&d.items.length)){repaintChat();return;}
   localRuns.set(id,run);clearTimeout(idleTimer);
+  const sendCount=1+Math.floor(Math.random()*cfg.count);
   let sent=0;
   function step(){
     const latest=contact(id);
@@ -4271,7 +4272,7 @@ function queueLocalCards(c){
     if(page==='chat'&&activeContact===id&&localConfig(latest).mode==='cards'&&!deviceLocked&&!document.hidden){
       const content=chooseCard(localConfig(latest));
       if(content&&patchSession(latest,'cards',{messages:[...localConfig(latest).cards.messages,{role:'assistant',content,sentAt:Date.now()}]})){
-        if(++sent<cfg.count){repaintChat();setTimeout(step,cfg.speed*1000);return;}
+        if(++sent<sendCount){repaintChat();setTimeout(step,cfg.speed*1000);return;}
       }
     }
     localRuns.delete(id);
