@@ -4798,7 +4798,12 @@ async function startCardVoice(button){
       const blob=new Blob(chunks,{type:recorder.mimeType||chunks[0].type});
       if(blob.size>740000){toast('语音文件过大，请缩短录音。');return;}
       try{
-        const src=await billImageData(blob),voice={src,seconds:Math.min(60,Math.max(1,Math.round(elapsed/1000)))};
+        const src=await new Promise((resolve,reject)=>{
+          const reader=new FileReader();
+          reader.onload=()=>resolve(reader.result);
+          reader.onerror=reject;
+          reader.readAsDataURL(blob);
+        }),voice={src,seconds:Math.min(60,Math.max(1,Math.round(elapsed/1000)))};
         const latest=contact(job.id);
         if(!latest||activeContact!==job.id||page!=='chat'||deviceLocked||localConfig(latest).mode!=='cards'||teaLock([job.id])||mysteryChatBlocked([job.id]))return;
         if(!validCardVoice(voice)){toast('当前设备的录音格式暂不支持。');return;}
