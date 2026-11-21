@@ -272,6 +272,7 @@ body.full-chat{overflow:hidden}
 :is(.full-chat #chatForm,.group-room #groupChatForm){min-width:0;max-height:45%;overflow:auto;overscroll-behavior:contain}
 :is(.full-chat #chatForm,.group-room #groupChatForm) textarea{width:100%;min-height:48px;max-height:120px;margin-bottom:4px}
 .deck-presets{margin:14px 0}
+#dialog [data-deck-group]{touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .deck-category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr));gap:10px}
 #dialog .deck-category-grid button{display:grid;gap:5px;text-align:start;min-width:0;overflow-wrap:anywhere;padding:12px 14px;background:var(--control);color:var(--ink);border:1px solid var(--line);border-radius:10px}
 #dialog .deck-category-grid button small{color:var(--muted)}
@@ -4155,7 +4156,10 @@ function openLocalChatSettings(c=contact(activeContact)){
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     '<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>');
   const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
-  if(!keyword)form.savedDecks=cfg.decks;
+  if(!keyword){
+    form.savedDecks=cfg.decks;
+    bindDeckGroupDelete(form);
+  }
 }
 function localFormPreview(form,items){
   const keyword=form.dataset.mode==='keyword';
@@ -4669,9 +4673,67 @@ function openChatDirectory(){
     '<div class="clear-chat-row">'+clearChatButton(localSession(c).messages.length)+'</div></div></div>',true);
 }
 function deckPresetMenu(decks){
-  return '<section class="deck-presets"><h3>字卡分类</h3><div class="deck-category-grid">'+
-    decks.map((d,i)=>'<button type="button" data-deck-preset="'+i+'">'+'<strong>'+esc(d.name)+'</strong><small>'+d.items.length+' 张 · '+(d.enabled?'已启用':'已停用')+'</small></button>').join('')+
+  return '<section class="deck-presets"><h3>字卡分类</h3><p class="muted">点按查看字卡，长按可删除分组。</p><div class="deck-category-grid">'+
+    decks.map((d,i)=>'<button type="button" data-deck-group data-deck-preset="'+i+'">'+'<strong>'+esc(d.name)+'</strong><small>'+d.items.length+' 张 · '+(d.enabled?'已启用':'已停用')+'</small></button>').join('')+
     '<button type="button" data-deck-preset="-1">＋ 新建分组预设</button></div></section>';
+}
+function bindDeckGroupDelete(form){
+  const categories=$('deckImportCategories');
+  let press,handled;
+  const cancel=()=>{
+    if(press)clearTimeout(press.timer);
+    press=null;
+  };
+  function confirmRemoval(button){
+    if(handled===button||!form.isConnected||!button.isConnected)return;
+    handled=button;
+    const index=Number(button.dataset.deckPreset),c=contact(form.dataset.id),decks=form.savedDecks;
+    const deck=decks[index];
+    if(!c||!deck)return;
+    if(localConfig(c).decks!==decks){toast('字卡分组已更新，请重新打开设置。');return;}
+    if(form.elements.source.value!==manualChatSource(decks,false)||decks.some((group,i)=>
+      form.querySelector('[name=deckEnabled][value="'+i+'"]')?.checked!==group.enabled)){
+      toast('批量编辑还有未保存的修改。请先保存或取消修改，再删除分组。');return;
+    }
+    if(!confirm('删除字卡分组「'+deck.name+'」及其中 '+deck.items.length+' 张字卡？此操作无法撤销。'))return;
+    if(!saveChatModes(c,{decks:decks.filter((_,i)=>i!==index)}))return;
+    const saved=localConfig(contact(c.id)).decks;
+    form.savedDecks=saved;
+    form.elements.source.value=manualChatSource(saved,false);
+    localFormPreview(form,saved);
+    categories.innerHTML=deckPresetMenu(saved);
+    $('deckImportStatus').textContent='已删除字卡分组「'+deck.name+'」。';
+    resetIdleTimer();
+  }
+  categories.addEventListener('pointerdown',event=>{
+    if(!event.isPrimary||event.button!==0)return;
+    handled=null;
+    cancel();
+    const button=event.target.closest('[data-deck-group]');
+    if(!button)return;
+    press={id:event.pointerId,x:event.clientX,y:event.clientY,timer:setTimeout(()=>{
+      cancel();
+      confirmRemoval(button);
+    },500)};
+  });
+  categories.addEventListener('pointermove',event=>{
+    if(press?.id===event.pointerId&&Math.hypot(event.clientX-press.x,event.clientY-press.y)>10)cancel();
+  });
+  for(const type of ['pointerup','pointercancel','pointerleave'])categories.addEventListener(type,cancel);
+  categories.addEventListener('contextmenu',event=>{
+    const button=event.target.closest('[data-deck-group]');
+    if(!button)return;
+    event.preventDefault();
+    cancel();
+    confirmRemoval(button);
+  });
+  categories.addEventListener('click',event=>{
+    if(handled&&event.target.closest('[data-deck-group]')===handled){
+      handled=null;
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  },true);
 }
 function openDeckPreset(index,edit=false){
   const c=contact(activeContact);
