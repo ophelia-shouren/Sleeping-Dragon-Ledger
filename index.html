@@ -285,6 +285,11 @@ body.full-chat{overflow:hidden}
 .deck-card-actions[hidden]{display:none}
 [data-card-poke-avatar]{touch-action:manipulation}.card-pack-list{max-height:35dvh;overflow:auto;overscroll-behavior:contain}.card-pack-status{display:block;max-width:min(45vw,25ch);color:var(--gold);font-size:.72em;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.card-pack-status:empty{display:none}
 .card-settings-section{margin-block:10px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.card-settings-section h3{margin:0 0 8px}.card-settings-section .row{flex-wrap:wrap}
+#dialog .card-settings-directory{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-block:12px}
+#dialog .card-settings-entry{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;align-items:center;width:100%;min-width:0;padding:12px clamp(8px,2vw,14px);text-align:start;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+#dialog .card-settings-entry small{grid-column:1;color:var(--muted);font-weight:normal;white-space:normal}
+#dialog .card-settings-entry span{grid-column:2;grid-row:1/3;color:var(--gold)}
+#dialog [data-card-settings-page][hidden]{display:none}
 .deck-card-editor{margin:10px 0;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .deck-bulk-editor{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px}.deck-bulk-editor summary{cursor:pointer;color:var(--gold)}
 .home-orb{position:fixed;z-index:12;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;align-items:center;border-radius:50%;color:var(--gold);background:var(--panel);border:1px solid var(--gold);box-shadow:0 3px 14px #0005}
@@ -4230,11 +4235,18 @@ function openCardPack(c=contact(activeContact),back=()=>{$('dialog').close();},o
   };
   dialog('<h2>'+(only?cardSettingsLabels[only]:'字卡资料与工具')+'</h2><div class="row"><button type="button" id="cardPackBack">‹ 返回</button>'+
     (!only?'<button type="button" id="cardPackClear">清除当前资料</button>':'')+'</div>'+
-    (only?(content[only]||'<p class="muted">暂无素材。</p>'):
+    (only?'<section class="card-settings-section">'+(content[only]||'<p class="muted">暂无素材。</p>')+cardSettingsTransfer(only)+'</section>':
       '<div class="deck-card-editor">'+[['当前状态',cardPackStatus(c)],['签名',pack.motto],['简介',pack.intro]].filter(([,value])=>value).map(([label,value])=>'<p><strong>'+label+'</strong> · '+(label==='简介'?formatIntro(value):esc(value))+'</p>').join('')+'</div>'+
       Object.entries(content).filter(([,value])=>value).map(([kind,value])=>'<section class="card-settings-section"><h3>'+cardSettingsLabels[kind]+'</h3>'+value+'</section>').join('')));
   const panel=$('dialog');
   $('cardPackBack').onclick=back;
+  if(only){
+    panel.orbBack=back;
+    panel.querySelector('[data-card-settings-import]').addEventListener('change',event=>{
+      importCardSettings(event.target).then(saved=>{if(saved)openCardPack(contact(c.id),back,only);}).catch(error=>{event.target.value='';toast(error.message);});
+      event.stopPropagation();
+    });
+  }
   const update=patch=>{
     const latest=contact(c.id);
     if(!latest||!saveChatModes(latest,{cardPack:{...localConfig(latest).cardPack,...patch}}))return;
@@ -4335,14 +4347,34 @@ function cardSettingsTransfer(kind){
   return '<label>导入 JSON<input type="file" data-card-settings-import="'+kind+'" accept=".json,application/json"></label>'+
     '<button type="button" data-card-settings-export="'+kind+'">导出 JSON</button>';
 }
-function cardSettingsSection(kind,content){
-  return '<section class="card-settings-section"><h3>'+cardSettingsLabels[kind]+'</h3>'+content+'</section>';
+const cardSettingsDescriptions={
+  decks:'查看字卡分类、批量编辑或单独导入导出字卡。',
+  replies:'设置首条等待时间、回复间隔和条数。',
+  pokes:'管理拍一拍分组和自定义预设。',
+  statuses:'管理显示在角色名字下方的轮换状态。',
+  emojis:'管理表情，并勾选角色可以发哪些。',
+  mottos:'管理和切换角色签名。',
+  intros:'管理和切换角色简介。',
+  announcements:'管理公告素材并发送到聊天。',
+  full:'用一份完整 JSON 一次导入字卡和其他资料。'
+};
+function cardSettingsDirectory(){
+  return '<div class="card-settings-directory" data-card-settings-page="">'+Object.entries(cardSettingsDescriptions).map(([kind,description])=>
+    '<button type="button" class="card-settings-entry" data-card-settings-entry="'+kind+'"><strong>'+(cardSettingsLabels[kind]||'完整导入')+'</strong><small>'+description+'</small><span aria-hidden="true">›</span></button>').join('')+'</div>';
 }
-function cardSettingsMaterials(){
-  return Object.keys(cardSettingsPackKeys).map(kind=>cardSettingsSection(kind,
-    '<button type="button" data-card-settings-open="'+kind+'">管理'+cardSettingsLabels[kind]+'</button>'+cardSettingsTransfer(kind))).join('');
+function showCardSettingsPage(kind){
+  const panel=$('dialog');
+  for(const section of panel.querySelectorAll('[data-card-settings-page]'))section.hidden=section.dataset.cardSettingsPage!==kind;
+  const back=$('cardSettingsBack'),close=$('cardSettingsClose'),title=$('cardSettingsTitle');
+  back.hidden=!kind;close.hidden=!!kind;
+  title.textContent=kind?(cardSettingsLabels[kind]||'完整导入'):'字卡设置';
+  panel.orbBack=kind?()=>showCardSettingsPage(''):null;
+  panel.scrollTop=0;
+  if(kind)title.focus();
+  else panel.querySelector('[data-card-settings-entry="'+back.dataset.from+'"]')?.focus();
+  back.dataset.from=kind;
 }
-function openLocalChatSettings(c=contact(activeContact)){
+function openLocalChatSettings(c=contact(activeContact),initialPage=''){
   if(!c)return;
   const cfg=localConfig(c),keyword=cfg.mode==='keyword';
   if(cfg.mode==='ai')return;
@@ -4352,24 +4384,32 @@ function openLocalChatSettings(c=contact(activeContact)){
     '<p class="muted">每行一张字卡，逗号保留在卡片里。单独写一行 [分类名]，下一行起就是该分类的字卡。</p>';
   const summary=keyword?cfg.rules.map(x=>'<li>'+esc(x.triggers.join('、'))+' → '+esc(x.reply)+' <small class="muted">'+(x.triggers.length>1?'多对一':'一对一')+'</small></li>').join(''):
     cfg.decks.map((d,i)=>'<label class="mode-toggle"><input type="checkbox" name="deckEnabled" value="'+i+'" '+(d.enabled?'checked':'')+'><span></span>'+esc(d.name)+' · '+d.items.length+' 张</label>').join('');
-  dialog((keyword?'<h2>提示词设置</h2>':'<div class="row between"><h2>字卡设置</h2><button type="button" data-action="close">关闭</button></div>')+'<form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'">'+
+  dialog((keyword?'<h2>提示词设置</h2>':'<div class="row between"><button type="button" id="cardSettingsBack" hidden>‹ 返回</button><h2 id="cardSettingsTitle" tabindex="-1">字卡设置</h2><button type="button" id="cardSettingsClose" data-action="close">关闭</button></div>'+cardSettingsDirectory())+'<form id="localChatForm" data-id="'+esc(c.id)+'" data-mode="'+cfg.mode+'"'+(keyword?'':' data-card-settings-page="decks" hidden')+'>'+
     (keyword?fields+'<label>导入 Markdown／JSON<input id="localChatImport" type="file" accept=".md,.markdown,.json"></label>':
-      '<section class="card-settings-section"><h3>我的字卡</h3><div id="deckImportCategories">'+deckPresetMenu(cfg.decks)+'</div><label>单独导入字卡<input id="localChatImport" type="file" accept=".json,application/json"></label>'+
+      '<section class="card-settings-section"><div id="deckImportCategories">'+deckPresetMenu(cfg.decks)+'</div><label>单独导入字卡<input id="localChatImport" type="file" accept=".json,application/json"></label>'+
       '<button type="button" data-card-settings-export="decks">导出字卡 JSON</button><p class="muted" id="deckImportStatus" role="status">导入后立即保存，新分组会显示在上方。</p>'+
       '<details class="deck-bulk-editor"><summary>批量编辑</summary>'+fields)+
     '<div class="row between"><label for="localChatSource">'+(keyword?'提示词规则':'字卡内容')+'</label>'+(keyword?'<button type="button" data-action="insertRuleArrow" aria-label="插入箭头">→</button>':'')+'</div><textarea id="localChatSource" name="source" rows="7">'+esc(source)+'</textarea>'+
     '<div id="localChatSummary">'+(keyword?'<ul>'+summary+'</ul>':summary)+'</div>'+(keyword?'':'</details>')+
     (keyword?billRuleEditor(cfg.billRules||[]):'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button type="submit" class="primary">保存字卡</button></div></section></form>'+
-      '<form id="cardReplyForm" data-id="'+esc(c.id)+'"><section class="card-settings-section"><h3>回复设置</h3><div class="local-chat-fields"><label>首条回复最短等待（秒）<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>首条回复最长等待（秒）<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
+      '<form id="cardReplyForm" data-id="'+esc(c.id)+'" data-card-settings-page="replies" hidden><section class="card-settings-section"><div class="local-chat-fields"><label>首条回复最短等待（秒）<input name="firstReplyMin" type="number" min="0" max="120" step=".1" required value="'+firstReplyMin+'"></label><label>首条回复最长等待（秒）<input name="firstReplyMax" type="number" min="0" max="120" step=".1" required value="'+firstReplyMax+'"></label><label>多久没回复时主动发（秒）<input name="idle" type="number" min="1" max="86400" value="'+cfg.idle+'"></label><label>每次最多发几条<input name="count" type="number" min="1" max="10" value="'+cfg.count+'"><small class="muted">每次随机发 1 条到设定上限</small></label><label>连续回复间隔（秒）<input name="speed" type="number" min="0" max="120" step=".1" value="'+cfg.speed+'"></label></div>'+
       '<label class="mode-toggle"><input type="checkbox" name="proactive" '+(cfg.proactive?'checked':'')+'><span></span>允许 Char 主动发消息</label>'+
       '<label class="mode-toggle"><input type="checkbox" name="multiple" '+(cfg.multiple?'checked':'')+'><span></span>一句话使用多个字卡</label>')+
     (keyword?'<div class="row actions"><button type="button" data-action="localChatPreview">解析并预览</button><button class="primary">保存</button><button type="button" data-action="close">取消</button></div></form>':
       '<button type="submit" class="primary">保存回复设置</button>'+cardSettingsTransfer('replies')+'</section></form>'+
-      cardSettingsMaterials()+'<section class="card-settings-section"><h3>完整导入</h3><p class="muted">上传完整的字卡资料包 JSON，一次导入字卡分类及文件自带的资料。</p><label>选择完整资料包<input type="file" id="fullCardPackImport" accept=".json,application/json"></label></section>'));
+      '<section class="card-settings-section" data-card-settings-page="full" hidden><p class="muted">上传完整的字卡资料包 JSON，一次导入字卡分类及文件自带的资料。</p><label>选择完整资料包<input type="file" id="fullCardPackImport" accept=".json,application/json"></label></section>'));
   const form=$('localChatForm');form.parsed=keyword?cfg.rules:cfg.decks;form.sourceSnapshot=form.elements.source.value;
   if(!keyword){
     form.savedDecks=cfg.decks;
     bindDeckGroupDelete(form);
+    $('cardSettingsBack').onclick=()=>showCardSettingsPage('');
+    const panel=$('dialog');
+    panel.querySelectorAll('[data-card-settings-entry]').forEach(button=>button.onclick=()=>{
+      const kind=button.dataset.cardSettingsEntry;
+      if(Object.hasOwn(cardSettingsPackKeys,kind))openCardPack(contact(c.id),()=>openLocalChatSettings(contact(c.id)),kind);
+      else showCardSettingsPage(kind);
+    });
+    if(initialPage)showCardSettingsPage(initialPage);
   }
 }
 function localFormPreview(form,items){
@@ -4508,6 +4548,7 @@ async function importCardSettings(input){
     for(const key of ['proactive','multiple'])e[key].checked=patch[key];
   }
   repaintChat();resetIdleTimer();toast(cardSettingsLabels[kind]+'已导入');
+  return true;
 }
 function changeChatMode(mode){
   const c=contact(activeContact);if(!c||!Object.hasOwn(chatModeLabels,mode)||localConfig(c).mode===mode)return;
@@ -5138,7 +5179,8 @@ function openDeckCards(c,index){
     if(input.checked)next.delete(card);else next.add(card);
     if(!save(decks.map((group,i)=>i===index?{...group,disabledItems:[...next]}:group)))input.checked=!disabled.has(card);
   });
-  $('deckBack').onclick=()=>openLocalChatSettings(contact(c.id));
+  $('deckBack').onclick=()=>$('dialog').orbBack?.();
+  $('dialog').orbBack=()=>openLocalChatSettings(contact(c.id),'decks');
   $('deckSettings').onclick=()=>openDeckPreset(index,true);
   $('deckAdd').onclick=()=>editCard(null);
   $('deckClear').onclick=clear;
@@ -5171,7 +5213,7 @@ function saveDeckPreset(form){
   if(cfg.decks.some(d=>d.name===name&&d.name!==original))throw Error('这个分组名已存在。');
   const next={...cfg.decks.find(deck=>deck.name===original),name,items,enabled:form.elements.deckActive.checked,disabledItems:(cfg.decks.find(deck=>deck.name===original)?.disabledItems||[]).filter(item=>items.includes(item))};
   const decks=original?cfg.decks.map(d=>d.name===original?next:d):[...cfg.decks,next];
-  if(saveChatModes(c,{decks})){openLocalChatSettings(contact(c.id));resetIdleTimer();toast('分组预设已保存');}
+  if(saveChatModes(c,{decks})){openLocalChatSettings(contact(c.id),'decks');resetIdleTimer();toast('分组预设已保存');}
 }
 function openHomeOrb(){
   const c=page==='chat'?contact(activeContact):null,current=c?c.preset:state.profile;
@@ -6895,7 +6937,6 @@ document.addEventListener('click',e=>{
     changeChatMode(d.chatMode);
   }
   if(d.cardSettingsExport)exportCardSettings(d.cardSettingsExport);
-  if(d.cardSettingsOpen)openCardPack(contact(activeContact),()=>openLocalChatSettings(),d.cardSettingsOpen);
   if(d.deckPreset!==undefined)openDeckPreset(Number(d.deckPreset));
   if(d.emoji){
     const input=document.querySelector('#chatForm textarea');
