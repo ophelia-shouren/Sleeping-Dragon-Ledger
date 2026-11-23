@@ -1175,7 +1175,7 @@ function bindStoryStyleChip(chip){
   chip.onkeydown=event=>{if(event.key==='Delete'){event.preventDefault();remove();}};
 }
 function storyGenerator(){
-  recoverStoryDrafts();
+  initializeStoryBodies().then(()=>recoverStoryDrafts()).catch(error=>toast('文章数据库读取失败：'+storyStorageError(error)));
   if(storyJob&&!storyJob.html){storyProgress();return;}
   if(storyFailures.has(false)){storyProgress(storyFailures.get(false));return;}
   storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
@@ -1308,6 +1308,7 @@ function storyCategoryInput(label,name,list,value='',choices=storyCategories()){
     '<datalist id="'+list+'">'+choices.map(key=>'<option value="'+esc(key||'未分类')+'"></option>').join('')+'</datalist>';
 }
 function storyLibrary(category=null){
+  if(!storyBodiesReady){initializeStoryBodies().then(()=>storyLibrary(category)).catch(error=>toast('藏书阁加载失败：'+storyStorageError(error)));return;}
   const categories=storyCategories();
   if(category!==null&&!categories.includes(category))category=null;
   if(category===null){
@@ -1438,12 +1439,43 @@ async function writeStoryDraft(article){
     tx.onabort=()=>reject(tx.error||new Error('IndexedDBWriteAborted'));
   });
 }
+let storyBodiesReady=false;
+let storyBodiesLoading=null;
+async function initializeStoryBodies(){
+  if(storyBodiesReady)return;
+  if(storyBodiesLoading)return storyBodiesLoading;
+  storyBodiesLoading=(async()=>{
+    const drafts=await listStoryDrafts();
+    const byId=new Map(drafts.map(x=>[x.id,x]));
+    // Keep the original localStorage archive untouched until EVERY legacy body is durable.
+    for(const article of state.stories){
+      if(!article?.id||typeof article.body!=='string')continue;
+      const stored=byId.get(article.id);
+      if(article.body && (!stored||article.body.length>String(stored.body||'').length)){
+        await writeStoryDraft(article);
+        byId.set(article.id,article);
+      }
+    }
+    state={...state,stories:state.stories.map(article=>{
+      const stored=byId.get(article.id);
+      return stored&&(!article.body||stored.body.length>article.body.length)
+        ?{...article,body:stored.body,partial:stored.partial}:article;
+    })};
+    storyBodiesReady=true;
+    // Release localStorage space only after all bodies have been committed to IndexedDB.
+    if(!commit({...state}))console.warn('文章正文已备份，但旧存档目录压缩失败');
+  })();
+  try{await storyBodiesLoading;}catch(error){storyBodiesLoading=null;throw error;}
+}
+function storyIndexOnly(next){
+  return {...next,stories:next.stories.map(article=>({...article,body:''}))};
+}
 async function listStoryDrafts(){
   const db=await storyDraftDB();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction('drafts','readonly');
     const request=tx.objectStore('drafts').getAll();
-    request.onsuccess=()=>resolve(request.result.filter(x=>x&&typeof x.body==='string'&&!x.htmlCard));
+    request.onsuccess=()=>resolve(request.result.filter(x=>x&&typeof x.body==='string'));
     request.onerror=()=>reject(request.error);
   });
 }
@@ -1451,6 +1483,7 @@ async function recoverStoryDrafts(){
   try{
     const drafts=await listStoryDrafts();
     const candidates=drafts.filter(x=>{
+      if(x.htmlCard)return false;
       const existing=state.stories.find(y=>y.id===x.id);
       return !existing||String(x.body||'').length>String(existing.body||'').length;
     });
@@ -1461,10 +1494,8 @@ async function recoverStoryDrafts(){
     for(const draft of candidates){
       const existing=state.stories.find(x=>x.id===draft.id);
       const next={...existing,...draft,partial:true};
-      const stories=state.stories.some(x=>x.id===next.id)
-        ?state.stories.map(x=>x.id===next.id?next:x):[next,...state.stories];
-      if(commit({...state,stories})){restored++;}
-      else{toast('旧存档容量不足，无法恢复到藏书阁。请勿清除浏览器数据。');break;}
+      try{await storeStory(next);restored++;}
+      catch(error){toast('恢复失败：'+storyStorageError(error));break;}
     }
     if(restored)toast('已恢复 '+restored+' 篇文章');
   }catch(error){console.warn('读取文章恢复备份失败',storyStorageError(error));}
@@ -1482,11 +1513,12 @@ function exportStoryDraft(title,body){
   document.body.append(link);link.click();link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
-function storeStory(x){
+async function storeStory(x){
+  await initializeStoryBodies();
+  await writeStoryDraft(x);
   const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
-  if(!commit({...state,stories,storyCategories:storyCategories(x.htmlCard?[]:[storyCategoryKey(x.category)]).slice(1)}))throw Error('旧版存档写入失败：浏览器存储配额或权限异常。');
-  // Secondary durable copy; primary archive migration is intentionally deferred until verified.
-  writeStoryDraft(x).catch(error=>console.warn('文章 IndexedDB 备份失败',storyStorageError(error)));
+  if(!commit({...state,stories,storyCategories:storyCategories(x.htmlCard?[]:[storyCategoryKey(x.category)]).slice(1)}))throw Error('文章目录写入失败：浏览器存储配额或权限异常。');
+
 }
 function storyMemoryContext(people){
   return people.map(c=>{
@@ -1634,7 +1666,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
   if(!recovering)storyProgress();
   else {refreshStoryOrb();openNativeStory();}
   let live='',saved='',timer,checkpointChars=0,storageWarning='';
-  function save(raw,partial){
+  async function save(raw,partial){
     if(html&&partial)return false;
     let body=html?parseHtmlCard(raw):raw.trim(),name=article.title;
     if(firstTitle){
@@ -1645,9 +1677,9 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     if(!body)return false;
     if(partial&&body===saved)return true;
     const next={...article,...state.stories.find(x=>x.id===article.id),title:name,body,partial};
-    storeStory(next);article=next;saved=body;return true;
+    await storeStory(next);article=next;saved=body;return true;
   }
-  const checkpoint=()=>{if(!live||html)return;const draft={...article,body:live,partial:true};writeStoryDraft(draft).catch(error=>{storageWarning=storyStorageError(error);});try{save(live,true);}catch(error){storageWarning=error.message||'旧版存档写入失败';}};
+  const checkpoint=()=>{if(!live||html)return;const draft={...article,body:live,partial:true};writeStoryDraft(draft).catch(error=>{storageWarning=storyStorageError(error);});};
   const visibility=()=>{if(document.hidden)checkpoint();};
   window.addEventListener('pagehide',checkpoint);
   document.addEventListener('visibilitychange',visibility);
@@ -1672,7 +1704,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
     const text=html?htmlCardResponse(response):dialogueReply(response,storyResponseText);
     let finalSaved=false;
-    try{finalSaved=save(text,!html&&partial);}catch(error){storageWarning=error.message||'存档写入失败';}
+    try{finalSaved=await save(text,!html&&partial);}catch(error){storageWarning=error.message||'存档写入失败';}
     if(!finalSaved&&text){
       article={...article,body:text,partial:!html&&partial};
       try{await writeStoryDraft(article);storageWarning='文章已存入 IndexedDB 临时备份，但未进入藏书阁';}catch(error){storageWarning=storyStorageError(error);}
@@ -1770,7 +1802,7 @@ async function storyAction(d){
     case 'moonBuild':
       if(x?.htmlCard&&x.componentReady===false){
         const card={...x,body:parseHtmlCard(x.body),componentReady:true};
-        storeStory(card);moonCard(card);
+        await storeStory(card);moonCard(card);
       }
       break;
     case 'moonDelete':
@@ -1836,7 +1868,7 @@ async function submitStoryForm(form,submitter){
       if(!x?.htmlCard)return;
       const title=value('title');
       if(!title||title.length>120)throw Error('请填写 1–120 字的卡片名称。');
-      storeStory({...x,title});
+      await storeStory({...x,title});
       const heading=$('dialog').querySelector('.moon-card-title');
       heading.textContent=title;
       heading.setAttribute('aria-label','编辑卡片名称：'+title);
@@ -1873,7 +1905,7 @@ async function submitStoryForm(form,submitter){
     }
     case 'storyMoonReceive':{
       const card={id:crypto.randomUUID(),title:value('title')||'未命名 HTML 卡片',body:parseHtmlCard(value('source')),category:'',cast:[],parent:'',htmlCard:true,componentReady:false};
-      storeStory(card);moonCard(card);break;
+      await storeStory(card);moonCard(card);break;
     }
     case 'storyMoonGenerate':
       await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),stream:data.has('stream'),includeUser:true,readMemory:data.has('readMemory'),html:true});
@@ -1894,11 +1926,11 @@ async function submitStoryForm(form,submitter){
       const styleNames=data.getAll('style');
       const updated={...x,title,body,cast:cast.flatMap(choice=>choice.id?[choice.id]:[]),
         castNames:cast.map(choice=>choice.name),styleNames:styleNames.length||x.styleNames?styleNames:undefined};
-      storeStory(updated);storyRead(updated);toast('文章已保存 · 全文 '+storyCount(body)+' 字');
+      await storeStory(updated);storyRead(updated);toast('文章已保存 · 全文 '+storyCount(body)+' 字');
       break;
     }
     case 'storyCategory':
-      if(x){const updated={...x,category:storyCategoryKey(value('category'))};storeStory(updated);storyRead(updated);}
+      if(x){const updated={...x,category:storyCategoryKey(value('category'))};await storeStory(updated);storyRead(updated);}
       break;
     case 'storyFolderAdd':{
       const name=storyCategoryKey(value('category'));
@@ -6646,7 +6678,7 @@ function commit(next){
   if(archiveResetting)return false;
   try{
     if(next.bills!==state.bills)next=withBillReplies(next);
-    localStorage.setItem(key,JSON.stringify(next));
+    localStorage.setItem(key,JSON.stringify(storyBodiesReady?storyIndexOnly(next):next));
   }catch{toast('存档写入失败，请检查浏览器存储空间或权限。');return false;}
   state=next;
   storageError='';
