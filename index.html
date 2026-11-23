@@ -1175,6 +1175,7 @@ function bindStoryStyleChip(chip){
   chip.onkeydown=event=>{if(event.key==='Delete'){event.preventDefault();remove();}};
 }
 function storyGenerator(){
+  recoverStoryDrafts();
   if(storyJob&&!storyJob.html){storyProgress();return;}
   if(storyFailures.has(false)){storyProgress(storyFailures.get(false));return;}
   storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
@@ -1401,7 +1402,7 @@ function storyRead(x){
 }
 function storyProgress(failure){
   const {html,status,preview}=failure||storyJob;
-  const actions=failure?((failure.options?storyRetryButton(html):'')+storyButton('dismissGenerationFailure','新建生成',String(html))):'<button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button>';
+  const actions=failure?((failure.options?storyRetryButton(html):'')+(!html&&preview?storyButton('exportFailedDraft','导出当前全文 TXT'):'')+storyButton('dismissGenerationFailure','新建生成',String(html))):'<button type="button" id="stopStory" class="message-danger" data-story-action="stop">停止生成</button>';
   storyDialog(html?'月下工坊':'日隙拾光','<section class="story-generation"><div class="story-reader-bar"><p id="storyStatus" class="story-progress" role="status"></p><strong id="storyLiveCount"></strong>'+actions+'</div><div class="story-paper" id="storyLive" tabindex="0" aria-label="生成中的正文"></div></section>',html?'moon':'compose');
   $('storyStatus').textContent=status;
   if(!failure)$('stopStory').disabled=storyJob.controller.signal.aborted;
@@ -1416,9 +1417,76 @@ function updateStoryCount(body){
     if(!orbCount.hidden)orbCount.textContent='已生成 '+words+' 字';
   }
 }
+// IndexedDB emergency drafts are independent of the legacy archive transaction.
+const storyDraftDB=(()=>{
+  let opening;
+  return ()=>opening||(opening=new Promise((resolve,reject)=>{
+    if(!window.indexedDB){reject(new Error('IndexedDBUnavailable'));return;}
+    const request=indexedDB.open('sleeping-dragon-story-drafts',1);
+    request.onupgradeneeded=()=>request.result.createObjectStore('drafts',{keyPath:'id'});
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>{opening=null;reject(request.error);};
+  }));
+})();
+async function writeStoryDraft(article){
+  const db=await storyDraftDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('drafts','readwrite');
+    tx.objectStore('drafts').put({...article,updatedAt:Date.now()});
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error||new Error('IndexedDBWriteFailed'));
+    tx.onabort=()=>reject(tx.error||new Error('IndexedDBWriteAborted'));
+  });
+}
+async function listStoryDrafts(){
+  const db=await storyDraftDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('drafts','readonly');
+    const request=tx.objectStore('drafts').getAll();
+    request.onsuccess=()=>resolve(request.result.filter(x=>x&&typeof x.body==='string'&&!x.htmlCard));
+    request.onerror=()=>reject(request.error);
+  });
+}
+async function recoverStoryDrafts(){
+  try{
+    const drafts=await listStoryDrafts();
+    const candidates=drafts.filter(x=>{
+      const existing=state.stories.find(y=>y.id===x.id);
+      return !existing||String(x.body||'').length>String(existing.body||'').length;
+    });
+    if(!candidates.length)return;
+    const accepted=confirm('检测到 '+candidates.length+' 篇未完成文章的本地备份。是否恢复到余晖藏书阁？');
+    if(!accepted)return;
+    let restored=0;
+    for(const draft of candidates){
+      const existing=state.stories.find(x=>x.id===draft.id);
+      const next={...existing,...draft,partial:true};
+      const stories=state.stories.some(x=>x.id===next.id)
+        ?state.stories.map(x=>x.id===next.id?next:x):[next,...state.stories];
+      if(commit({...state,stories})){restored++;}
+      else{toast('旧存档容量不足，无法恢复到藏书阁。请勿清除浏览器数据。');break;}
+    }
+    if(restored)toast('已恢复 '+restored+' 篇文章');
+  }catch(error){console.warn('读取文章恢复备份失败',storyStorageError(error));}
+}
+function storyStorageError(error){
+  if(error?.name==='QuotaExceededError')return '浏览器存储配额不足';
+  if(error?.name==='UnknownError'||error?.name==='AbortError')return '数据库写入失败';
+  if(error?.message==='IndexedDBUnavailable')return '浏览器不支持 IndexedDB';
+  return '本地数据库保存失败（设备空间是否不足尚无法确定）';
+}
+function exportStoryDraft(title,body){
+  const blob=new Blob([title+'\\n\\n'+body],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download=(title||'未完成文章').replace(/[\\/:*?"<>|]/g,'_').slice(0,80)+'.txt';
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
 function storeStory(x){
   const stories=state.stories.some(y=>y.id===x.id)?state.stories.map(y=>y.id===x.id?x:y):[x,...state.stories];
-  if(!commit({...state,stories,storyCategories:storyCategories(x.htmlCard?[]:[storyCategoryKey(x.category)]).slice(1)}))throw Error('文章保存失败，请检查本机存储空间。');
+  if(!commit({...state,stories,storyCategories:storyCategories(x.htmlCard?[]:[storyCategoryKey(x.category)]).slice(1)}))throw Error('旧版存档写入失败：浏览器存储配额或权限异常。');
+  // Secondary durable copy; primary archive migration is intentionally deferred until verified.
+  writeStoryDraft(x).catch(error=>console.warn('文章 IndexedDB 备份失败',storyStorageError(error)));
 }
 function storyMemoryContext(people){
   return people.map(c=>{
@@ -1565,7 +1633,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
   storyOrbResult='';
   if(!recovering)storyProgress();
   else {refreshStoryOrb();openNativeStory();}
-  let live='',saved='',timer;
+  let live='',saved='',timer,checkpointChars=0,storageWarning='';
   function save(raw,partial){
     if(html&&partial)return false;
     let body=html?parseHtmlCard(raw):raw.trim(),name=article.title;
@@ -1579,7 +1647,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     const next={...article,...state.stories.find(x=>x.id===article.id),title:name,body,partial};
     storeStory(next);article=next;saved=body;return true;
   }
-  const checkpoint=()=>{try{save(live,true);}catch{/* Retry on the next update. */}};
+  const checkpoint=()=>{if(!live||html)return;const draft={...article,body:live,partial:true};writeStoryDraft(draft).catch(error=>{storageWarning=storyStorageError(error);});try{save(live,true);}catch(error){storageWarning=error.message||'旧版存档写入失败';}};
   const visibility=()=>{if(document.hidden)checkpoint();};
   window.addEventListener('pagehide',checkpoint);
   document.addEventListener('visibilitychange',visibility);
@@ -1590,7 +1658,8 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     const onDelta=delta=>{
       live+=delta;job.preview=live;
       if(!html){
-        if(!saved)checkpoint();else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;checkpoint();},1000);
+        if(Array.from(live).length-checkpointChars>=800){checkpointChars=Array.from(live).length;checkpoint();}
+        else if(timer===undefined)timer=setTimeout(()=>{timer=undefined;checkpointChars=Array.from(live).length;checkpoint();},3000);
       }
       const box=$('storyLive');if(box&&!html)box.append(document.createTextNode(delta));
       updateStoryCount(job.preview);
@@ -1602,7 +1671,17 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
     const reason=response?.choices?.[0]?.finish_reason;
     const partial=response?.streamInterrupted===true||reason==='length'||reason==='content_filter';
     const text=html?htmlCardResponse(response):dialogueReply(response,storyResponseText);
-    if(!save(text,!html&&partial)){
+    let finalSaved=false;
+    try{finalSaved=save(text,!html&&partial);}catch(error){storageWarning=error.message||'存档写入失败';}
+    if(!finalSaved&&text){
+      article={...article,body:text,partial:!html&&partial};
+      try{await writeStoryDraft(article);storageWarning='文章已存入 IndexedDB 临时备份，但未进入藏书阁';}catch(error){storageWarning=storyStorageError(error);}
+      job.preview=text;
+      const failure={html,status:'正文已生成，但保存异常：'+storageWarning+'。请立即导出全文 TXT。',preview:text,options};
+      storyFailures.set(html,failure);if($('dialog').open)storyProgress(failure);
+      return;
+    }
+    if(!finalSaved){
       const choice=response?.choices?.[0];
       if(reason==='content_filter'||choice?.message?.refusal)throw Error('模型拒绝生成正文。');
       if(reason==='length')throw Error('模型达到生成长度上限时仍未输出正文。');
@@ -1610,6 +1689,7 @@ async function runStory(article,{firstTitle,stream,html=false,model,native=false
       throw Error('未收到正文。');
     }
     if(response?.streamInterrupted===true&&!html)throw Error('生成连接提前结束。');
+    if(storageWarning)toast('保存提醒：'+storageWarning);
     if(native)localStorage.setItem(nativeStoryKey+'-last',article.id);
     job.preview=article.body;
     if($('storyLive'))$('storyLive').textContent=job.preview;
@@ -1667,6 +1747,7 @@ function storyEdit(x){
 async function storyAction(d){
   const x=state.stories.find(y=>y.id===d.storyId);
   switch(d.storyAction){
+    case 'exportFailedDraft':{const failed=storyFailures.get(false);if(failed?.preview)exportStoryDraft('日隙拾光-未完成文章',failed.preview);break;}
     case 'retryGeneration':await retryStoryGeneration(d.storyId==='true');break;
     case 'dismissGenerationFailure':
       storyFailures.delete(d.storyId==='true');
