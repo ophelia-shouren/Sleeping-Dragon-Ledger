@@ -1493,10 +1493,8 @@ async function recoverStoryDrafts(){
     for(const draft of candidates){
       const existing=state.stories.find(x=>x.id===draft.id);
       const next={...existing,...draft,partial:true};
-      const stories=state.stories.some(x=>x.id===next.id)
-        ?state.stories.map(x=>x.id===next.id?next:x):[next,...state.stories];
-      await storeStory(next);restored++;
-      else{toast('旧存档容量不足，无法恢复到藏书阁。请勿清除浏览器数据。');break;}
+      try{await storeStory(next);restored++;}
+      catch(error){toast('恢复失败：'+storyStorageError(error));break;}
     }
     if(restored)toast('已恢复 '+restored+' 篇文章');
   }catch(error){console.warn('读取文章恢复备份失败',storyStorageError(error));}
@@ -1906,7 +1904,7 @@ async function submitStoryForm(form,submitter){
     }
     case 'storyMoonReceive':{
       const card={id:crypto.randomUUID(),title:value('title')||'未命名 HTML 卡片',body:parseHtmlCard(value('source')),category:'',cast:[],parent:'',htmlCard:true,componentReady:false};
-      await await storeStory(card);moonCard(card);break;
+      await storeStory(card);moonCard(card);break;
     }
     case 'storyMoonGenerate':
       await generateStory({cast:data.getAll('cast'),title:value('title'),guide:value('guide'),stream:data.has('stream'),includeUser:true,readMemory:data.has('readMemory'),html:true});
@@ -1927,7 +1925,7 @@ async function submitStoryForm(form,submitter){
       const styleNames=data.getAll('style');
       const updated={...x,title,body,cast:cast.flatMap(choice=>choice.id?[choice.id]:[]),
         castNames:cast.map(choice=>choice.name),styleNames:styleNames.length||x.styleNames?styleNames:undefined};
-      await await storeStory(updated);storyRead(updated);toast('文章已保存 · 全文 '+storyCount(body)+' 字');
+      await storeStory(updated);storyRead(updated);toast('文章已保存 · 全文 '+storyCount(body)+' 字');
       break;
     }
     case 'storyCategory':
