@@ -1175,6 +1175,7 @@ function bindStoryStyleChip(chip){
   chip.onkeydown=event=>{if(event.key==='Delete'){event.preventDefault();remove();}};
 }
 function storyGenerator(){
+  recoverStoryDrafts();
   if(storyJob&&!storyJob.html){storyProgress();return;}
   if(storyFailures.has(false)){storyProgress(storyFailures.get(false));return;}
   storyDialog('日隙拾光','<form id="storyGenerate" class="fields story-compose">'+
@@ -1436,6 +1437,37 @@ async function writeStoryDraft(article){
     tx.onerror=()=>reject(tx.error||new Error('IndexedDBWriteFailed'));
     tx.onabort=()=>reject(tx.error||new Error('IndexedDBWriteAborted'));
   });
+}
+async function listStoryDrafts(){
+  const db=await storyDraftDB();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction('drafts','readonly');
+    const request=tx.objectStore('drafts').getAll();
+    request.onsuccess=()=>resolve(request.result.filter(x=>x&&typeof x.body==='string'&&!x.htmlCard));
+    request.onerror=()=>reject(request.error);
+  });
+}
+async function recoverStoryDrafts(){
+  try{
+    const drafts=await listStoryDrafts();
+    const candidates=drafts.filter(x=>{
+      const existing=state.stories.find(y=>y.id===x.id);
+      return !existing||String(x.body||'').length>String(existing.body||'').length;
+    });
+    if(!candidates.length)return;
+    const accepted=confirm('检测到 '+candidates.length+' 篇未完成文章的本地备份。是否恢复到余晖藏书阁？');
+    if(!accepted)return;
+    let restored=0;
+    for(const draft of candidates){
+      const existing=state.stories.find(x=>x.id===draft.id);
+      const next={...existing,...draft,partial:true};
+      const stories=state.stories.some(x=>x.id===next.id)
+        ?state.stories.map(x=>x.id===next.id?next:x):[next,...state.stories];
+      if(commit({...state,stories})){restored++;}
+      else{toast('旧存档容量不足，无法恢复到藏书阁。请勿清除浏览器数据。');break;}
+    }
+    if(restored)toast('已恢复 '+restored+' 篇文章');
+  }catch(error){console.warn('读取文章恢复备份失败',storyStorageError(error));}
 }
 function storyStorageError(error){
   if(error?.name==='QuotaExceededError')return '浏览器存储配额不足';
