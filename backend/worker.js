@@ -50,11 +50,13 @@ async function readModelReply(response) {
       throw error;
     });
     if (data?.error) throw fail('API 返回了错误对象。请在服务商后台查看该请求的详情。',502);
-    return responseText(data?.choices?.[0]?.message?.content);
+    const choice = data?.choices?.[0];
+    return {text:responseText(choice?.message?.content),finishReason:choice?.finish_reason};
   }
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   let pending = '';
   let reply = '';
+  let finishReason;
   let bytes = 0;
   function consume(line) {
     if (!line.startsWith('data:')) return false;
@@ -64,7 +66,9 @@ async function readModelReply(response) {
     let event;
     try {event = JSON.parse(payload);} catch {throw fail('API 返回了无法解析的流式数据。',502);}
     if (event?.error) throw fail('API 在生成过程中返回错误。请在服务商后台查看该请求。',502);
-    reply += responseText(event?.choices?.[0]?.delta?.content);
+    const choice = event?.choices?.[0];
+    reply += responseText(choice?.delta?.content);
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
     return reply.length >= 4000;
   }
   try {
@@ -77,7 +81,7 @@ async function readModelReply(response) {
       pending = lines.pop();
       if (lines.some(consume)) break;
     }
-    return reply;
+    return {text:reply,finishReason};
   } finally {
     void reader.cancel().catch(() => {});
   }
@@ -118,7 +122,12 @@ async function requestModel(env, char, messages, maxTokens = 800, timeout = 5500
       }
     }
     if (!response.ok) throw upstreamError(response.status);
-    const reply = (await readModelReply(response)).trim().slice(0,4000);
+    const {text,finishReason} = await readModelReply(response);
+    const limitNotice = /[（(]系统提示[：:]\s*本条回复写到了你在客户端设置的[\s\S]*?max_tokens\s*=\s*\d+[\s\S]*?被截断[\s\S]*$/u;
+    const reply = text.replace(limitNotice,'').trim().slice(0,4000);
+    if (!reply && (finishReason === 'length' || limitNotice.test(text))) {
+      throw fail('模型达到输出上限，未生成可发送的角色回复。请重试，或为该角色选择推理耗时较短的模型。',502);
+    }
     if (!reply) throw fail('API 已收到请求，但模型没有返回可显示的文字。请检查所选模型是否支持聊天。',502);
     return reply;
   } catch (error) {
@@ -389,7 +398,7 @@ async function generateReply(env,room,char,summarize,ledger,messageId=null,autom
       ...history.map(m=>({role:m.char_id===char.id?'assistant':'user',content:m.char_id===char.id?stripCharacterPrefix(m.body,m.name).slice(0,1600):m.name+'：'+(m.char_id?stripCharacterPrefix(m.body,m.name):m.body).slice(0,1600)}))
     ];
     if(automatic)messages.push({role:'user',content:'请以角色身份主动在群聊发一条消息。'});
-    let raw=await requestModel(env,char,messages);
+    const raw=await requestModel(env,char,messages,4096);
     if(packetRequest){
       let action;
       try{action=JSON.parse(raw.replace(/^`{3}(?:json)?\s*|\s*`{3}$/gi,'')).redPacket;}catch{}
