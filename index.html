@@ -250,7 +250,7 @@ header{align-items:center}.header-actions{display:flex;align-items:center;justif
 .chat-mode-bar button,.chat-attachments button,.chat-emojis button{padding:5px 9px}
 .chat-emojis[hidden]{display:none}
 .chat-file{position:relative;display:inline-flex;align-items:center;padding:5px 9px;border:1px solid var(--line);border-radius:6px;background:var(--control);cursor:pointer;overflow:hidden}
-.chat-file:focus-within{outline:2px solid var(--gold)}.chat-file input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;margin:0}
+.chat-file:focus-visible{outline:2px solid var(--gold)}
 .message-image,.chat-image-preview img{display:block;max-width:min(280px,100%);max-height:240px;object-fit:contain;border-radius:8px;margin-top:4px}
 .chat-image-preview img{max-height:76px}.stream-reply{white-space:pre-wrap;overflow-wrap:anywhere}
 .mode-toggle{position:relative;display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer}
@@ -863,7 +863,7 @@ html #dialog.reader-polished:not(.reader-immersive) .story-header{background:var
 }
 </style><link rel="stylesheet" href="./mist-theme.css"><link rel="stylesheet" href="./dawn-frost.css?v=chat-colors"><link rel="stylesheet" href="./obsidian-duet.css?v=5"><link rel="stylesheet" href="./rose-graphite.css?v=4"><link rel="stylesheet" href="./baker-street.css?v=3"></head>
 <body><aside><div class="brand"><button type="button" id="siteMenuToggle" data-action="siteMenu" aria-label="主菜单" aria-controls="siteMenu" aria-expanded="false"><span aria-hidden="true">♜</span></button><div>眠龙勿扰<small>LET SLEEPING DRAGONS LIE</small></div></div><div id="siteMenu" hidden><div class="navtitle">私人金库</div><nav><button data-page="home">◈　金库总览</button><button data-page="ledger">▤　收支明细</button><button data-page="report">◷　周期结算</button></nav><div class="navtitle">魔法通信</div><nav><button data-page="chat">✧　魔法通信</button><button data-page="cards">♧　人设与世界书</button><button data-page="api">⚙　API 连接</button><button data-page="backup">⬡　存档管理</button></nav><footer><i></i> 本机存档 <small id="ledgerLocale">HOGWARTS · PRIVATE LEDGER</small></footer><header class="site-menu-info"><span><span id="ledgerLocation">霍格沃茨</span> <b> / </b> 私人账本</span><div class="header-actions"><span id="date"></span><button type="button" data-action="support">询问客服</button></div></header></div><nav class="desktop-menu-rail" aria-label="主导航快捷入口"><button type="button" data-page="home" aria-label="金库总览" title="金库总览"><span aria-hidden="true">◈</span></button><button type="button" data-page="ledger" aria-label="收支明细" title="收支明细"><span aria-hidden="true">▤</span></button><button type="button" data-page="report" aria-label="周期结算" title="周期结算"><span aria-hidden="true">◷</span></button><button type="button" data-page="chat" aria-label="魔法通信" title="魔法通信"><span aria-hidden="true">✧</span></button><button type="button" data-page="cards" aria-label="人设与世界书" title="人设与世界书"><span aria-hidden="true">♧</span></button><button type="button" data-page="api" aria-label="API 连接" title="API 连接"><span aria-hidden="true">⚙</span></button><button type="button" data-page="backup" aria-label="存档管理" title="存档管理"><span aria-hidden="true">⬡</span></button></nav></aside>
-<time id="ledgerPageTime" hidden aria-label="当前时间"></time><main><div id="view"></div></main><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
+<time id="ledgerPageTime" hidden aria-label="当前时间"></time><main><div id="view"></div></main><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif" hidden><div id="homeOrb" class="home-orb" hidden><button type="button" class="home-orb-owl" data-action="homeOrb" aria-label="主页快捷菜单"><svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M20 3C12 3 7 8 7 15c0 2 .5 4 1.5 5.5C5.5 24 5 29 7 32c1.2 1.6 3 1.7 4.6.4 1.2 2 3 3.4 5.1 4l-.8 1.1h-3a1 1 0 0 1 0-2h.5l1-1.2L19 35v2.5a1 1 0 0 0 2 0V35l4.6-.7 1 1.2h.5a1 1 0 0 1 0 2h-3l-.8-1.1c2.1-.6 3.9-2 5.1-4 1.6 1.3 3.4 1.2 4.6-.4 2-3 1.5-8-1.5-11.5A11 11 0 0 0 33 15c0-7-5-12-13-12Zm-5.5 9.5a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4Zm11 0a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 0 0 0-3.4ZM20 16l-2 1.8 2 2.4 2-2.4Z"/></svg></button><span id="storyOrbStatus" class="story-orb-status" hidden><strong id="storyOrbLabel"></strong><small id="storyOrbCount" hidden></small></span><button type="button" id="storyOrbJump" data-action="storyOrbJump" hidden>→</button><div id="teaOrbJobs" hidden></div></div><div id="toast" role="status"></div><div id="minchoProgress" hidden><div id="minchoProgressLabel">正在下载明朝字体</div><progress id="minchoProgressBar" max="100" value="0" aria-labelledby="minchoProgressLabel"></progress><output id="minchoPercent">0%</output></div><dialog id="orbQuickDialog"></dialog><dialog id="teaTools" aria-labelledby="teaToolsTitle"></dialog><dialog id="dialog"></dialog><dialog id="modelError"></dialog><dialog id="deviceLock"></dialog><dialog id="calculator" aria-labelledby="calculatorTitle"></dialog>
 <script>
 'use strict';
 
@@ -2934,9 +2934,9 @@ async function sendKindroid(c,retry,reroll,gameTurn){
   }finally{threads.delete(c.id);if(page==='chat')render();}
 }
 async function send(retry=false,reroll=null,gameTurn=null){
-  if(!retry&&!reroll&&$('chatImage')?.dataset.loading){toast('图片正在处理，请稍候。');return;}
   const c=contact(activeContact);
   if(!c||teaSendBlocked([c.id]))return;
+  if(!retry&&!reroll&&chatImageReads.has(imageKey(c.id,localConfig(c).mode))){toast('图片正在处理，请稍候。');return;}
   if(localConfig(c).mode!=='ai'){if(!retry)sendLocalChat(c);return;}
   if(threads.has(c.id))return;
   if(c.provider==='kindroid')return sendKindroid(c,retry,reroll,gameTurn);
@@ -4155,7 +4155,7 @@ function chatAttachments(c,busy,group){
   return '<div id="chatImagePreview">'+(src?renderChatImagePreview(src):'')+'</div>'+
     '<div id="composerMenu" class="composer-menu" hidden><h3>聊天工具</h3>'+
     (mode==='ai'?'<div class="chat-story-controls">'+(group?currentSceneButton(group,true)+actionWritingControl(group,true):currentSceneButton(c)+actionWritingControl(c))+'</div>':'')+
-    '<div class="composer-tools">'+(mode==='cards'?'':'<button type="button" class="composer-tool composer-icon" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" aria-label="茶叙" title="茶叙" '+(busy?'disabled':'')+'>'+tea+'</button><button type="button" class="composer-tool bonus-tea-button" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" data-tea-bonus="true">✦ 番外茶叙</button>')+'<label class="chat-file composer-tool">'+photo+'<span>图片</span><input type="file" id="chatImage" accept="image/png,image/jpeg,image/webp,image/gif"></label>'+
+    '<div class="composer-tools">'+(mode==='cards'?'':'<button type="button" class="composer-tool composer-icon" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" aria-label="茶叙" title="茶叙" '+(busy?'disabled':'')+'>'+tea+'</button><button type="button" class="composer-tool bonus-tea-button" data-tea-open="'+esc(group?.id||c.id)+'" data-tea-mode="'+(group?'group':mode)+'" data-tea-bonus="true">✦ 番外茶叙</button>')+'<button type="button" class="chat-file composer-tool" data-action="pickChatImage">'+photo+'<span>图片</span></button>'+
     '<button type="button" class="composer-tool" data-action="cardStickers">'+emoji+'<span>表情包</span></button>'+
     (mode==='ai'?'<button type="button" class="composer-tool composer-icon" data-action="chatGames" aria-label="小游戏" title="小游戏" aria-haspopup="dialog" '+(busy?'disabled':'')+'>'+dice+'</button></div></div>':mode==='cards'?
     '</div></div>':
@@ -4203,11 +4203,30 @@ function imageInMessage(m){
   const src=safePicture(m.image||'');
   return src?'<img class="message-image" loading="lazy" decoding="async" src="'+esc(src)+'" alt="聊天图片">':'';
 }
+const chatImageReads=new Map();
+let chatImagePickerTarget=null;
 async function readChatImage(input){
-  const c=contact(activeContact),file=input.files[0];if(!c||!file)return;
-  const mode=localConfig(c).mode,k=imageKey(c.id,mode);
-  const src=await encodeChatImage(file);
-  if(input.isConnected){chatImages.set(k,src);$('chatImagePreview').innerHTML=renderChatImagePreview(src);}
+  const target=chatImagePickerTarget,file=input.files[0];
+  chatImagePickerTarget=null;
+  input.value='';
+  if(!target||!file)return;
+  const {id,mode}=target,key=imageKey(id,mode);
+  chatImageReads.set(key,target);
+  try{
+    const src=await encodeChatImage(file);
+    if(chatImageReads.get(key)!==target)return;
+    const group=mode==='group';
+    if(group?!groupById(id):!contact(id))return;
+    const images=group?groupImages:chatImages;
+    images.set(group?id:key,src);
+    const form=group?$('groupChatForm'):
+      page==='chat'&&activeContact===id&&localConfig(contact(id)).mode===mode?$('chatForm'):null;
+    if(group&&(!$('dialog').open||form?.dataset.id!==id))return;
+    const preview=form?.querySelector('#chatImagePreview');
+    if(preview)preview.innerHTML=renderChatImagePreview(src);
+  }finally{
+    if(chatImageReads.get(key)===target)chatImageReads.delete(key);
+  }
 }
 async function encodeChatImage(file,maxSize=960){
   if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size>10_000_000)throw Error('请选择不超过 10 MB 的 PNG、JPG、WebP 或 GIF。');
@@ -7540,10 +7559,20 @@ document.addEventListener('click',e=>{
     case 'removeGroupAvatar':{
       const form=$('groupSettings'),input=$('groupAvatarFile');input.value='';form.avatarDraft='';$('groupAvatarPreview').innerHTML=groupAvatar({name:form.elements.name.value});break;
     }
-    case 'removeChatImage':{
+    case 'pickChatImage':case 'removeChatImage':{
       const room=b.closest('[data-group-room]'),c=contact(activeContact);
-      if(room)groupImages.delete(room.dataset.groupRoom);else if(c)chatImages.delete(imageKey(c.id,localConfig(c).mode));
-      $('chatImage').value='';$('chatImagePreview').replaceChildren();break;
+      if(!room&&!c)break;
+      const id=room?room.dataset.groupRoom:c.id,mode=room?'group':localConfig(c).mode;
+      const key=imageKey(id,mode);
+      if(d.action==='pickChatImage'){
+        chatImagePickerTarget={id,mode};
+        $('chatImage').click();
+      }else{
+        chatImageReads.delete(key);
+        if(room)groupImages.delete(id);else chatImages.delete(key);
+        b.closest('#chatImagePreview').replaceChildren();
+      }
+      break;
     }
     case 'contacts':cancelDirectCardReplies();activeContact='';go('chat');break;
     case 'olderGroupPage':case 'newerGroupPage':case 'latestGroupPage':{
@@ -7627,6 +7656,7 @@ document.addEventListener('input',e=>{
     else if(t.type==='range'||t.type==='checkbox')refreshLook(t.form);
   }
 });
+$('chatImage').addEventListener('cancel',()=>{chatImagePickerTarget=null;});
 document.addEventListener('change',async e=>{
   const t=e.target;
   if(t.matches('.bulk-check')&&t.form)syncFormSelection(t.form);
@@ -7652,17 +7682,7 @@ document.addEventListener('change',async e=>{
         if(t.isConnected&&t.files[0]===file){form.avatarDraft=avatar;$('groupAvatarPreview').innerHTML=groupAvatar({name:form.elements.name.value,avatar});}
       }finally{delete t.dataset.loading;}
     }
-    if(t.id==='chatImage'){
-      const room=t.closest('[data-group-room]'),file=t.files[0];
-      t.dataset.loading='true';
-      try{
-        if(!room)await readChatImage(t);
-        else if(file){
-          const src=await encodeChatImage(file);
-          if(t.isConnected){groupImages.set(room.dataset.groupRoom,src);$('chatImagePreview').innerHTML=renderChatImagePreview(src);}
-        }
-      }finally{delete t.dataset.loading;}
-    }
+    if(t.id==='chatImage')await readChatImage(t);
     if(t.id==='localChatImport'||t.id==='fullCardPackImport')await importLocalChat(t);
     if(t.dataset.cardSettingsImport)await importCardSettings(t);
     if(t.hasAttribute('data-world-position')&&!mysteryWorldGroup(t.dataset.worldPosition))commit({...state,worldPlacement:{...state.worldPlacement,[t.dataset.worldPosition]:t.value}});
@@ -7672,7 +7692,7 @@ document.addEventListener('change',async e=>{
       if(threads.size||memoryJobs.size||mergeJobs.size)throw Error('请等当前回复完成后再恢复存档。');
       const data=validate(JSON.parse(await t.files[0].text()));
       if(threads.size||memoryJobs.size||mergeJobs.size)throw Error('请等当前回复完成后再恢复存档。');
-      if(confirm('用此备份替换当前账目、聊天和设置？')&&commit(data)){replyErrors.clear();memoryErrors.clear();localRuns.clear();cardIdleDeadlines.clear();chatImages.clear();activeContact='';pendingShare='';render();toast('存档已恢复');}
+      if(confirm('用此备份替换当前账目、聊天和设置？')&&commit(data)){replyErrors.clear();memoryErrors.clear();localRuns.clear();cardIdleDeadlines.clear();chatImages.clear();chatImageReads.clear();chatImagePickerTarget=null;activeContact='';pendingShare='';render();toast('存档已恢复');}
       t.value='';
     }
     if(t.hasAttribute('data-persona-file')&&t.files[0]){
@@ -7733,7 +7753,7 @@ document.addEventListener('submit',e=>{
     }
     if(f.id==='groupChatForm'){
       const message=f.elements.message.value.trim();
-      if($('chatImage')?.dataset.loading)throw Error('图片正在处理，请稍候。');
+      if(chatImageReads.has(imageKey(f.dataset.id,'group')))throw Error('图片正在处理，请稍候。');
       const picture=groupImages.get(f.dataset.id);
       sendGroup(f.dataset.id,message,picture,null,false,!message&&!picture);
     }
