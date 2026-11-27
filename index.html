@@ -6965,7 +6965,7 @@ function api(){
   return heading('CONNECTION SETTINGS','API 连接','保存多个 OpenAI 兼容 API 预设，可切换中转站和模型。')+
   '<section class="panel"><div class="row"><label>已保存预设<select id="profileSelect"><option value="">新建预设</option>'+state.profiles.map(x=>'<option value="'+esc(x.id)+'" '+(x===p?'selected':'')+'>'+esc(x.name)+' · '+esc(x.model)+'</option>').join('')+'</select></label><button data-action="newProfile">＋ 新建</button></div><form id="apiForm"><div class="fields"><label>预设名称<input name="name" required value="'+esc(p?.name)+'" placeholder="常用中转站"></label><label>Base URL<input name="url" type="url" required value="'+esc(p?.url)+'" placeholder="https://example.com/v1"></label>'+apiKeyField('textApiKey','API Key',p?.key)+'<label>模型 ID<input name="model" list="models" required value="'+esc(p?.model)+'" placeholder="可手动填写"><datalist id="models"></datalist></label></div><div class="row"><button class="primary">保存预设（含 Key）</button><button type="button" data-action="models">提取模型列表</button>'+(p?'<button type="button" data-action="deleteProfile">删除预设</button>':'')+'</div><p class="notice" id="apiStatus">Key 保存在当前浏览器。中转站需允许此网站通过浏览器访问。</p></form></section>'+
   '<section class="panel"><h2>流式输出</h2><label class="mode-toggle"><input type="checkbox" id="streamReplies" '+(state.streamReplies?'checked':'')+'><span></span>使用流式接收，完整回复后显示</label></section>'+
-  '<section class="panel"><h2>图片专用 API</h2><form id="imageForm"><div class="fields"><label>图片 API Base URL<input name="url" type="url" value="'+esc(img.url)+'" placeholder="https://example.com/v1"></label>'+apiKeyField('imageApiKey','图片 API Key',img.key)+'<label>视觉识别模型 ID<input name="model" list="imageModels" value="'+esc(img.model)+'" placeholder="用于读取账单截图"></label><label>生图模型 ID（可选）<input name="generationModel" list="imageModels" value="'+esc(img.generationModel)+'" placeholder="单独保存生图模型配置"></label></div><datalist id="imageModels"></datalist><div class="row"><button class="primary">保存图片 API（含 Key）</button><button type="button" data-action="imageModels">提取图片模型列表</button></div><p class="muted" id="imageModelStatus" role="status"></p><p class="muted">账单识别使用支持图片输入的 OpenAI 兼容对话模型。纯生图模型可单独记录，但无法读取账单。</p></form></section>'+
+  '<section class="panel"><h2>图片专用 API</h2><form id="imageForm"><div class="fields"><label>调取 API 预设<select id="imagePresetSelect" '+(state.profiles.length?'':'disabled')+'><option value="">'+(state.profiles.length?'选择已保存的预设':'暂无已保存的预设')+'</option>'+state.profiles.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+' · '+esc(x.model)+'</option>').join('')+'</select></label><label>图片 API Base URL<input name="url" type="url" value="'+esc(img.url)+'" placeholder="https://example.com/v1"></label>'+apiKeyField('imageApiKey','图片 API Key',img.key)+'<label>视觉识别模型 ID<input name="model" list="imageModels" value="'+esc(img.model)+'" placeholder="用于读取账单截图"></label><label>生图模型 ID（可选）<input name="generationModel" list="imageModels" value="'+esc(img.generationModel)+'" placeholder="单独保存生图模型配置"></label></div><datalist id="imageModels"></datalist><div class="row"><button class="primary">保存图片 API（含 Key）</button><button type="button" data-action="imageModels">提取图片模型列表</button></div><p class="muted" id="imageModelStatus" role="status"></p><p class="muted">账单识别使用支持图片输入的 OpenAI 兼容对话模型。纯生图模型可单独记录，但无法读取账单。</p></form></section>'+
   translationModelCard()+
   '<section class="panel"><h2>皮肤</h2><div class="skin-grid">'+Object.entries(skins).filter(([id])=>skinAvailable(id,state)).map(([id,label])=>'<button type="button" class="'+(id===state.skin?'active':'')+'" data-skin="'+id+'" aria-pressed="'+(id===state.skin)+'"><span class="swatch '+id+'"></span>'+label+'</button>').join('')+'</div></section>'+
   '<section class="panel"><h2>字体</h2><div class="font-choice-row">'+Object.entries(fontOptions).map(([id,label])=>{
@@ -7340,6 +7340,7 @@ async function loadModels(button,image=false){
     const ids=await fetchModelIds({url,key});
     if(!ids.length)throw Error('接口未返回可选模型，可以手动填写模型 ID。');
     if(!form.isConnected)return;
+    if(image&&(form.elements.url.value.trim()!==url||form.elements.key.value.trim()!==key))return;
     const options=ids.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
     $(image?'imageModels':'models').innerHTML=options;
     status.textContent='已提取 '+ids.length+' 个模型。选好后保存。';
@@ -7711,6 +7712,17 @@ document.addEventListener('change',async e=>{
     if(t.hasAttribute('data-world-position')&&!mysteryWorldGroup(t.dataset.worldPosition))commit({...state,worldPlacement:{...state.worldPlacement,[t.dataset.worldPosition]:t.value}});
     if(t.id==='anchor'&&validDate(t.value)){anchor=t.value;render();}
     if(t.id==='profileSelect'&&commit({...state,profile:t.value}))render();
+    if(t.id==='imagePresetSelect'&&t.value){
+      const preset=state.profiles.find(x=>x.id===t.value),form=t.form;
+      t.value='';
+      if(preset){
+        form.elements.url.value=preset.url;
+        form.elements.key.value=preset.key;
+        form.elements.model.value=preset.model;
+        $('imageModels').replaceChildren();
+        $('imageModelStatus').textContent='已填入「'+preset.name+'」。确认模型支持图片输入后，点「保存图片 API」。';
+      }
+    }
     if(t.id==='archiveImport'&&t.files[0]){
       if(threads.size||memoryJobs.size||mergeJobs.size)throw Error('请等当前回复完成后再恢复存档。');
       const data=validate(JSON.parse(await t.files[0].text()));
